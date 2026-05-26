@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>Latest</LangVersion>
+    <OutputType>Exe</OutputType>
+    <AssemblyVersion>0.0.28</AssemblyVersion>
+    <AssemblyName>TiaMcpServer</AssemblyName>
+    <BaseOutputPath>.\bin-v20</BaseOutputPath>
+    <BaseIntermediateOutputPath>.\obj-v20\</BaseIntermediateOutputPath>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <DefineConstants>$(DefineConstants);TIA_V20</DefineConstants>
+    <TiaPortalLocation>D:\app\TIA20\Portal V20</TiaPortalLocation>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0-preview.4.25258.110" />
+    <PackageReference Include="ModelContextProtocol" Version="0.3.0-preview.4" />
+    <PackageReference Include="Siemens.Collaboration.Net.OperatingSystem.Windows" Version="3.0.1725521661" />
+    <PackageReference Include="Siemens.Collaboration.Net.TiaPortal.Openness.Resolver" Version="1.1.1725480302" />
+    <PackageReference Include="Siemens.Collaboration.Net.TiaPortal.Packages.Openness" Version="20.0.1744190253" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Management">
+      <HintPath>C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8\System.Management.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="tests\**" />
+    <None Include="tests\**" />
+  </ItemGroup>
+</Project>

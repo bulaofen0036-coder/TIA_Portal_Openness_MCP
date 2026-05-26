@@ -1,7 +1,7 @@
 {
   "kind": "fc",
   "tool": "PlcBuildAndImport",
-  "description": "Generic math, compare, ABS, LIMIT and quality flag example.",
+  "description": "通用数学、比较、限幅和质量位示例。",
   "json": {
     "blockName": "FC_MathCompareDemo",
     "blockNumber": 150,
@@ -20,10 +20,10 @@
     ],
     "structuredText": {
       "operations": [
-        { "op": "line", "items": [ { "sym": "ErrorValue" }, { "token": ":=" }, { "sym": "Setpoint" }, { "token": "-" }, { "sym": "Actual" } ] },
-        { "op": "line", "items": [ { "sym": "AbsError" }, { "token": ":=" }, { "token": "ABS" }, { "raw": "(" }, { "sym": "ErrorValue" }, { "raw": ")" } ] },
-        { "op": "line", "items": [ { "sym": "OutputValue" }, { "token": ":=" }, { "token": "LIMIT" }, { "raw": "(" }, { "token": "MN" }, { "token": ":=" }, { "sym": "OutMin" }, { "token": "," }, { "token": "IN" }, { "token": ":=" }, { "sym": "ErrorValue" }, { "token": "," }, { "token": "MX" }, { "token": ":=" }, { "sym": "OutMax" }, { "raw": ")" } ] },
-        { "op": "line", "items": [ { "sym": "InTolerance" }, { "token": ":=" }, { "sym": "AbsError" }, { "token": "<=" }, { "sym": "Deadband" } ] }
+        { "op": "assignment", "target": "ErrorValue", "source": "Setpoint - Actual" },
+        { "op": "assignment", "target": "AbsError", "source": "ABS(ErrorValue)" },
+        { "op": "assignment", "target": "OutputValue", "source": "LIMIT(MN := OutMin, IN := ErrorValue, MX := OutMax)" },
+        { "op": "assignment", "target": "InTolerance", "source": "AbsError <= Deadband" }
       ]
     }
   }

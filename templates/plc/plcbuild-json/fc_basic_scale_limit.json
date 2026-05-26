@@ -1,7 +1,7 @@
 {
   "kind": "fc",
   "tool": "PlcBuildAndImport",
-  "description": "Generic linear scaling and LIMIT example.",
+  "description": "通用线性缩放与限幅块。",
   "json": {
     "blockName": "FC_BasicScaleLimit",
     "blockNumber": 120,
@@ -18,67 +18,9 @@
     ],
     "structuredText": {
       "operations": [
-        { "op": "token", "text": "IF" },
-        { "op": "blank" },
-        { "op": "symbol", "name": "RawMax" },
-        { "op": "blank" },
-        { "op": "token", "text": "<>" },
-        { "op": "blank" },
-        { "op": "symbol", "name": "RawMin" },
-        { "op": "blank" },
-        { "op": "token", "text": "THEN" },
-        { "op": "newline" },
-        {
-          "op": "line",
-          "indent": 1,
-          "items": [
-            { "sym": "EngValue" },
-            { "token": ":=" },
-            { "sym": "EngMin" },
-            { "token": "+" },
-            { "raw": "(" },
-            { "raw": "(" },
-            { "sym": "RawValue" },
-            { "token": "-" },
-            { "sym": "RawMin" },
-            { "raw": ")" },
-            { "token": "*" },
-            { "raw": "(" },
-            { "sym": "EngMax" },
-            { "token": "-" },
-            { "sym": "EngMin" },
-            { "raw": ")" },
-            { "token": "/" },
-            { "raw": "(" },
-            { "sym": "RawMax" },
-            { "token": "-" },
-            { "sym": "RawMin" },
-            { "raw": ")" },
-            { "raw": ")" }
-          ]
-        },
-        {
-          "op": "line",
-          "indent": 1,
-          "items": [
-            { "sym": "EngValue" },
-            { "token": ":=" },
-            { "token": "LIMIT" },
-            { "raw": "(" },
-            { "token": "MN" },
-            { "token": ":=" },
-            { "sym": "EngMin" },
-            { "token": "," },
-            { "token": "IN" },
-            { "token": ":=" },
-            { "sym": "EngValue" },
-            { "token": "," },
-            { "token": "MX" },
-            { "token": ":=" },
-            { "sym": "EngMax" },
-            { "raw": ")" }
-          ]
-        },
+        { "op": "if", "condition": "RawMax <> RawMin" },
+        { "op": "line", "text": "EngValue := EngMin + ((RawValue - RawMin) * (EngMax - EngMin) / (RawMax - RawMin));", "indent": 1 },
+        { "op": "line", "text": "EngValue := LIMIT(MN := EngMin, IN := EngValue, MX := EngMax);", "indent": 1 },
         { "op": "assignment", "target": "Valid", "literalValue": "TRUE", "indent": 1 },
         { "op": "else" },
         { "op": "assignment", "target": "EngValue", "source": "EngMin", "indent": 1 },
@@ -88,3 +30,4 @@
     }
   }
 }
+

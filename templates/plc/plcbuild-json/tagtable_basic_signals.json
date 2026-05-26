@@ -1,7 +1,7 @@
 {
   "kind": "tagtable",
   "tool": "PlcBuildAndImport",
-  "description": "Generic basic signal tag table. Addresses are placeholders.",
+  "description": "通用基础信号变量表骨架，地址仅为示例，真实项目应按硬件重新分配。",
   "json": {
     "tableName": "Basic_Signals",
     "tags": [

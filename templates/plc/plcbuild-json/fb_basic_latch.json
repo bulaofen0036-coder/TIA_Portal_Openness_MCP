@@ -1,7 +1,7 @@
 {
   "kind": "fb",
   "tool": "PlcBuildAndImport",
-  "description": "Generic enable, disable, fault latch and reset example.",
+  "description": "通用启用/停止/故障/复位保持块，只表达基础布尔逻辑。",
   "json": {
     "blockName": "FB_BasicLatch",
     "blockNumber": 110,
@@ -27,29 +27,9 @@
         { "op": "elsif", "condition": "Reset" },
         { "op": "assignment", "target": "FaultLatch", "literalValue": "FALSE", "indent": 1 },
         { "op": "endif" },
-        { "op": "token", "text": "IF" },
-        { "op": "blank" },
-        { "op": "symbol", "name": "Disable" },
-        { "op": "blank" },
-        { "op": "token", "text": "OR" },
-        { "op": "blank" },
-        { "op": "symbol", "name": "FaultLatch" },
-        { "op": "blank" },
-        { "op": "token", "text": "THEN" },
-        { "op": "newline" },
+        { "op": "if", "condition": "Disable OR FaultLatch" },
         { "op": "assignment", "target": "ActiveLatch", "literalValue": "FALSE", "indent": 1 },
-        { "op": "token", "text": "ELSIF" },
-        { "op": "blank" },
-        { "op": "symbol", "name": "Enable" },
-        { "op": "blank" },
-        { "op": "token", "text": "AND" },
-        { "op": "blank" },
-        { "op": "token", "text": "NOT" },
-        { "op": "blank" },
-        { "op": "symbol", "name": "FaultLatch" },
-        { "op": "blank" },
-        { "op": "token", "text": "THEN" },
-        { "op": "newline" },
+        { "op": "elsif", "condition": "Enable AND NOT FaultLatch" },
         { "op": "assignment", "target": "ActiveLatch", "literalValue": "TRUE", "indent": 1 },
         { "op": "endif" },
         { "op": "assignment", "target": "Active", "source": "ActiveLatch" },
@@ -58,3 +38,4 @@
     }
   }
 }
+

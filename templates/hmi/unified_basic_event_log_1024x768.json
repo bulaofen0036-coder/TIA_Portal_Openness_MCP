@@ -1,352 +1,52 @@
 {
   "screen": {
-    "width": 1024,
-    "height": 768,
     "BackColor": "0xFFF4F7FB"
   },
   "items": [
-    {
-      "type": "Rectangle",
-      "name": "Header",
-      "left": 0,
-      "top": 0,
-      "width": 1024,
-      "height": 64,
-      "properties": {
-        "BackColor": "0xFF172033",
-        "BorderColor": "0xFF172033",
-        "BorderWidth": 1
-      }
-    },
-    {
-      "type": "Text",
-      "name": "Title",
-      "left": 24,
-      "top": 14,
-      "width": 420,
-      "height": 32,
-      "text": "Basic Events",
-      "properties": {
-        "ForeColor": "0xFFFFFFFF"
-      },
-      "font": {
-        "Size": 23
-      }
-    },
-    {
-      "type": "Text",
-      "name": "HeaderNote",
-      "left": 704,
-      "top": 22,
-      "width": 290,
-      "height": 20,
-      "text": "Event / Warning / Notice",
-      "properties": {
-        "ForeColor": "0xFFBFD1E5"
-      },
-      "font": {
-        "Size": 12
-      }
-    },
-    {
-      "type": "Rectangle",
-      "name": "HeaderAccent",
-      "left": 0,
-      "top": 60,
-      "width": 1024,
-      "height": 4,
-      "properties": {
-        "BackColor": "0xFF3B82F6",
-        "BorderColor": "0xFF3B82F6",
-        "BorderWidth": 1
-      }
-    },
-    {
-      "type": "Rectangle",
-      "name": "Panel_Summary",
-      "left": 24,
-      "top": 92,
-      "width": 300,
-      "height": 224,
-      "properties": {
-        "BackColor": "0xFFFFFFFF",
-        "BorderColor": "0xFFD4DDE8",
-        "BorderWidth": 1
-      }
-    },
-    {
-      "type": "Text",
-      "name": "SummaryTitle",
-      "left": 48,
-      "top": 116,
-      "width": 180,
-      "height": 26,
-      "text": "Summary",
-      "properties": {
-        "ForeColor": "0xFF172033"
-      },
-      "font": {
-        "Size": 17
-      }
-    },
-    {
-      "type": "Rectangle",
-      "name": "Status_Normal",
-      "left": 48,
-      "top": 160,
-      "width": 252,
-      "height": 42,
-      "properties": {
-        "BackColor": "0xFFECFDF5",
-        "BorderColor": "0xFF86EFAC",
-        "BorderWidth": 1
-      }
-    },
-    {
-      "type": "Text",
-      "name": "StatusNormalText",
-      "left": 64,
-      "top": 172,
-      "width": 220,
-      "height": 18,
-      "text": "Status input: normal",
-      "properties": {
-        "ForeColor": "0xFF166534"
-      },
-      "font": {
-        "Size": 12
-      }
-    },
-    {
-      "type": "Rectangle",
-      "name": "Status_Warning",
-      "left": 48,
-      "top": 218,
-      "width": 252,
-      "height": 42,
-      "properties": {
-        "BackColor": "0xFFFFFBEB",
-        "BorderColor": "0xFFF59E0B",
-        "BorderWidth": 1
-      }
-    },
-    {
-      "type": "Text",
-      "name": "StatusWarningText",
-      "left": 64,
-      "top": 230,
-      "width": 220,
-      "height": 18,
-      "text": "Status input: warning",
-      "properties": {
-        "ForeColor": "0xFF92400E"
-      },
-      "font": {
-        "Size": 12
-      }
-    },
-    {
-      "type": "Button",
-      "name": "Btn_Reset",
-      "left": 48,
-      "top": 276,
-      "width": 252,
-      "height": 38,
-      "text": "RESET",
-      "properties": {
-        "BackColor": "0xFF2563EB",
-        "ForeColor": "0xFFFFFFFF",
-        "BorderColor": "0xFF1D4ED8",
-        "BorderWidth": 1
-      },
-      "font": {
-        "Size": 14
-      }
-    },
-    {
-      "type": "Rectangle",
-      "name": "Panel_Flow",
-      "left": 348,
-      "top": 92,
-      "width": 652,
-      "height": 224,
-      "properties": {
-        "BackColor": "0xFFFFFFFF",
-        "BorderColor": "0xFFD4DDE8",
-        "BorderWidth": 1
-      }
-    },
-    {
-      "type": "Text",
-      "name": "FlowTitle",
-      "left": 372,
-      "top": 116,
-      "width": 220,
-      "height": 26,
-      "text": "Basic State Chain",
-      "properties": {
-        "ForeColor": "0xFF172033"
-      },
-      "font": {
-        "Size": 17
-      }
-    },
-    {
-      "type": "Rectangle",
-      "name": "Step_Input",
-      "left": 384,
-      "top": 174,
-      "width": 120,
-      "height": 46,
-      "properties": {
-        "BackColor": "0xFFECFDF5",
-        "BorderColor": "0xFF86EFAC",
-        "BorderWidth": 1
-      }
-    },
-    {
-      "type": "Text",
-      "name": "StepInputText",
-      "left": 416,
-      "top": 188,
-      "width": 70,
-      "height": 18,
-      "text": "Input",
-      "properties": {
-        "ForeColor": "0xFF166534"
-      },
-      "font": {
-        "Size": 12
-      }
-    },
-    {
-      "type": "Rectangle",
-      "name": "Step_Check",
-      "left": 558,
-      "top": 174,
-      "width": 120,
-      "height": 46,
-      "properties": {
-        "BackColor": "0xFFE0F2FE",
-        "BorderColor": "0xFF38BDF8",
-        "BorderWidth": 1
-      }
-    },
-    {
-      "type": "Text",
-      "name": "StepCheckText",
-      "left": 590,
-      "top": 188,
-      "width": 70,
-      "height": 18,
-      "text": "Check",
-      "properties": {
-        "ForeColor": "0xFF075985"
-      },
-      "font": {
-        "Size": 12
-      }
-    },
-    {
-      "type": "Rectangle",
-      "name": "Step_Result",
-      "left": 732,
-      "top": 174,
-      "width": 120,
-      "height": 46,
-      "properties": {
-        "BackColor": "0xFFF8FAFC",
-        "BorderColor": "0xFFCBD5E1",
-        "BorderWidth": 1
-      }
-    },
-    {
-      "type": "Text",
-      "name": "StepResultText",
-      "left": 760,
-      "top": 188,
-      "width": 76,
-      "height": 18,
-      "text": "Result",
-      "properties": {
-        "ForeColor": "0xFF475569"
-      },
-      "font": {
-        "Size": 12
-      }
-    },
-    {
-      "type": "Rectangle",
-      "name": "Panel_Detail",
-      "left": 24,
-      "top": 348,
-      "width": 976,
-      "height": 284,
-      "properties": {
-        "BackColor": "0xFFFFFFFF",
-        "BorderColor": "0xFFD4DDE8",
-        "BorderWidth": 1
-      }
-    },
-    {
-      "type": "Text",
-      "name": "DetailTitle",
-      "left": 48,
-      "top": 370,
-      "width": 220,
-      "height": 26,
-      "text": "Event Rows",
-      "properties": {
-        "ForeColor": "0xFF172033"
-      },
-      "font": {
-        "Size": 17
-      }
-    },
-    {
-      "type": "Text",
-      "name": "Row1Text",
-      "left": 72,
-      "top": 472,
-      "width": 840,
-      "height": 18,
-      "text": "1    Info      Basic condition is true",
-      "properties": {
-        "ForeColor": "0xFF166534"
-      },
-      "font": {
-        "Size": 12
-      }
-    },
-    {
-      "type": "Text",
-      "name": "Row2Text",
-      "left": 72,
-      "top": 524,
-      "width": 840,
-      "height": 18,
-      "text": "2    Warn      Value is outside the normal range",
-      "properties": {
-        "ForeColor": "0xFF92400E"
-      },
-      "font": {
-        "Size": 12
-      }
-    },
-    {
-      "type": "Text",
-      "name": "Row3Text",
-      "left": 72,
-      "top": 576,
-      "width": 840,
-      "height": 18,
-      "text": "3    Note      Waiting for next command",
-      "properties": {
-        "ForeColor": "0xFF475569"
-      },
-      "font": {
-        "Size": 12
-      }
-    }
+    { "type": "Rectangle", "name": "Header", "left": 0, "top": 0, "width": 1024, "height": 64, "properties": { "BackColor": "0xFF172033" } },
+    { "type": "Text", "name": "Title", "left": 24, "top": 14, "width": 360, "height": 32, "text": "Basic Events", "properties": { "ForeColor": "0xFFFFFFFF" }, "font": { "Size": 23 } },
+    { "type": "Text", "name": "HeaderNote", "left": 724, "top": 20, "width": 270, "height": 22, "text": "Event / Warning / Notice", "properties": { "ForeColor": "0xFFBFD1E5" }, "font": { "Size": 12 } },
+    { "type": "Rectangle", "name": "HeaderAccent", "left": 0, "top": 60, "width": 1024, "height": 4, "properties": { "BackColor": "0xFF3B82F6" } },
+
+    { "type": "Rectangle", "name": "ShadowSummary", "left": 28, "top": 96, "width": 300, "height": 224, "properties": { "BackColor": "0x140F172A" } },
+    { "type": "Rectangle", "name": "Panel_Summary", "left": 24, "top": 92, "width": 300, "height": 224, "properties": { "BackColor": "0xFFFFFFFF", "BorderColor": "0xFFD4DDE8", "BorderWidth": 1 } },
+    { "type": "Text", "name": "SummaryTitle", "left": 48, "top": 114, "width": 180, "height": 26, "text": "Summary", "properties": { "ForeColor": "0xFF172033" }, "font": { "Size": 17 } },
+    { "type": "Rectangle", "name": "Status_Normal", "left": 48, "top": 160, "width": 252, "height": 42, "properties": { "BackColor": "0xFFECFDF5", "BorderColor": "0xFF86EFAC", "BorderWidth": 1 } },
+    { "type": "Text", "name": "StatusNormalText", "left": 64, "top": 172, "width": 220, "height": 18, "text": "Status input: normal", "properties": { "ForeColor": "0xFF166534" }, "font": { "Size": 12 } },
+    { "type": "Rectangle", "name": "Status_Warning", "left": 48, "top": 218, "width": 252, "height": 42, "properties": { "BackColor": "0xFFFFFBEB", "BorderColor": "0xFFF59E0B", "BorderWidth": 1 } },
+    { "type": "Text", "name": "StatusWarningText", "left": 64, "top": 230, "width": 220, "height": 18, "text": "Status input: warning", "properties": { "ForeColor": "0xFF92400E" }, "font": { "Size": 12 } },
+    { "type": "Button", "name": "Btn_Reset", "left": 48, "top": 276, "width": 252, "height": 38, "text": "RESET", "properties": { "BackColor": "0xFF2563EB", "ForeColor": "0xFFFFFFFF", "BorderColor": "0xFF1D4ED8", "BorderWidth": 1 }, "font": { "Size": 14 } },
+
+    { "type": "Rectangle", "name": "ShadowFlow", "left": 352, "top": 96, "width": 652, "height": 224, "properties": { "BackColor": "0x140F172A" } },
+    { "type": "Rectangle", "name": "Panel_Flow", "left": 348, "top": 92, "width": 652, "height": 224, "properties": { "BackColor": "0xFFFFFFFF", "BorderColor": "0xFFD4DDE8", "BorderWidth": 1 } },
+    { "type": "Text", "name": "FlowTitle", "left": 372, "top": 114, "width": 220, "height": 26, "text": "Basic State Chain", "properties": { "ForeColor": "0xFF172033" }, "font": { "Size": 17 } },
+    { "type": "Rectangle", "name": "Step_Input", "left": 384, "top": 174, "width": 120, "height": 46, "properties": { "BackColor": "0xFFECFDF5", "BorderColor": "0xFF86EFAC", "BorderWidth": 1 } },
+    { "type": "Text", "name": "StepInputText", "left": 416, "top": 188, "width": 70, "height": 18, "text": "Input", "properties": { "ForeColor": "0xFF166534" }, "font": { "Size": 12 } },
+    { "type": "Rectangle", "name": "Chain1", "left": 504, "top": 194, "width": 54, "height": 6, "properties": { "BackColor": "0xFF94A3B8" } },
+    { "type": "Rectangle", "name": "Step_Check", "left": 558, "top": 174, "width": 120, "height": 46, "properties": { "BackColor": "0xFFE0F2FE", "BorderColor": "0xFF38BDF8", "BorderWidth": 1 } },
+    { "type": "Text", "name": "StepCheckText", "left": 590, "top": 188, "width": 70, "height": 18, "text": "Check", "properties": { "ForeColor": "0xFF075985" }, "font": { "Size": 12 } },
+    { "type": "Rectangle", "name": "Chain2", "left": 678, "top": 194, "width": 54, "height": 6, "properties": { "BackColor": "0xFF94A3B8" } },
+    { "type": "Rectangle", "name": "Step_Result", "left": 732, "top": 174, "width": 120, "height": 46, "properties": { "BackColor": "0xFFF8FAFC", "BorderColor": "0xFFCBD5E1", "BorderWidth": 1 } },
+    { "type": "Text", "name": "StepResultText", "left": 760, "top": 188, "width": 76, "height": 18, "text": "Result", "properties": { "ForeColor": "0xFF475569" }, "font": { "Size": 12 } },
+    { "type": "Rectangle", "name": "Chain3", "left": 852, "top": 194, "width": 54, "height": 6, "properties": { "BackColor": "0xFF94A3B8" } },
+    { "type": "Rectangle", "name": "Step_Output", "left": 906, "top": 174, "width": 64, "height": 46, "properties": { "BackColor": "0xFFF1F5F9", "BorderColor": "0xFFCBD5E1", "BorderWidth": 1 } },
+    { "type": "Text", "name": "StepOutputText", "left": 918, "top": 188, "width": 42, "height": 18, "text": "Out", "properties": { "ForeColor": "0xFF475569" }, "font": { "Size": 12 } },
+
+    { "type": "Rectangle", "name": "ShadowDetail", "left": 28, "top": 352, "width": 976, "height": 284, "properties": { "BackColor": "0x140F172A" } },
+    { "type": "Rectangle", "name": "Panel_Detail", "left": 24, "top": 348, "width": 976, "height": 284, "properties": { "BackColor": "0xFFFFFFFF", "BorderColor": "0xFFD4DDE8", "BorderWidth": 1 } },
+    { "type": "Text", "name": "DetailTitle", "left": 48, "top": 370, "width": 220, "height": 26, "text": "Event Rows", "properties": { "ForeColor": "0xFF172033" }, "font": { "Size": 17 } },
+    { "type": "Rectangle", "name": "RowHead", "left": 48, "top": 416, "width": 928, "height": 34, "properties": { "BackColor": "0xFFF1F5F9", "BorderColor": "0xFFE2E8F0", "BorderWidth": 1 } },
+    { "type": "Text", "name": "HeadIndex", "left": 72, "top": 424, "width": 120, "height": 18, "text": "Index", "properties": { "ForeColor": "0xFF475569" }, "font": { "Size": 11 } },
+    { "type": "Text", "name": "HeadLevel", "left": 220, "top": 424, "width": 120, "height": 18, "text": "Level", "properties": { "ForeColor": "0xFF475569" }, "font": { "Size": 11 } },
+    { "type": "Text", "name": "HeadMessage", "left": 360, "top": 424, "width": 520, "height": 18, "text": "Message", "properties": { "ForeColor": "0xFF475569" }, "font": { "Size": 11 } },
+    { "type": "Rectangle", "name": "Row1", "left": 48, "top": 460, "width": 928, "height": 42, "properties": { "BackColor": "0xFFECFDF5", "BorderColor": "0xFFDCFCE7", "BorderWidth": 1 } },
+    { "type": "Text", "name": "Row1Text", "left": 72, "top": 472, "width": 840, "height": 18, "text": "1    Info      Basic condition is true", "properties": { "ForeColor": "0xFF166534" }, "font": { "Size": 12 } },
+    { "type": "Rectangle", "name": "Row2", "left": 48, "top": 512, "width": 928, "height": 42, "properties": { "BackColor": "0xFFFFFBEB", "BorderColor": "0xFFFEF3C7", "BorderWidth": 1 } },
+    { "type": "Text", "name": "Row2Text", "left": 72, "top": 524, "width": 840, "height": 18, "text": "2    Warn      Value is outside the normal range", "properties": { "ForeColor": "0xFF92400E" }, "font": { "Size": 12 } },
+    { "type": "Rectangle", "name": "Row3", "left": 48, "top": 564, "width": 928, "height": 42, "properties": { "BackColor": "0xFFF8FAFC", "BorderColor": "0xFFE2E8F0", "BorderWidth": 1 } },
+    { "type": "Text", "name": "Row3Text", "left": 72, "top": 576, "width": 840, "height": 18, "text": "3    Note      Waiting for the next generic command", "properties": { "ForeColor": "0xFF475569" }, "font": { "Size": 12 } },
+
+    { "type": "Rectangle", "name": "Footer", "left": 24, "top": 680, "width": 976, "height": 48, "properties": { "BackColor": "0xFFEFF4FA", "BorderColor": "0xFFD4DDE8", "BorderWidth": 1 } },
+    { "type": "Text", "name": "FooterText", "left": 48, "top": 694, "width": 920, "height": 18, "text": "Recent events and operator acknowledgements", "properties": { "ForeColor": "0xFF607086" }, "font": { "Size": 11 } }
   ]
 }

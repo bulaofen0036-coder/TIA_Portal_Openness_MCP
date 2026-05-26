@@ -1,7 +1,16 @@
-# TIA Portal MCP 完整交付包
+# TIA Portal MCP 完整交付包（2026-05-25 / V20+V21 + S7DCL）
 
-在 **Windows + TIA Portal V21** 下，通过 **MCP（stdio 或 HTTP）** 驱动博途：建项目、加硬件、生成 PLC（Tag/UDT/DB/SCL/LAD）、生成 **WinCC Unified** 画面与事件、编译诊断、保存。  
+在 **Windows + TIA Portal V20 或 V21** 下，通过 **MCP（stdio 或 HTTP）** 驱动博途：建项目、加硬件、生成 PLC（Tag/UDT/DB/SCL/LAD）、生成 **WinCC Unified** 画面与事件、编译诊断、保存。  
 包内含 **已编译运行时**、Skill、静态工具清单、能力矩阵、PLC/HMI 模板、**一键可读的项目蓝图**与手册。**不要求**另行克隆源码仓库。
+
+**本次更新（相对 20260512 包）**
+
+- **双版本支持（V20 + V21）**：包内含两个 exe — `bin/Release/net48/TiaMcpServer.exe`（V21 编译）与 `bin-v20/Release/net48/TiaMcpServer.exe`（V20 编译）。
+  - 二者**必须分别使用**，不能互换：V21 用 split DLL（`Siemens.Engineering.Base/Step7/...`），V20 用单体 `Siemens.Engineering.dll`，IL 层面绑定不同。
+  - 两份 exe 都接受新 CLI 参数 `--tia-portal-location <path>`，配合 `--tia-major-version <20|21>` 用于非标准安装位置。
+- **S7DCL 专用工具**：新增 4 个工具 `ExportBlockAsScl` / `ExportBlocksAsScl` / `ImportBlockFromScl` / `ImportBlocksFromScl`，是 `ExportAsDocuments` / `ImportFromDocuments` 这套的别名 + 加强描述，让 AI 模型更容易在 V20+ 项目里首选 SIMATIC SD 文本格式（`.s7dcl + .s7res`）而不是 SimaticML XML。XML 工具链未删，向后兼容。
+- **V21 端到端验证**（DemoProjects/MCP_Demo_Rich_20260523）：8 块导出 + 8 块导入回环 14.7s。
+- **V20 端到端验证**（江夏测试5T车_V20）：CompileSoftware → ExportBlocksAsScl，51 个 `.s7dcl` + 33 个 `.s7res` 全量导出成功。LAD 块以 `RUNG / I_Contact / Coil / TON{...}` 文本表达，diff 友好。
 
 **与 IDE 无关**：凡支持 MCP 的客户端（Cursor、VS Code、Claude Desktop、自研 HTTP 客户端等）均可使用同一 `TiaMcpServer.exe`。若某 IDE 中「看不到某个工具」，属于 **客户端工具描述符/缓存** 问题，不是交付包裁剪能力；见 `docs/mcp-ide-and-tool-visibility.md`。
 
@@ -12,17 +21,22 @@
 ## 上手步骤
 
 1. **环境准备**  
-   - .NET Framework **4.8**、**TIA Portal V21** 已安装；  
+   - .NET Framework **4.8**、**TIA Portal V20 或 V21** 已安装；  
    - 当前用户加入 **`Siemens TIA Openness`** 本地组，注销重登；  
-   - 用户环境变量 **`TiaPortalLocation`** 指向博途安装根，例如：  
-     `D:\app\TIA21\Portal V21` 或 `C:\Program Files\Siemens\Automation\Portal V21`；  
+   - 三选一定位博途安装根：  
+     a) 启动 exe 时传 `--tia-portal-location "D:\app\TIA20\Portal V20"`（推荐，非标准安装位置必用）；  
+     b) 用户环境变量 `TiaPortalLocation` 指向博途安装根；  
+     c) 让程序自动从注册表 `HKLM\SOFTWARE\Siemens\Automation\_InstalledSW\TIAP{20|21}\TIA_Opns\Path` 读取。  
+   - 当机器装了多个版本时显式传 `--tia-major-version 20`（或 21）以免自动选最高版；  
    - 首次连接时在 TIA 弹窗中授权 **Openness**。
 
 2. **挂载 MCP**  
    - 复制 `cursor-mcp.example.json` 片段到任意支持 MCP 的客户端（Cursor / VS Code / Claude Desktop / 自研 HTTP 客户端均可）；  
-   - 将路径中的 **`REPLACE_ME`** 替换为 **本包根目录**；可执行文件固定为：  
-     `…\tools\tiaportal-mcp\src\TiaMcpServer\bin\Release\net48\TiaMcpServer.exe`；  
-   - 若操作系统未设置 `TiaPortalLocation`，在客户端配置的 `env` 块内补同名变量。
+   - 将路径中的 **`REPLACE_ME`** 替换为 **本包根目录**；
+   - **按 TIA 版本选 exe 路径**：  
+     - V21 → `…\tools\tiaportal-mcp\src\TiaMcpServer\bin\Release\net48\TiaMcpServer.exe`  
+     - V20 → `…\tools\tiaportal-mcp\src\TiaMcpServer\bin-v20\Release\net48\TiaMcpServer.exe`  
+   - 非标准安装位置必须在客户端 `args` 里加 `--tia-portal-location "<安装根>" --tia-major-version <20|21>`，例如 `"--tia-portal-location","D:\\app\\TIA20\\Portal V20","--tia-major-version","20"`。
 
 3. **首次调用顺序**  
    - `Bootstrap` → `Connect` → `OpenProject`（或 `CreateProject`）→ `GetProjectTree`，从树中读取真实的 `PLC_xxx` / `HMI_RT_xxx` 路径再继续。

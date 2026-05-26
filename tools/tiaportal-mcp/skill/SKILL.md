@@ -1,9 +1,9 @@
-﻿---
+---
 name: tiaportal-mcp
-description: Drive Siemens TIA Portal (鍗氶€? end-to-end through the TiaMcpServer MCP plugin. Use whenever the user mentions TIA Portal, 鍗氶€? STEP 7, WinCC, S7-1200/1500, PLC, HMI, SCL, LAD, STL, Openness, or asks to create/modify/compile/download a project. Always start by calling the `Bootstrap` tool 鈥?it returns environment status and the recommended next tool.
+description: Drive Siemens TIA Portal (博途) end-to-end through the TiaMcpServer MCP plugin. Use whenever the user mentions TIA Portal, 博途, STEP 7, WinCC, S7-1200/1500, PLC, HMI, SCL, LAD, STL, Openness, or asks to create/modify/compile/download a project. Always start by calling the `Bootstrap` tool — it returns environment status and the recommended next tool.
 ---
 
-# TIA Portal MCP 鈥?Single Skill
+# TIA Portal MCP — Single Skill
 
 This is the operating skill for TIA Portal MCP automation. The
 companion plugin lives at `tools/tiaportal-mcp/`. It exposes on the order of
@@ -13,14 +13,15 @@ project, hardware, PLC, HMI, and online operations.
 ## 0. Always start here
 
 ```
-1. Call Bootstrap                        鈫?returns env, project state, next step
-2. Follow RecommendedNextTool            鈫?e.g. Connect, AttachToOpenProject
-3. Call GetProjectTree                   鈫?resolve real paths (PLC_1, HMI_RT_1)
-4. Read-before-write loop                鈫?inspect, smallest change, compile, save
+1. Call Bootstrap                        ← returns env, project state, next step
+2. Follow RecommendedNextTool            ← e.g. Connect, AttachToOpenProject
+3. Call GetProjectTree                   ← resolve real paths (PLC_1, HMI_RT_1)
+4. Read-before-write loop                ← inspect, smallest change, compile, save
 ```
 
-**浜や粯鍖呭唴鏈€鐭矾寰勶紙浠呰鍖呭唴鏂囦欢鏃讹級**  
-鏍圭洰褰?`README.md`锛堜笁姝ヤ笂鎵嬶級鈫?`scripts/Validate-Bundle.ps1`锛堣劚鏈烘牎楠岋級鈫?鐢?`cursor-mcp.example.json` 鎶?`command` 鎸囧埌鍖呭唴 `TiaMcpServer.exe` 鈫?鎵ц椤哄簭瑙?`docs/full-project-generation-runbook.md` 涓?`templates/project-blueprints/full_plc_hmi_project.json`銆?
+**交付包内最短路径（仅读包内文件时）**  
+根目录 `README.md`（三步上手）→ `scripts/Validate-Bundle.ps1`（脱机校验）→ 用 `cursor-mcp.example.json` 把 `command` 指到包内 `TiaMcpServer.exe` → 执行顺序见 `docs/full-project-generation-runbook.md` 与 `templates/project-blueprints/full_plc_hmi_project.json`。
+
 Never guess paths. Never invent SCL/LAD XML. If a tool exists for the task, use
 it; otherwise inspect with `DescribeObject`/`DescribeService` first, then call
 `InvokeObject`/`InvokeService`.
@@ -79,7 +80,7 @@ Endpoints:
 | `GET /mcp/health` | Liveness + session count + build version |
 | `DELETE /mcp` | Terminate session (best-effort) |
 
-Auth (when `--http-api-key` is set): either header works 鈥?pick whichever your
+Auth (when `--http-api-key` is set): either header works — pick whichever your
 client supports:
 
 ```
@@ -94,12 +95,13 @@ message event (for spec-compliant clients). Otherwise the response is plain JSON
 calls may include it for client-side correlation. State is **not** isolated
 across sessions because TIA Portal itself is process-wide.
 
-### 璋冪敤鏂瑰紡鎬庝箞閫夛紙閬垮厤韪╁潙锛?
-| 鍦烘櫙 | 鎺ㄨ崘 |
+### 调用方式怎么选（避免踩坑）
+
+| 场景 | 推荐 |
 |------|------|
-| **Cursor / Claude Desktop / VS Code锛圡CP stdio锛?* | `mcpServers.command` 鎸囧悜鍖呭唴 `TiaMcpServer.exe`锛宍args: []`銆傜敱瀹㈡埛绔畬鎴?MCP 鎻℃墜锛岀洿鎺ヨ皟 `tools/call`銆?|
-| **鍋ュ悍妫€鏌?/ 鏄惁宸插惎鍔?* | `GET /mcp/health`锛堜粎鎺㈡椿锛屼笉鏇夸唬 MCP 鍗忚锛?|
-| **HTTP 鑷啓鑴氭湰** | 闇€瀹炵幇 **瀹屾暣** MCP JSON-RPC 浼氳瘽锛堝 `initialize`銆侀儴鍒嗗満鏅笅 SSE / `Mcp-Session-Id`锛夛紝**涓嶈**瀵?`POST /mcp` 鍙彂鍗曟潯瑁?`tools/call` 灏辨湡鏈涜繑鍥烇紝鍚﹀垯鏄撻暱鏃堕棿闃诲銆?|
+| **Cursor / Claude Desktop / VS Code（MCP stdio）** | `mcpServers.command` 指向包内 `TiaMcpServer.exe`，`args: []`。由客户端完成 MCP 握手，直接调 `tools/call`。 |
+| **健康检查 / 是否已启动** | `GET /mcp/health`（仅探活，不替代 MCP 协议） |
+| **HTTP 自写脚本** | 需实现 **完整** MCP JSON-RPC 会话（如 `initialize`、部分场景下 SSE / `Mcp-Session-Id`），**不要**对 `POST /mcp` 只发单条裸 `tools/call` 就期望返回，否则易长时间阻塞。 |
 
 ## 3. Read-before-write workflow (the only one that matters)
 
@@ -112,23 +114,23 @@ SaveProject                          persist to disk
 ```
 
 `PlcBuildAndImport` is the preferred entry for declarative PLC objects (UDT,
-tag table, GlobalDB, FC, FB) 鈥?it generates Openness XML and imports in one
+tag table, GlobalDB, FC, FB) — it generates Openness XML and imports in one
 call. Use the lower-level `ImportBlock`/`ImportType`/`ImportPlcTagTable` only
 when you already have hand-crafted XML.
 
 ## 4. What this MCP cannot do (V21 PublicAPI limits)
 
-These have NO Openness API 鈥?do not try to invent reflection workarounds:
+These have NO Openness API — do not try to invent reflection workarounds:
 
-- Read or change CPU operating mode (RUN/STOP/STARTUP) 鈫?use OPC UA
-- Read CPU fault/diagnostic buffer 鈫?use OPC UA
+- Read or change CPU operating mode (RUN/STOP/STARTUP) → use OPC UA
+- Read CPU fault/diagnostic buffer → use OPC UA
 - ClearForces / Unforce / per-block selective download
 - Trigger Safety F-CPU compile (must be done in TIA UI manually)
 
 Force/Watch table tools edit the project-side definition; values become
 effective only after the project is online and the table trigger fires.
 
-Full list (this bundle): `鎵嬪唽/openness-limitations.md` (bundle root: same folder as `README.md`).
+Full list (this bundle): `手册/openness-limitations.md` (bundle root: same folder as `README.md`).
 
 ## 5. Encoding & PowerShell traps (script drivers only)
 
@@ -155,7 +157,7 @@ Full list (this bundle): `鎵嬪唽/openness-limitations.md` (bundle root: same 
 
 - Reading stdio responses: cache the pending `ReadLineAsync` task between
   iterations. Calling `ReadLineAsync` twice on the same stream before the
-  first one completes throws `"娴佹鍦ㄧ敱鍏朵笂鐨勫墠涓€鎿嶄綔浣跨敤"`.
+  first one completes throws `"流正在由其上的前一操作使用"`.
 
   ```powershell
   if ($null -eq $script:pending) { $script:pending = $proc.StandardOutput.ReadLineAsync() }
@@ -166,29 +168,29 @@ Full list (this bundle): `鎵嬪唽/openness-limitations.md` (bundle root: same 
 - Tool failures often surface as `result.isError = true` with
   `content[0].text = "An error occurred invoking 'X'"` rather than as a
   JSON-RPC `error`. Check both shapes; the real exception text is on stderr.
-- Don't read tool-call response text via regex 鈥?the server JSON-encodes
+- Don't read tool-call response text via regex — the server JSON-encodes
   Chinese as `\uXXXX`. Always `ConvertFrom-Json` the `text` field first, then
   read named properties (`.items[0].name`, `.tree`, ...).
 
 ## 6. Bundle-only docs + copy-paste JSON for `PlcBuildAndImport` / Unified HMI
 
-Paths below are relative to the **delivery bundle root** (the folder that contains `README.md`, `鎵嬪唽/`, and `tools/`).
+Paths below are relative to the **delivery bundle root** (the folder that contains `README.md`, `手册/`, and `tools/`).
 
 ### 6.1 Authoritative files shipped in this bundle
 
 | Need | Path |
 |---|---|
-| Setup + MCP wiring | `鎵嬪唽/quickstart.md` |
-| What Openness cannot do | `鎵嬪唽/openness-limitations.md` |
-| Error model | `鎵嬪唽/error-model.md` |
-| NL 鈫?tool sequences (16 scenarios) | `鎵嬪唽/TIA_NL_INTENT_RECIPES.md` |
+| Setup + MCP wiring | `手册/quickstart.md` |
+| What Openness cannot do | `手册/openness-limitations.md` |
+| Error model | `手册/error-model.md` |
+| NL → tool sequences (16 scenarios) | `手册/TIA_NL_INTENT_RECIPES.md` |
 | Static tool roster | `manifest/tools-list.json` |
 | Tool capability matrix | `docs/tool-capability-matrix.md` |
 | Full PLC+HMI project blueprint | `templates/project-blueprints/full_plc_hmi_project.json` |
 | Full project runbook | `docs/full-project-generation-runbook.md` |
 | Offline bundle validation (no TIA start) | `scripts/Validate-Bundle.ps1` |
 | IDE-neutral MCP + tool list authority | `docs/mcp-ide-and-tool-visibility.md` |
-| HMI鈫擯LC symbolic / absolute / red-tag troubleshooting | `docs/hmi-plc-tag-binding-and-addressing.md` |
+| HMI↔PLC symbolic / absolute / red-tag troubleshooting | `docs/hmi-plc-tag-binding-and-addressing.md` |
 | Optional `reference/` sample projects (outside bundle) | `docs/optional-reference-materials.md` |
 | PLC network & instruction expansion patterns | `docs/plc-network-patterns-expanded.md` |
 | Importable LAD XML samples | `tools/tiaportal-mcp/skill/lad-cookbook/*.xml` |
@@ -198,7 +200,7 @@ The static files are for planning and parser grounding; run `tools/list` on the
 live MCP server for the authoritative runtime roster. There is **no** bundled
 Siemens STEP7/WinCC manual tree.
 
-### 6.2 `PlcBuildAndImport` 鈥?minimal `json` shapes (always `dryRun=true` first)
+### 6.2 `PlcBuildAndImport` — minimal `json` shapes (always `dryRun=true` first)
 
 Pass `json` as a **string** (escape quotes in MCP args). Replace
 `softwarePath` / group paths with values from `GetProjectTree`.
@@ -222,7 +224,7 @@ Pass `json` as a **string** (escape quotes in MCP args). Replace
 ```
 
 **`kind=fc`** (ST body from `structuredText.operations`; `op` includes `if`,
-`elsif`, `else`, `endif`, `assignment`, `line`, 鈥?
+`elsif`, `else`, `endif`, `assignment`, `line`, …)
 
 ```json
 {
@@ -247,12 +249,12 @@ Pass `json` as a **string** (escape quotes in MCP args). Replace
 }
 ```
 
-### 6.3 Unified HMI 鈥?minimal `designJson` for `ApplyUnifiedHmiScreenDesignJson`
+### 6.3 Unified HMI — minimal `designJson` for `ApplyUnifiedHmiScreenDesignJson`
 
 Keys are **lowercase**. Colors: ARGB hex strings like `0xAARRGGBB`. Call
 `EnsureUnifiedHmiScreen` before apply. Button bit actions:
 `EnsureUnifiedHmiButtonAction` with `eventType` **`Down` / `Up` / `Tapped`**
-( **`Pressed` / `Released` are wrong** ). Full recipe + schema: **搂12** below.
+( **`Pressed` / `Released` are wrong** ). Full recipe + schema: **§12** below.
 
 ```json
 {
@@ -271,104 +273,104 @@ Keys are **lowercase**. Colors: ARGB hex strings like `0xAARRGGBB`. Call
 ### Build a minimal new project
 
 ```
-Bootstrap 鈫?Connect 鈫?CreateProject(<dir>, <name>_<timestamp>)
-鈫?AddDeviceWithFallback(CPU)
-鈫?AddHardwareCatalogDeviceWithProbe(HMI)       (optional)
-鈫?ConnectDeviceNodesToProfinetSubnet           (optional)
-鈫?PlcBuildAndImport(kind=tagtable, ...)
-鈫?PlcBuildAndImport(kind=globaldb, ...)
-鈫?PlcBuildAndImport(kind=fc|fb, ...)           (one per logic unit)
-鈫?CompileSoftware                              (must be 0/0)
-鈫?SaveProject 鈫?Disconnect
+Bootstrap → Connect → CreateProject(<dir>, <name>_<timestamp>)
+→ AddDeviceWithFallback(CPU)
+→ AddHardwareCatalogDeviceWithProbe(HMI)       (optional)
+→ ConnectDeviceNodesToProfinetSubnet           (optional)
+→ PlcBuildAndImport(kind=tagtable, ...)
+→ PlcBuildAndImport(kind=globaldb, ...)
+→ PlcBuildAndImport(kind=fc|fb, ...)           (one per logic unit)
+→ CompileSoftware                              (must be 0/0)
+→ SaveProject → Disconnect
 ```
 
 ### Deploy to a real CPU
 
 ```
-Bootstrap 鈫?AttachToOpenProject
-鈫?CompileSoftware
-鈫?CheckDownloadReadiness
-鈫?DownloadToPlc(keepActualValues=true)
-鈫?GetOnlineState 鈫?SaveProject
+Bootstrap → AttachToOpenProject
+→ CompileSoftware
+→ CheckDownloadReadiness
+→ DownloadToPlc(keepActualValues=true)
+→ GetOnlineState → SaveProject
 ```
 
 ### Watch/Force values
 
 ```
-Bootstrap 鈫?AttachToOpenProject 鈫?GoOnline
-鈫?SetForceTableEntry(address, value)           force, persistent until cleared
-鈫?SetWatchTableModifyValue(address, value)     one-shot modify
-鈫?GoOffline
+Bootstrap → AttachToOpenProject → GoOnline
+→ SetForceTableEntry(address, value)           force, persistent until cleared
+→ SetWatchTableModifyValue(address, value)     one-shot modify
+→ GoOffline
 ```
 
 For more scenarios (alarms, OPC UA, multi-language text, Unified HMI pages)
-see `鎵嬪唽/TIA_NL_INTENT_RECIPES.md` (bundle root).
+see `手册/TIA_NL_INTENT_RECIPES.md` (bundle root).
 
-## 8. Frequently used tools 鈥?exact parameter names
+## 8. Frequently used tools — exact parameter names
 
 The table below lists **exact parameter names** that commonly trip parsers. When
 in doubt, confirm with `tools/list` / `Bootstrap` on your build.
 
 | Layer | Tool | Required args (verified names) | Notes |
 |---|---|---|---|
-| L0 | `Bootstrap` | 鈥?| Read-only orientation; returns `{ready, environment, portal, recommendedNextTool, toolLayers, knownLimits}` |
-| L0 | `GetState` | 鈥?| Cheap probe; returns `{isConnected, project, session}` |
+| L0 | `Bootstrap` | — | Read-only orientation; returns `{ready, environment, portal, recommendedNextTool, toolLayers, knownLimits}` |
+| L0 | `GetState` | — | Cheap probe; returns `{isConnected, project, session}` |
 | L0 | `RunCapabilitySelfTest` | `inspectPortalProcesses=false`, `includeProjectTree=false` | ~15 ms when light; sets pass/fail per capability |
-| L1 | `Connect` | 鈥?| Attaches to a running TIA process; first call may pop Openness auth dialog in TIA UI |
+| L1 | `Connect` | — | Attaches to a running TIA process; first call may pop Openness auth dialog in TIA UI |
 | L1 | `AttachToOpenProject` | `projectName` (must match the leaf shown in TIA window title) | Cleanest path when a project is already open. Avoids `CreateProject` pollution |
-| L1 | `GetProject` | 鈥?| Lists open projects + multi-user sessions |
-| L1 | `GetProjectTree` | 鈥?| Returns ASCII tree string 鈥?parse with `Devices`/`PLC Software` markers |
-| L1 | `GetDevices` | 鈥?| Returns `items[].name` (e.g. `PLC_1`) and `description` |
+| L1 | `GetProject` | — | Lists open projects + multi-user sessions |
+| L1 | `GetProjectTree` | — | Returns ASCII tree string — parse with `Devices`/`PLC Software` markers |
+| L1 | `GetDevices` | — | Returns `items[].name` (e.g. `PLC_1`) and `description` |
 | L1 | `SearchHardwareCatalog` | `keyword` (e.g. `"1211C"`) | ~500 ms; needs Connect; returns `count` + `items[]` |
 | L1 | `GetSoftwareInfo` | `softwarePath` (e.g. `"PLC_1"`) | Returns class name (e.g. `Siemens.Engineering.SW.PlcSoftware`) |
 | L1 | `GetSoftwareTree` | `softwarePath` | Returns ASCII tree with `Program blocks`, `PLC tags`, etc. |
 | L1 | `GetBlocks` | `softwarePath` | Returns `items[]` with `typeName`/`name`/`programmingLanguage` (LAD/SCL/STL) |
 | L1 | `PlcBuildAndImport` | `softwarePath`, `kind=tagtable`, `json={tableName,tags:[{name,dataTypeName,logicalAddress}]}`, `dryRun=true` | dryRun writes XML to `%TEMP%\tia_mcp_plc_build_import_*` without touching project |
 | L1 | `PlcBuildAndImport` | `softwarePath`, `kind=globaldb`, `json={dbName,dbNumber,staticMembers:[{name,datatype,startValue}]}`, `dryRun=true` | Same pattern |
-| L1 | `PlcBuildAndImport` | `softwarePath`, `kind=fc`, `json={blockName,blockNumber,inputs,outputs,structuredText:{operations:[...]}}`, `dryRun=true` | `op` 鈭?`if`/`elsif`/`endif`/`assignment`/`line` |
+| L1 | `PlcBuildAndImport` | `softwarePath`, `kind=fc`, `json={blockName,blockNumber,inputs,outputs,structuredText:{operations:[...]}}`, `dryRun=true` | `op` ∈ `if`/`elsif`/`endif`/`assignment`/`line` |
 | L2 | `BuildPlcTagTableXml` | `tagTableJson` (note: NOT `tableJson`) | Pure offline; returns `{xml}` |
 | L2 | `ComposePlcFcBlockXml` | `fcBlockJson` | Pure offline; returns `{xml}` |
 | L2 | `BuildClassicHmiScreenXml` | `designJson={Screen:{Name,Width,Height},Items:[{Type,Name,Left,Top,Width,Height,Text}]}` (PascalCase) | Pure offline; for Classic/Basic HMI |
 | L2 | `GetOnlineState` | `softwarePath` | Returns `{state:"Offline"\|"Online", isOnline, isReachable, message}` |
 | L2 | `CheckDownloadReadiness` | `softwarePath` | Returns `{ready, hasDownloadProvider, hasConfiguration, isConsistent}` |
-| L1 | `SaveProject` | 鈥?| Verified safe on attached project |
-| L1 | `Disconnect` | 鈥?| Always end with this |
+| L1 | `SaveProject` | — | Verified safe on attached project |
+| L1 | `Disconnect` | — | Always end with this |
 
 ### Attach-mode workflow (no pollution, preferred when TIA already has a project open)
 
 ```
-Bootstrap                                     鈫?env + recommendedNextTool
-Connect                                       鈫?may need Openness UI click on first call
-GetProject  鈫? items[0].name                  鈫?internal Project.Name; TIA window title may differ
-AttachToOpenProject(projectName=<that name>)  鈫?reuse existing project
-GetProjectTree                                鈫?never guess paths
-                                               regex 'PlcSoftware:\s*([^\s\[]+)' 鈫?all PLC softwarePaths
-GetDevices                                    鈫?returns station containers, not CPUs
-                                               鈫?use GetProjectTree to find real PLC names
-GetSoftwareTree / GetBlocks / GetSoftwareInfo 鈫?inspect
-PlcBuildAndImport(dryRun=true)                鈫?validate XML without modifying project
-GetOnlineState / CheckDownloadReadiness       鈫?read-only diagnostics
+Bootstrap                                     ← env + recommendedNextTool
+Connect                                       ← may need Openness UI click on first call
+GetProject  →  items[0].name                  ← internal Project.Name; TIA window title may differ
+AttachToOpenProject(projectName=<that name>)  ← reuse existing project
+GetProjectTree                                ← never guess paths
+                                               regex 'PlcSoftware:\s*([^\s\[]+)' → all PLC softwarePaths
+GetDevices                                    ← returns station containers, not CPUs
+                                               → use GetProjectTree to find real PLC names
+GetSoftwareTree / GetBlocks / GetSoftwareInfo ← inspect
+PlcBuildAndImport(dryRun=true)                ← validate XML without modifying project
+GetOnlineState / CheckDownloadReadiness       ← read-only diagnostics
 Disconnect
 ```
 
-### Real-write on a Chinese-named device (verified 2026-05-11 against `瀹夊叏PLC`)
+### Real-write on a Chinese-named device (verified 2026-05-11 against `安全PLC`)
 
 ```
 Connect
-GetProject                                     鈫?"姹熷娴嬭瘯椤圭洰V21-260511"
-AttachToOpenProject(projectName="姹熷娴嬭瘯椤圭洰V21-260511")
-GetProjectTree                                鈫?discover "PlcSoftware: 瀹夊叏PLC"
-PlcBuildAndImport(softwarePath="瀹夊叏PLC", kind="tagtable", json=鈥? dryRun=false) 鈫?10s, ok
-PlcBuildAndImport(softwarePath="瀹夊叏PLC", kind="globaldb", json=鈥? dryRun=false) 鈫?5s, ok
-PlcBuildAndImport(softwarePath="瀹夊叏PLC", kind="fc",       json=鈥? dryRun=false) 鈫?5s, ok
-GetBlocks(softwarePath="瀹夊叏PLC", namePattern="MCPVerify_*") 鈫?confirms imported blocks
-CompileSoftware(softwarePath="瀹夊叏PLC")        鈫?18s, errorCount=0 (warnings ok)
-CheckDownloadReadiness / GetOnlineState        鈫?ready=true / state=Offline
-SaveProject 鈫?Disconnect
+GetProject                                     → "江夏测试项目V21-260511"
+AttachToOpenProject(projectName="江夏测试项目V21-260511")
+GetProjectTree                                → discover "PlcSoftware: 安全PLC"
+PlcBuildAndImport(softwarePath="安全PLC", kind="tagtable", json=…, dryRun=false) → 10s, ok
+PlcBuildAndImport(softwarePath="安全PLC", kind="globaldb", json=…, dryRun=false) → 5s, ok
+PlcBuildAndImport(softwarePath="安全PLC", kind="fc",       json=…, dryRun=false) → 5s, ok
+GetBlocks(softwarePath="安全PLC", namePattern="MCPVerify_*") → confirms imported blocks
+CompileSoftware(softwarePath="安全PLC")        → 18s, errorCount=0 (warnings ok)
+CheckDownloadReadiness / GetOnlineState        → ready=true / state=Offline
+SaveProject → Disconnect
 ```
 
 Use a unique prefix (`MCPVerify_`, `MCP_`, etc.) for any object you write into a
-real shared project 鈥?the user can find and delete them in TIA UI later.
+real shared project — the user can find and delete them in TIA UI later.
 
 ### Common parameter-name traps
 
@@ -388,7 +390,7 @@ $resp = Send-Request 'tools/call' @{ name='PlcBuildAndImport'; arguments=@{
 } } 30000
 ```
 
-## 9. LAD native instructions (verified 2026-05-11 against `瀹夊叏PLC`)
+## 9. LAD native instructions (verified 2026-05-11 against `安全PLC`)
 
 LAD blocks live in `<FlgNet xmlns="http://.../FlgNet/v5">` with two collections:
 `Parts` (operands + instructions) and `Wires` (pin-to-pin energy flow).
@@ -404,72 +406,75 @@ It exercises:
 
 | Network | Instruction(s) | Part Name(s) | Pin set |
 |---|---|---|---|
-| 1 | Two contacts in series 鈫?coil | `Contact`, `Contact`, `Coil` | `in/out/operand` |
-| 2 | Two contacts in parallel (OR) 鈫?coil | `Contact`, `Contact`, `O`, `Coil` | OR-box: `in1/in2/out` |
+| 1 | Two contacts in series → coil | `Contact`, `Contact`, `Coil` | `in/out/operand` |
+| 2 | Two contacts in parallel (OR) → coil | `Contact`, `Contact`, `O`, `Coil` | OR-box: `in1/in2/out` |
 | 3 | Set coil | `Contact`, `SCoil` | `in/operand` |
 | 4 | Reset coil | `Contact`, `RCoil` | `in/operand` |
-| 5 | Compare `>` literal 鈫?coil | `Gt` (`<TemplateValue Name="SrcType" Type="Type">Int</TemplateValue>`), `Coil` | Compare: `pre/in1/in2/out` |
-| 6 | Move literal 鈫?variable | `Move` (`<TemplateValue Name="Card" Type="Cardinality">1</TemplateValue>`) | Move: `en/eno/in/out1` |
-| 7 | Add Int+Int 鈫?Int | `Add` (SrcType+Card templates) | Add/Sub/Mul/Div: `en/eno/in1/in2/out` |
+| 5 | Compare `>` literal → coil | `Gt` (`<TemplateValue Name="SrcType" Type="Type">Int</TemplateValue>`), `Coil` | Compare: `pre/in1/in2/out` |
+| 6 | Move literal → variable | `Move` (`<TemplateValue Name="Card" Type="Cardinality">1</TemplateValue>`) | Move: `en/eno/in/out1` |
+| 7 | Add Int+Int → Int | `Add` (SrcType+Card templates) | Add/Sub/Mul/Div: `en/eno/in1/in2/out` |
 
 Verified `Part Name` registry (more exist; these are the ones live-tested):
 
 ```
-Contact          甯稿紑瑙︾偣 (add <Negated Name="operand"/> for 甯搁棴)
-Coil / SCoil / RCoil   绾垮湀 / 缃綅 / 澶嶄綅
-O                骞惰仈 OR-box (TemplateValue Name="Card" = inputs count)
-PBox / NBox      涓婂崌娌?/ 涓嬮檷娌?Gt / Lt / Eq / Ne / Ge / Le   姣旇緝 (TemplateValue SrcType=Int|DInt|Real|Word|...)
-Add / Sub / Mul / Div         绠楁湳 (SrcType + Card templates)
-Move             浼犻€?(Card=1 normally)
-TON / TOF / TP   IEC 瀹氭椂鍣?(require <Instance Scope="LocalVariable|GlobalVariable" UId="鈥?><Component Name="..."/></Instance>; only inside FB or with explicit IDB)
-Calc             琛ㄨ揪寮忓潡 (<Equation>...</Equation> + Card + SrcType)
-Serialize / Deserialize / SCATTER / GATHER   瀛楄妭绾ц浆鎹?```
+Contact          常开触点 (add <Negated Name="operand"/> for 常闭)
+Coil / SCoil / RCoil   线圈 / 置位 / 复位
+O                并联 OR-box (TemplateValue Name="Card" = inputs count)
+PBox / NBox      上升沿 / 下降沿
+Gt / Lt / Eq / Ne / Ge / Le   比较 (TemplateValue SrcType=Int|DInt|Real|Word|...)
+Add / Sub / Mul / Div         算术 (SrcType + Card templates)
+Move             传送 (Card=1 normally)
+TON / TOF / TP   IEC 定时器 (require <Instance Scope="LocalVariable|GlobalVariable" UId="…"><Component Name="..."/></Instance>; only inside FB or with explicit IDB)
+Calc             表达式块 (<Equation>...</Equation> + Card + SrcType)
+Serialize / Deserialize / SCATTER / GATHER   字节级转换
+```
 
 Connection reference (`Wires` rules):
 
 ```
-<Wire UId="鈥?>
-  <Powerrail/>                宸︾姣嶇嚎锛堣兘娴佸叆鍙ｏ級
-  <NameCon UId="P" Name="鈥?/> 鎺ュ埌 Part P 鐨勫懡鍚嶅紩鑴?  <NameCon UId="P2" Name="鈥?/> 澶氫釜 NameCon = 骞惰仈鍚屾椂椹卞姩澶氫釜 Part
+<Wire UId="…">
+  <Powerrail/>                左端母线（能流入口）
+  <NameCon UId="P" Name="…"/> 接到 Part P 的命名引脚
+  <NameCon UId="P2" Name="…"/> 多个 NameCon = 并联同时驱动多个 Part
 </Wire>
 
 <Wire><IdentCon UId="V"/><NameCon UId="P" Name="operand"/></Wire>
-                                     鍙橀噺/瀛楅潰閲?V 鎺ュ埌 P 鐨?operand/in/...
+                                     变量/字面量 V 接到 P 的 operand/in/...
 <Wire><NameCon UId="P1" Name="out"/><NameCon UId="P2" Name="in"/></Wire>
-                                     P1.out 涓茶仈鍒?P2.in
+                                     P1.out 串联到 P2.in
 ```
 
-### LAD pitfalls (these all bit me 鈥?read once, save hours)
+### LAD pitfalls (these all bit me — read once, save hours)
 
 1. **`UId` inside `<FlgNet>` MUST be decimal `xs:int`**, NOT hex. Block-level
    `ID` attributes ARE hex strings (`"A"`, `"B"`, `"10"`, `"1A"`...) and they
    live in a separate namespace. Mixing them gives the cryptic Simatic ML
-   error: `UId 灞炴€ф棤鏁?- 绫诲瀷 鈥MLSchema:int 鐨勫€?"2A" 鏃犳晥`.
-2. **Strip every `<!-- -->` XML comment** before import 鈥?Openness rejects them.
-3. **Escape `&` `<` `>`** in any `<Text>`/comment 鈥?TIA reports
-   `鍒嗘瀽 EntityName 鏃跺嚭閿欍€?绗?N`.
+   error: `UId 属性无效 - 类型 …XMLSchema:int 的值 "2A" 无效`.
+2. **Strip every `<!-- -->` XML comment** before import — Openness rejects them.
+3. **Escape `&` `<` `>`** in any `<Text>`/comment — TIA reports
+   `分析 EntityName 时出错。 第 N`.
 4. The `ProgrammingLanguage` element appears **twice**: once at block level
    (`<SW.Blocks.FC>/AttributeList/ProgrammingLanguage>LAD`) and once per
    `CompileUnit` (`AttributeList/ProgrammingLanguage>LAD`). Mixing SCL and LAD
    networks is allowed if you set the per-CompileUnit value accordingly.
 5. Importing `Contact + Coil + Compare/Move/Add` to a **safety PLC** standard
-   block group works 鈥?these are standard instructions; safety F-FCs need
+   block group works — these are standard instructions; safety F-FCs need
    different builders we don't ship yet.
 6. After `ImportBlock`, server now surfaces the real Openness exception
    chain (Portal.cs `UnwrapImportError`, since 2026-05-11). Don't reinterpret
-   `"Import failed"` 鈥?read everything after the colon.
+   `"Import failed"` — read everything after the colon.
 
 To create a new LAD FC, copy `MCPVerify_FC_LAD.xml`, change `Name`, `Number`,
 `Interface/Sections`, and rebuild networks. Then:
 
 ```
 ImportBlock(softwarePath="<plc>", groupPath="", importPath="<your.xml>")
-CompileSoftware(softwarePath="<plc>")        鈫?errorCount must be 0
+CompileSoftware(softwarePath="<plc>")        ← errorCount must be 0
 ```
 
 ## 10. SCL via DSL (verified 2026-05-11)
 
-`PlcBuildAndImport(kind=fc, json={鈥tructuredText.operations})` is the supported
+`PlcBuildAndImport(kind=fc, json={…structuredText.operations})` is the supported
 DSL. Verified ops: `assignment`, `if`, `else`, `endif`, `line`, `token`,
 `blank`, `newline`, `symbol`, `local`, `global`, `literal`.
 
@@ -495,23 +500,23 @@ DSL. Verified ops: `assignment`, `if`, `else`, `endif`, `line`, `token`,
 
 ### SCL DSL limits (known)
 
-- `if/elsif` `condition` accepts a **single boolean variable name** only 鈥?NOT
+- `if/elsif` `condition` accepts a **single boolean variable name** only — NOT
   expressions like `Mode = 1`. For multi-variable conditions, fall back to
   `op:"line"` (free-form token list, but it always appends `;` and newline,
   so it can't emit standalone `IF cond THEN` headers).
 - `for`, `while`, `case`, `return`, `exit`, `continue`, `repeat` are NOT
   supported by the DSL. For these, hand-write the `<StructuredText>` token AST
-  directly (or use a generic `op:"line"` chain 鈥?but the AST path is cleaner).
+  directly (or use a generic `op:"line"` chain — but the AST path is cleaner).
 - `String`/`WString` outputs may compile-error in some safety standard groups;
   test with `dryRun=true` first.
 
-## 11. LAD v2 鈥?extended instructions (verified 2026-05-11 against `瀹夊叏PLC`, errorCount=0)
+## 11. LAD v2 — extended instructions (verified 2026-05-11 against `安全PLC`, errorCount=0)
 
-A second cookbook FC adds 10 more instructions on top of 搂9. Imports cleanly
+A second cookbook FC adds 10 more instructions on top of §9. Imports cleanly
 and compiles with errorCount=0 on Safety PLC standard side:
 
 ```
-tools/tiaportal-mcp/skill/lad-cookbook/MCPVerify_FC_LAD_v2.xml   鈫?FC 902
+tools/tiaportal-mcp/skill/lad-cookbook/MCPVerify_FC_LAD_v2.xml   ← FC 902
 ```
 
 | Network | Instruction | Part Name + required template values | Wire pin set |
@@ -524,30 +529,30 @@ tools/tiaportal-mcp/skill/lad-cookbook/MCPVerify_FC_LAD_v2.xml   鈫?FC 902
 | 6 | Mul Int | `Mul` SrcType=Int + `Card=2` | same |
 | 7 | Div Int | `Div` SrcType=Int | same |
 | 8 | Mod Int | `Mod` SrcType=Int | same |
-| 9 | Convert Int鈫扲eal | `Convert` `<TemplateValue Name="SrcType">Int</TemplateValue>` `<TemplateValue Name="DestType">Real</TemplateValue>` | `en/eno/in/out` |
+| 9 | Convert Int→Real | `Convert` `<TemplateValue Name="SrcType">Int</TemplateValue>` `<TemplateValue Name="DestType">Real</TemplateValue>` | `en/eno/in/out` |
 | 10 | Negated contact | `Contact` + child `<Negated Name="operand"/>` | `in/out/operand` |
 
-Combined with 搂9, the verified native-LAD instruction set is:
-contacts (NO/NC) 路 S/R coils 路 OR-box 路 Compare (Eq/Ne/Lt/Gt/Le/Ge) 路
-Math (Add/Sub/Mul/Div/Mod) 路 Convert 路 Move.
+Combined with §9, the verified native-LAD instruction set is:
+contacts (NO/NC) · S/R coils · OR-box · Compare (Eq/Ne/Lt/Gt/Le/Ge) ·
+Math (Add/Sub/Mul/Div/Mod) · Convert · Move.
 
 Import `skill/lad-cookbook/MCPVerify_FC_LAD.xml` via `ImportBlock` and compile;
 the FC encodes the v2 instruction sweep (8 networks).
 
-### LAD v3 鈥?timers **must not** live in FC `Temp` on F-CPU; use FB `Static` or DB
+### LAD v3 — timers **must not** live in FC `Temp` on F-CPU; use FB `Static` or DB
 
-**Rule (F-CPU / 瀹夊叏 PLC):** `TON` / `TOF` / `TP` **IEC timer instances** must
-**not** be declared in an **FC** `Temp` section (not allowed 鈫?compile errors).
-Valid options: **(1)** `TON_TIME` in **`FB` 鈫?`Static`** (with `SetPoint` on the
-static member when the export shows it 鈥?see `Speed_Ctrl.xml`), **(2)** timer
+**Rule (F-CPU / 安全 PLC):** `TON` / `TOF` / `TP` **IEC timer instances** must
+**not** be declared in an **FC** `Temp` section (not allowed → compile errors).
+Valid options: **(1)** `TON_TIME` in **`FB` → `Static`** (with `SetPoint` on the
+static member when the export shows it — see `Speed_Ctrl.xml`), **(2)** timer
 in a **global DB** and `Instance Scope="GlobalVariable"` in LAD (see
-`07-鎿嶄綔閫夋嫨.xml`), **(3)** author in TIA and `ExportBlock`.
+`07-操作选择.xml`), **(3)** author in TIA and `ExportBlock`.
 
 **Repo layout:**
 
 | File | Role |
 |---|---|
-| `skill/lad-cookbook/MCPVerify_FC_LAD_v3.xml` | FC **59990**, **Lt** only 鈥?quick LAD import sanity check |
+| `skill/lad-cookbook/MCPVerify_FC_LAD_v3.xml` | FC **59990**, **Lt** only — quick LAD import sanity check |
 | `skill/lad-cookbook/MCPVerify_FB_LAD_v3.xml` | FB **59989**, **Static** `tonInst : TON_TIME` + networks **TON**, **`PBox`**, **`Not`**, **`Lt`** |
 
 Stage both XML files to a temp folder, import **FC then FB** with
@@ -555,7 +560,7 @@ Stage both XML files to a temp folder, import **FC then FB** with
 `CompileSoftware` until `errorCount=0`.
 
 **`PBox` wiring:** same operand for contact and `bit` needs **two** `Access`
-entries with **different** `UId`s (two `IdentCon`s) 鈥?see `07-鎿嶄綔閫夋嫨.xml` in a
+entries with **different** `UId`s (two `IdentCon`s) — see `07-操作选择.xml` in a
 full repo export if you have one; otherwise follow the `MCPVerify_FB_LAD_v3`
 export in `lad-cookbook`.
 
@@ -578,7 +583,7 @@ EnsureUnifiedHmiTag(hmiSoftwarePath="HMI_RT_1", tagTableName="MyTags",
                     plcTag="DB_HMI_Interface.CmdEnable",
                     connectionName="HMI_Conn_X",
                     address="%DB200.DBX0.0")
-                    鈫?omit PLC binding if PLC tag does not yet exist
+                    ← omit PLC binding if PLC tag does not yet exist
 EnsureUnifiedHmiScreen(hmiSoftwarePath="HMI_RT_1",
                        screenName="Main", width=1024, height=768)
 ApplyUnifiedHmiScreenDesignJson(hmiSoftwarePath="HMI_RT_1",
@@ -603,7 +608,7 @@ All keys are **lowercase**. Colors are TIA ARGB hex `0xAARRGGBB` strings.
       "type": "Rectangle" | "Text" | "Button" | "IOField" | "<full CLR type>",
       "name": "TitleBar",                    // unique on this screen
       "left": 0, "top": 0, "width": 1024, "height": 72,
-      "text": "鍙€夋枃鏈紝鑷姩鍖呮垚 zh-CN MultilingualText",
+      "text": "可选文本，自动包成 zh-CN MultilingualText",
       "textProperty": "Text",                // optional, default "Text"
       "properties": {                         // forwarded to reflection setter
         "BackColor": "0xFF0F172A",
@@ -611,9 +616,9 @@ All keys are **lowercase**. Colors are TIA ARGB hex `0xAARRGGBB` strings.
         "BorderColor": "0xFFCBD5E1",
         "BorderWidth": 1
       },
-      "font":    { "Size": 22 },             // 鈫?ScreenItem.Font part
-      "content": { "..." : "..." },          // 鈫?ScreenItem.Content part
-      "padding": { "..." : "..." }           // 鈫?ScreenItem.Padding part
+      "font":    { "Size": 22 },             // → ScreenItem.Font part
+      "content": { "..." : "..." },          // → ScreenItem.Content part
+      "padding": { "..." : "..." }           // → ScreenItem.Padding part
     }
   ]
 }
@@ -622,58 +627,46 @@ All keys are **lowercase**. Colors are TIA ARGB hex `0xAARRGGBB` strings.
 Returns `meta.changed[]` (created/updated items) and `meta.failed[]` (per-property
 write failures, e.g. unknown property name).
 
-### `HmiButtonEventType` (probed from V21 Openness 鈥?only these are accepted)
+### `HmiButtonEventType` (probed from V21 Openness — only these are accepted)
 
 ```
 None, Activated, Deactivated, Tapped, KeyDown, KeyUp, Down, Up, ContextTapped
 ```
 
 `Down` = press, `Up` = release. **`Pressed` / `Released` / `Press` / `Release` /
-`Click` are NOT valid** in V21 and produce `System.ArgumentException: 鏈壘鍒拌姹傜殑鍊糮
+`Click` are NOT valid** in V21 and produce `System.ArgumentException: 未找到请求的值`
 deep inside `SetUnifiedHmiButtonEventScriptCode`.
 
 ### `EnsureUnifiedHmiButtonAction` `actionKind` values
 
 `set-bit`, `reset-bit`, `toggle-bit` (other recipes are rejected by the safety
 gate). The tool builds and applies the script via
-`SetUnifiedHmiButtonEventScriptCode` 鈥?i.e. it actually writes JS to the event
+`SetUnifiedHmiButtonEventScriptCode` — i.e. it actually writes JS to the event
 handler, then runs SyntaxCheck.
-
-Command buttons must have visible event scripts. For Start/Stop/Enable/Disable/Reset/Apply,
-create explicit `Down`/`Up` or `Press`/`Release` actions with
-`EnsureUnifiedHmiButtonAction`: the down/press event uses `set-bit`, and the up/release
-event uses `reset-bit`. `BindUnifiedHmiButtonPressedTag` may be kept as an auxiliary
-pressed-state binding, but it is not sufficient by itself because the button will look
-empty in the Events tab.
 
 ### Unified HMI pitfalls
 
-1. `EnsureUnifiedHmiConnection` 鈥?`plcName` must be the **PLC software** node name
+1. `EnsureUnifiedHmiConnection` — `plcName` must be the **PLC software** node name
    from `GetProjectTree` (e.g. `"PLC_1"` or `"PLC_Main"`). The tool resolves the actual
    PLC device, station, PROFINET node and CPU family from the project before writing
    `Partner` / `Station` / `Node` and `CommunicationDriver`. Re-run it after hardware
    insertion or subnet changes, then check readback for the real PLC partner instead of
    blank Partner/Station/Node.
-   For S7-1200/S7-1500 projects the readback `CommunicationDriver` must contain a
-   1200/1500-style driver. A `SIMATIC S7 300/400` readback is a failed connection,
-   not an acceptable default.
-2. `EnsureUnifiedHmiTag` 鈥?for the delivery blueprint, pass both `plcTag` and `address`.
+2. `EnsureUnifiedHmiTag` — for the delivery blueprint, pass both `plcTag` and `address`.
    `plcTag` is the symbolic DB member such as `DB_HMI_Interface.CmdEnable`; `address` is
    the verified runtime address such as `%DB200.DBX0.0`. The HMI interface DB is standard
    access (`MemoryLayout=Standard`, `DB200`), so absolute HMI addresses connect to real
    PLC memory even when Unified symbolic readback is empty on a local TIA build.
-   Do not create an empty HMI tag and patch the address later. The `address` parameter
-   belongs in the `EnsureUnifiedHmiTag` call, and `Address` or `LogicalAddress` must read
-   back non-empty before the screen binding is considered complete.
-3. `EnsureStartStopUnifiedHmi` 鈥?浼氬厛璋冪敤 `EnsureUnifiedHmiConnection`锛屽啀鐢ㄤ笌
-   `EnsureUnifiedHmiTag` **鐩稿悓** 鐨勮鍒欏啓 **绗﹀彿浜掕繛**锛堟竻鎺夐敊璇殑 `%DB1鈥 缁濆鍦板潃锛夛紝
-   鍙€夊弬鏁帮細`plcName`銆乣connectionName`锛堥粯璁?`HMI_Connection_1`锛夈€侶MI 鏍囩琛ㄥ悕
-   榛樿 `榛樿鍙橀噺琛╜锛孭LC 绗﹀彿闇€涓?`StartPB`/`StopPB`/`EStop`/`RunOut` 涓€鑷淬€?4. **Full visuals vs. 鈥渃hat minimal JSON鈥?* 鈥?`ApplyUnifiedHmiScreenDesignJson` only draws
+3. `EnsureStartStopUnifiedHmi` — 会先调用 `EnsureUnifiedHmiConnection`，再用与
+   `EnsureUnifiedHmiTag` **相同** 的规则写 **符号互连**（清掉错误的 `%DB1…` 绝对地址），
+   可选参数：`plcName`、`connectionName`（默认 `HMI_Connection_1`）。HMI 标签表名
+   默认 `默认变量表`，PLC 符号需与 `StartPB`/`StopPB`/`EStop`/`RunOut` 一致。
+4. **Full visuals vs. “chat minimal JSON”** — `ApplyUnifiedHmiScreenDesignJson` only draws
    what you pass in `designJson`. The **curated multi-page layouts** live under
    `templates/hmi/unified_*.json` (shadows, cards, IO fields, footers). For production-like
-   screens, **read a template file 鈫?minify 鈫?pass as `designJson`**, then bind
+   screens, **read a template file → minify → pass as `designJson`**, then bind
    dynamizations and `EnsureUnifiedHmiButtonAction` / `SetUnifiedHmiButtonEventScriptCode`.
-   A few rectangles in chat are **not** 鈥渢he template is ugly鈥? they skip the template.
+   A few rectangles in chat are **not** “the template is ugly”; they skip the template.
 5. Apply layout BEFORE wiring button actions. The button must exist as a
    ScreenItem before `EnsureUnifiedHmiButtonAction` can resolve it; otherwise
    you get `Screen item 'StartBtn' not found on screen '...'`.
@@ -681,41 +674,42 @@ empty in the Events tab.
    (`"30, 41, 59"`) silently land in `meta.failed[]`.
 7. Probe the available API surface with
    `ListUnifiedHmiApiTypes(nameContains="<filter>")` when you hit an enum or
-   property name you're not sure about 鈥?example:
+   property name you're not sure about — example:
    `nameContains="ButtonEvent"` returned `HmiButtonEventType` enum and family.
 
-End-to-end recipe (Connect 鈫?tags 鈫?screen 鈫?design 鈫?button actions 鈫?Save)
-matches **搂12** in this file; exercise it on your own Unified RT project.
+End-to-end recipe (Connect → tags → screen → design → button actions → Save)
+matches **§12** in this file; exercise it on your own Unified RT project.
 
-## 13. Real download 鈥?V21 cast bug (KNOWN ISSUE, 2026-05-11)
+## 13. Real download — V21 cast bug (KNOWN ISSUE, 2026-05-11)
 
-`DownloadToPlc(softwarePath=鈥?` currently fails with:
+`DownloadToPlc(softwarePath=…)` currently fails with:
 
 ```
-绫诲瀷 "Siemens.Engineering.Connection.ConnectionConfiguration" 鐨勫璞?鏃犳硶杞崲涓虹被鍨?"Siemens.Engineering.Connection.IConfiguration"
+类型 "Siemens.Engineering.Connection.ConnectionConfiguration" 的对象
+无法转换为类型 "Siemens.Engineering.Connection.IConfiguration"
 ```
 
 Root cause: V21 Openness changed the `DownloadProvider.Configuration` type
-hierarchy. `Portal.cs::DownloadToPlc` invokes the `Download(IConfiguration,鈥?`
+hierarchy. `Portal.cs::DownloadToPlc` invokes the `Download(IConfiguration,…)`
 overload via reflection but passes the raw `ConnectionConfiguration` instance
 which V21 no longer makes castable to `IConfiguration`. The right binding is
-likely `provider.Configurations.TargetConfigurations[0]` or similar 鈥?needs a
+likely `provider.Configurations.TargetConfigurations[0]` or similar — needs a
 focused V21 API audit.
 
 Workaround until fixed: use the TIA Portal UI for the actual CPU download.
 `CheckDownloadReadiness` still works correctly (`ready=true` means project
 side is consistent and the network configuration exists; it does NOT mean the
-CPU is currently reachable 鈥?check `GetOnlineState.isReachable`).
+CPU is currently reachable — check `GetOnlineState.isReachable`).
 
 ## 14. SCL external source files (`DeletePlcExternalSource` / `ImportPlcExternalSource` / `GenerateBlocksFromExternalSource`)
 
 **Root cause (fixed in plugin, 2026-05-11):** Siemens documents
-`PlcExternalSourceComposition.CreateFromFile(string name, string path)` 鈥?the
+`PlcExternalSourceComposition.CreateFromFile(string name, string path)` — the
 **first argument is the external-source name** (usually `MyBlock.scl`), the
 second is the **full path** on disk. The MCP server previously built
 `(string, string)` argument lists as `(FullPath, titleWithoutExtension)`, which
-invokes the wrong overload order and surfaces as a misleading *"method 鈥?Create
-鈥?not supported by the current version"* `EngineeringTargetInvocationException`.
+invokes the wrong overload order and surfaces as a misleading *"method … Create
+… not supported by the current version"* `EngineeringTargetInvocationException`.
 
 **Fix in `Portal.cs`:** `BuildExternalSourceImportArguments` now emits
 `(fi.Name, fi.FullName)` and `(fileTitleWithoutExtension, fi.FullName)` for
@@ -727,7 +721,8 @@ GenerateBlockOption)` via reflection when a zero-parameter generator is absent.
 **Verification:** with TIA running and a project open, import the UTF-8 BOM
 `.scl` files from `skill/scl-cookbook/` via `ImportPlcExternalSource`, run
 `GenerateBlocksFromExternalSource`, then `CompileSoftware` until
-`errorCount=0`. If Connect/`GetProject` fails, fix the environment first 鈥?that is **not** evidence that the import pipeline is wrong.
+`errorCount=0`. If Connect/`GetProject` fails, fix the environment first —
+that is **not** evidence that the import pipeline is wrong.
 
 **Operational notes:**
 
@@ -735,10 +730,11 @@ GenerateBlockOption)` via reflection when a zero-parameter generator is absent.
   as user rule for generated SCL in this repo).
 - `GetPlcExternalSources` returns names **with extension** (e.g. `Ramp.scl`).
   Pass the same string to `GenerateBlocksFromExternalSource`; the server also
-  matches `MCPVerify_FC_SCL_v2` 鈫?`MCPVerify_FC_SCL_v2.scl`.
-- Re-importing the same file name fails with **鈥淭he name is not unique鈥?* 鈥?  call `DeletePlcExternalSource(softwarePath, name)` first (idempotent: OK if
+  matches `MCPVerify_FC_SCL_v2` ↔ `MCPVerify_FC_SCL_v2.scl`.
+- Re-importing the same file name fails with **“The name is not unique”** —
+  call `DeletePlcExternalSource(softwarePath, name)` first (idempotent: OK if
   the source was never imported).
-- For logic that still does not fit `PlcBuildAndImport` DSL (搂10), prefer
+- For logic that still does not fit `PlcBuildAndImport` DSL (§10), prefer
   **external `.scl` + generate** or **UI authorship + `ExportBlock` +
   `ImportBlock`**; hand-writing `<StructuredText v4>` token XML is possible but
   extremely verbose.
@@ -747,8 +743,8 @@ GenerateBlockOption)` via reflection when a zero-parameter generator is absent.
 
 1. **Never** call write tools before `Bootstrap` + `GetProjectTree`.
 2. **Never** use a temporary/timestamped path on the user's real working
-   project 鈥?use a separate scratch directory.
-3. **Never** invent Openness reflection calls for items listed in 搂4.
+   project — use a separate scratch directory.
+3. **Never** invent Openness reflection calls for items listed in §4.
 4. **Always** end an editing session with `CompileSoftware` showing
    `errors=0` (warnings allowed) and `SaveProject` returning success.
 5. **Always** quote Description tags exactly when filtering tools by layer
@@ -757,20 +753,3 @@ GenerateBlockOption)` via reflection when a zero-parameter generator is absent.
 If a step takes longer than 90 seconds with no output, stop. The most likely
 cause is an Openness authorization dialog the user did not click. Report it,
 do not loop.
-
-## 16. HMI Template Choice
-
-For quick compatibility tests, use the original files under
-`templates/hmi/unified_*.json`.
-
-For cleaner industrial HMI screens, use the SICAR-style template set:
-
-- `templates/hmi/unified_minimal_sicar_page_set.json`
-- `templates/hmi/theme_minimal_sicar_tokens.json`
-- `templates/hmi/hmi_minimal_sicar_bindings.json`
-- `docs/hmi-minimal-sicar-template.md`
-
-The SICAR-style set contains six pages: `Overview`, `Operation`, `Parameters`,
-`Trend`, `Diagnostics`, and `Events`. Create each screen, pass the matching
-screen object as `designJson`, then apply button actions and dynamization from
-`hmi_minimal_sicar_bindings.json`.

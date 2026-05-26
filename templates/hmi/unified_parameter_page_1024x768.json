@@ -1,360 +1,41 @@
 {
   "screen": {
-    "width": 1024,
-    "height": 768,
     "BackColor": "0xFFF4F7FB"
   },
   "items": [
-    {
-      "type": "Rectangle",
-      "name": "Header",
-      "left": 0,
-      "top": 0,
-      "width": 1024,
-      "height": 64,
-      "properties": {
-        "BackColor": "0xFF172033",
-        "BorderColor": "0xFF172033",
-        "BorderWidth": 1
-      }
-    },
-    {
-      "type": "Text",
-      "name": "Title",
-      "left": 24,
-      "top": 14,
-      "width": 420,
-      "height": 32,
-      "text": "Parameters",
-      "properties": {
-        "ForeColor": "0xFFFFFFFF"
-      },
-      "font": {
-        "Size": 23
-      }
-    },
-    {
-      "type": "Text",
-      "name": "HeaderNote",
-      "left": 704,
-      "top": 22,
-      "width": 290,
-      "height": 20,
-      "text": "Setpoints and limits",
-      "properties": {
-        "ForeColor": "0xFFBFD1E5"
-      },
-      "font": {
-        "Size": 12
-      }
-    },
-    {
-      "type": "Rectangle",
-      "name": "HeaderAccent",
-      "left": 0,
-      "top": 60,
-      "width": 1024,
-      "height": 4,
-      "properties": {
-        "BackColor": "0xFF3B82F6",
-        "BorderColor": "0xFF3B82F6",
-        "BorderWidth": 1
-      }
-    },
-    {
-      "type": "Rectangle",
-      "name": "Panel_Setpoints",
-      "left": 24,
-      "top": 92,
-      "width": 468,
-      "height": 286,
-      "properties": {
-        "BackColor": "0xFFFFFFFF",
-        "BorderColor": "0xFFD4DDE8",
-        "BorderWidth": 1
-      }
-    },
-    {
-      "type": "Text",
-      "name": "SetpointsTitle",
-      "left": 48,
-      "top": 116,
-      "width": 220,
-      "height": 26,
-      "text": "Setpoints",
-      "properties": {
-        "ForeColor": "0xFF172033"
-      },
-      "font": {
-        "Size": 17
-      }
-    },
-    {
-      "type": "Text",
-      "name": "Lbl_Setpoint",
-      "left": 48,
-      "top": 166,
-      "width": 160,
-      "height": 20,
-      "text": "Main setpoint",
-      "properties": {
-        "ForeColor": "0xFF607086"
-      },
-      "font": {
-        "Size": 12
-      }
-    },
-    {
-      "type": "IOField",
-      "name": "IO_Setpoint",
-      "left": 260,
-      "top": 158,
-      "width": 160,
-      "height": 38,
-      "properties": {
-        "BackColor": "0xFFFFFFFF",
-        "ForeColor": "0xFF172033",
-        "BorderColor": "0xFF94A3B8",
-        "BorderWidth": 1
-      },
-      "font": {
-        "Size": 13
-      }
-    },
-    {
-      "type": "Text",
-      "name": "Lbl_OutputMin",
-      "left": 48,
-      "top": 222,
-      "width": 160,
-      "height": 20,
-      "text": "Output minimum",
-      "properties": {
-        "ForeColor": "0xFF607086"
-      },
-      "font": {
-        "Size": 12
-      }
-    },
-    {
-      "type": "IOField",
-      "name": "IO_OutputMin",
-      "left": 260,
-      "top": 214,
-      "width": 160,
-      "height": 38,
-      "properties": {
-        "BackColor": "0xFFFFFFFF",
-        "ForeColor": "0xFF172033",
-        "BorderColor": "0xFF94A3B8",
-        "BorderWidth": 1
-      },
-      "font": {
-        "Size": 13
-      }
-    },
-    {
-      "type": "Text",
-      "name": "Lbl_OutputMax",
-      "left": 48,
-      "top": 278,
-      "width": 160,
-      "height": 20,
-      "text": "Output maximum",
-      "properties": {
-        "ForeColor": "0xFF607086"
-      },
-      "font": {
-        "Size": 12
-      }
-    },
-    {
-      "type": "IOField",
-      "name": "IO_OutputMax",
-      "left": 260,
-      "top": 270,
-      "width": 160,
-      "height": 38,
-      "properties": {
-        "BackColor": "0xFFFFFFFF",
-        "ForeColor": "0xFF172033",
-        "BorderColor": "0xFF94A3B8",
-        "BorderWidth": 1
-      },
-      "font": {
-        "Size": 13
-      }
-    },
-    {
-      "type": "Rectangle",
-      "name": "Panel_Timing",
-      "left": 532,
-      "top": 92,
-      "width": 468,
-      "height": 286,
-      "properties": {
-        "BackColor": "0xFFFFFFFF",
-        "BorderColor": "0xFFD4DDE8",
-        "BorderWidth": 1
-      }
-    },
-    {
-      "type": "Text",
-      "name": "TimingTitle",
-      "left": 556,
-      "top": 116,
-      "width": 220,
-      "height": 26,
-      "text": "Timing and Count",
-      "properties": {
-        "ForeColor": "0xFF172033"
-      },
-      "font": {
-        "Size": 17
-      }
-    },
-    {
-      "type": "Text",
-      "name": "Lbl_CounterPreset",
-      "left": 556,
-      "top": 166,
-      "width": 160,
-      "height": 20,
-      "text": "Counter preset",
-      "properties": {
-        "ForeColor": "0xFF607086"
-      },
-      "font": {
-        "Size": 12
-      }
-    },
-    {
-      "type": "IOField",
-      "name": "IO_CounterPreset",
-      "left": 768,
-      "top": 158,
-      "width": 160,
-      "height": 38,
-      "properties": {
-        "BackColor": "0xFFFFFFFF",
-        "ForeColor": "0xFF172033",
-        "BorderColor": "0xFF94A3B8",
-        "BorderWidth": 1
-      },
-      "font": {
-        "Size": 13
-      }
-    },
-    {
-      "type": "Text",
-      "name": "Lbl_CounterValue",
-      "left": 556,
-      "top": 222,
-      "width": 160,
-      "height": 20,
-      "text": "Counter value",
-      "properties": {
-        "ForeColor": "0xFF607086"
-      },
-      "font": {
-        "Size": 12
-      }
-    },
-    {
-      "type": "IOField",
-      "name": "IO_CounterValue",
-      "left": 768,
-      "top": 214,
-      "width": 160,
-      "height": 38,
-      "properties": {
-        "BackColor": "0xFFFFFFFF",
-        "ForeColor": "0xFF172033",
-        "BorderColor": "0xFF94A3B8",
-        "BorderWidth": 1
-      },
-      "font": {
-        "Size": 13
-      }
-    },
-    {
-      "type": "Rectangle",
-      "name": "Panel_Actions",
-      "left": 24,
-      "top": 414,
-      "width": 976,
-      "height": 150,
-      "properties": {
-        "BackColor": "0xFFFFFFFF",
-        "BorderColor": "0xFFD4DDE8",
-        "BorderWidth": 1
-      }
-    },
-    {
-      "type": "Text",
-      "name": "ActionsTitle",
-      "left": 48,
-      "top": 436,
-      "width": 220,
-      "height": 26,
-      "text": "Write Actions",
-      "properties": {
-        "ForeColor": "0xFF172033"
-      },
-      "font": {
-        "Size": 17
-      }
-    },
-    {
-      "type": "Button",
-      "name": "Btn_Apply",
-      "left": 48,
-      "top": 486,
-      "width": 160,
-      "height": 48,
-      "text": "APPLY",
-      "properties": {
-        "BackColor": "0xFF2563EB",
-        "ForeColor": "0xFFFFFFFF",
-        "BorderColor": "0xFF1D4ED8",
-        "BorderWidth": 1
-      },
-      "font": {
-        "Size": 14
-      }
-    },
-    {
-      "type": "Button",
-      "name": "Btn_Reset",
-      "left": 232,
-      "top": 486,
-      "width": 160,
-      "height": 48,
-      "text": "RESET",
-      "properties": {
-        "BackColor": "0xFFFFFBEB",
-        "ForeColor": "0xFF92400E",
-        "BorderColor": "0xFF1D4ED8",
-        "BorderWidth": 1
-      },
-      "font": {
-        "Size": 14
-      }
-    },
-    {
-      "type": "Text",
-      "name": "ActionNote",
-      "left": 424,
-      "top": 500,
-      "width": 520,
-      "height": 20,
-      "text": "Parameter writes should be checked by PLC logic.",
-      "properties": {
-        "ForeColor": "0xFF607086"
-      },
-      "font": {
-        "Size": 12
-      }
-    }
+    { "type": "Rectangle", "name": "Header", "left": 0, "top": 0, "width": 1024, "height": 64, "properties": { "BackColor": "0xFF172033" } },
+    { "type": "Text", "name": "Title", "left": 24, "top": 14, "width": 360, "height": 32, "text": "Parameters", "properties": { "ForeColor": "0xFFFFFFFF" }, "font": { "Size": 23 } },
+    { "type": "Text", "name": "HeaderNote", "left": 724, "top": 20, "width": 270, "height": 22, "text": "Setpoints and limits", "properties": { "ForeColor": "0xFFBFD1E5" }, "font": { "Size": 12 } },
+    { "type": "Rectangle", "name": "HeaderAccent", "left": 0, "top": 60, "width": 1024, "height": 4, "properties": { "BackColor": "0xFF3B82F6" } },
+
+    { "type": "Rectangle", "name": "ShadowSetpoints", "left": 28, "top": 96, "width": 468, "height": 286, "properties": { "BackColor": "0x140F172A" } },
+    { "type": "Rectangle", "name": "Panel_Setpoints", "left": 24, "top": 92, "width": 468, "height": 286, "properties": { "BackColor": "0xFFFFFFFF", "BorderColor": "0xFFD4DDE8", "BorderWidth": 1 } },
+    { "type": "Text", "name": "SetpointsTitle", "left": 48, "top": 114, "width": 220, "height": 26, "text": "Setpoints", "properties": { "ForeColor": "0xFF172033" }, "font": { "Size": 17 } },
+    { "type": "Text", "name": "Lbl_Setpoint", "left": 48, "top": 162, "width": 160, "height": 20, "text": "Main setpoint", "properties": { "ForeColor": "0xFF607086" }, "font": { "Size": 12 } },
+    { "type": "IOField", "name": "IO_Setpoint", "left": 260, "top": 154, "width": 160, "height": 38, "properties": { "BackColor": "0xFFFFFFFF", "ForeColor": "0xFF172033", "BorderColor": "0xFF94A3B8", "BorderWidth": 1 }, "font": { "Size": 14 } },
+    { "type": "Text", "name": "Lbl_OutputMin", "left": 48, "top": 218, "width": 160, "height": 20, "text": "Output minimum", "properties": { "ForeColor": "0xFF607086" }, "font": { "Size": 12 } },
+    { "type": "IOField", "name": "IO_OutputMin", "left": 260, "top": 210, "width": 160, "height": 38, "properties": { "BackColor": "0xFFFFFFFF", "ForeColor": "0xFF172033", "BorderColor": "0xFF94A3B8", "BorderWidth": 1 }, "font": { "Size": 14 } },
+    { "type": "Text", "name": "Lbl_OutputMax", "left": 48, "top": 274, "width": 160, "height": 20, "text": "Output maximum", "properties": { "ForeColor": "0xFF607086" }, "font": { "Size": 12 } },
+    { "type": "IOField", "name": "IO_OutputMax", "left": 260, "top": 266, "width": 160, "height": 38, "properties": { "BackColor": "0xFFFFFFFF", "ForeColor": "0xFF172033", "BorderColor": "0xFF94A3B8", "BorderWidth": 1 }, "font": { "Size": 14 } },
+
+    { "type": "Rectangle", "name": "ShadowTiming", "left": 536, "top": 96, "width": 468, "height": 286, "properties": { "BackColor": "0x140F172A" } },
+    { "type": "Rectangle", "name": "Panel_Timing", "left": 532, "top": 92, "width": 468, "height": 286, "properties": { "BackColor": "0xFFFFFFFF", "BorderColor": "0xFFD4DDE8", "BorderWidth": 1 } },
+    { "type": "Text", "name": "TimingTitle", "left": 556, "top": 114, "width": 220, "height": 26, "text": "Timing", "properties": { "ForeColor": "0xFF172033" }, "font": { "Size": 17 } },
+    { "type": "Text", "name": "Lbl_DelayTime", "left": 556, "top": 162, "width": 160, "height": 20, "text": "Delay time", "properties": { "ForeColor": "0xFF607086" }, "font": { "Size": 12 } },
+    { "type": "IOField", "name": "IO_DelayTime", "left": 768, "top": 154, "width": 160, "height": 38, "properties": { "BackColor": "0xFFFFFFFF", "ForeColor": "0xFF172033", "BorderColor": "0xFF94A3B8", "BorderWidth": 1 }, "font": { "Size": 14 } },
+    { "type": "Text", "name": "Lbl_PulseTime", "left": 556, "top": 218, "width": 160, "height": 20, "text": "Pulse time", "properties": { "ForeColor": "0xFF607086" }, "font": { "Size": 12 } },
+    { "type": "IOField", "name": "IO_PulseTime", "left": 768, "top": 210, "width": 160, "height": 38, "properties": { "BackColor": "0xFFFFFFFF", "ForeColor": "0xFF172033", "BorderColor": "0xFF94A3B8", "BorderWidth": 1 }, "font": { "Size": 14 } },
+    { "type": "Text", "name": "Lbl_CounterPreset", "left": 556, "top": 274, "width": 160, "height": 20, "text": "Counter preset", "properties": { "ForeColor": "0xFF607086" }, "font": { "Size": 12 } },
+    { "type": "IOField", "name": "IO_CounterPreset", "left": 768, "top": 266, "width": 160, "height": 38, "properties": { "BackColor": "0xFFFFFFFF", "ForeColor": "0xFF172033", "BorderColor": "0xFF94A3B8", "BorderWidth": 1 }, "font": { "Size": 14 } },
+
+    { "type": "Rectangle", "name": "ShadowActions", "left": 28, "top": 418, "width": 976, "height": 150, "properties": { "BackColor": "0x140F172A" } },
+    { "type": "Rectangle", "name": "Panel_Actions", "left": 24, "top": 414, "width": 976, "height": 150, "properties": { "BackColor": "0xFFFFFFFF", "BorderColor": "0xFFD4DDE8", "BorderWidth": 1 } },
+    { "type": "Text", "name": "ActionsTitle", "left": 48, "top": 436, "width": 220, "height": 26, "text": "Write Actions", "properties": { "ForeColor": "0xFF172033" }, "font": { "Size": 17 } },
+    { "type": "Button", "name": "Btn_Apply", "left": 48, "top": 486, "width": 160, "height": 48, "text": "APPLY", "properties": { "BackColor": "0xFF2563EB", "ForeColor": "0xFFFFFFFF", "BorderColor": "0xFF1D4ED8", "BorderWidth": 1 }, "font": { "Size": 14 } },
+    { "type": "Button", "name": "Btn_Reset", "left": 232, "top": 486, "width": 160, "height": 48, "text": "RESET", "properties": { "BackColor": "0xFFFFFBEB", "ForeColor": "0xFF92400E", "BorderColor": "0xFFF59E0B", "BorderWidth": 1 }, "font": { "Size": 14 } },
+    { "type": "Text", "name": "ActionNote", "left": 424, "top": 500, "width": 520, "height": 20, "text": "Parameter writes should be validated by the PLC program", "properties": { "ForeColor": "0xFF607086" }, "font": { "Size": 12 } },
+
+    { "type": "Rectangle", "name": "Footer", "left": 24, "top": 690, "width": 976, "height": 46, "properties": { "BackColor": "0xFFEFF4FA", "BorderColor": "0xFFD6DEE8", "BorderWidth": 1 } },
+    { "type": "Text", "name": "FooterText", "left": 48, "top": 704, "width": 920, "height": 18, "text": "Editable values, limits and timing presets", "properties": { "ForeColor": "0xFF607086" }, "font": { "Size": 11 } }
   ]
 }

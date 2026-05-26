@@ -1,7 +1,7 @@
 {
   "kind": "udt",
   "tool": "PlcBuildAndImport",
-  "description": "Generic status UDT.",
+  "description": "通用状态 UDT，不绑定任何业务对象。",
   "json": {
     "name": "UDT_BasicStatus",
     "members": [
@@ -17,3 +17,4 @@
     ]
   }
 }
+

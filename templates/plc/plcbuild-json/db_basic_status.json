@@ -1,7 +1,7 @@
 {
   "kind": "globaldb",
   "tool": "PlcBuildAndImport",
-  "description": "Generic status DB using UDT_BasicStatus.",
+  "description": "通用状态 DB，使用 UDT_BasicStatus。",
   "json": {
     "dbName": "DB_BasicStatus",
     "dbNumber": 100,
@@ -13,3 +13,4 @@
     ]
   }
 }
+

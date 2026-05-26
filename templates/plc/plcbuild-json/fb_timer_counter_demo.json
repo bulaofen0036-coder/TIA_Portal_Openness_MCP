@@ -1,7 +1,7 @@
 {
   "kind": "fb",
   "tool": "PlcBuildAndImport",
-  "description": "Generic TON timer and counter example.",
+  "description": "通用定时器/计数器示例块，展示 TON 与基本计数逻辑的 SCL 结构。",
   "json": {
     "blockName": "FB_TimerCounterDemo",
     "blockNumber": 130,
@@ -23,60 +23,16 @@
     ],
     "structuredText": {
       "operations": [
-        {
-          "op": "line",
-          "items": [
-            { "sym": "OnDelay" },
-            { "raw": "(" },
-            { "token": "IN" },
-            { "token": ":=" },
-            { "sym": "Enable" },
-            { "token": "," },
-            { "token": "PT" },
-            { "token": ":=" },
-            { "lit": "T#2s" },
-            { "raw": ")" }
-          ]
-        },
+        { "op": "line", "text": "OnDelay(IN := Enable, PT := T#2s);" },
         { "op": "assignment", "target": "DelayedDone", "source": "OnDelay.Q" },
         { "op": "if", "condition": "Reset" },
         { "op": "assignment", "target": "Counter", "literalValue": "0", "indent": 1 },
-        { "op": "token", "text": "ELSIF" },
-        { "op": "blank" },
-        { "op": "symbol", "name": "CountPulse" },
-        { "op": "blank" },
-        { "op": "token", "text": "AND" },
-        { "op": "blank" },
-        { "op": "token", "text": "NOT" },
-        { "op": "blank" },
-        { "op": "symbol", "name": "LastCountPulse" },
-        { "op": "blank" },
-        { "op": "token", "text": "THEN" },
-        { "op": "newline" },
-        {
-          "op": "line",
-          "indent": 1,
-          "items": [
-            { "sym": "Counter" },
-            { "token": ":=" },
-            { "sym": "Counter" },
-            { "token": "+" },
-            { "lit": "1" }
-          ]
-        },
+        { "op": "elsif", "condition": "CountPulse AND NOT LastCountPulse" },
+        { "op": "assignment", "target": "Counter", "source": "Counter + 1", "indent": 1 },
         { "op": "endif" },
         { "op": "assignment", "target": "LastCountPulse", "source": "CountPulse" },
         { "op": "assignment", "target": "CountValue", "source": "Counter" },
-        {
-          "op": "line",
-          "items": [
-            { "sym": "CounterDone" },
-            { "token": ":=" },
-            { "sym": "Counter" },
-            { "token": ">=" },
-            { "sym": "PresetCount" }
-          ]
-        }
+        { "op": "assignment", "target": "CounterDone", "source": "Counter >= PresetCount" }
       ]
     }
   }

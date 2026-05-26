@@ -1,14 +1,15 @@
 {
-  "schemaVersion": "2026-05-12",
-  "packageName": "TIA_MCP_交付包_20260512_151308",
+  "schemaVersion": "2026-05-25",
+  "packageName": "TIA_MCP_交付包_20260525_V20S7DCL_184330",
   "packageType": "tia-portal-mcp-complete-offline-delivery-bundle",
-  "generatedAt": "2026-05-12T15:26:28+08:00",
-  "refreshedAt": "2026-05-12T22:00:00+08:00",
+  "generatedAt": "2026-05-25T18:43:30+08:00",
+  "refreshedAt": "2026-05-25T18:43:30+08:00",
   "target": {
-    "tiaPortalMajorVersion": 21,
-    "publicApiPathExample": "D:\\app\\TIA21\\Portal V21\\PublicAPI",
+    "tiaPortalMajorVersion": [20, 21],
+    "publicApiPathExample": "D:\\app\\TIA21\\Portal V21\\PublicAPI or D:\\app\\TIA20\\Portal V20\\PublicAPI",
     "runtimeRequirement": ".NET Framework 4.8",
-    "windowsGroupRequirement": "Siemens TIA Openness"
+    "windowsGroupRequirement": "Siemens TIA Openness",
+    "newCliFlags": ["--tia-portal-location <path>", "--tia-major-version {20|21}"]
   },
   "selfContainedScope": {
     "description": "The bundle contains runtime, skill, manuals, templates and blueprints required for PLC + WinCC Unified project generation.",
@@ -49,12 +50,18 @@
     "bundleValidationScript": "scripts/Validate-Bundle.ps1"
   },
   "capabilities": {
-    "mcpToolCount": 184,
+    "mcpToolCount": 188,
     "mcpToolLayers": {
       "L0": 6,
       "L1": 29,
-      "L2": 149
+      "L2": 153
     },
+    "newToolsThisRelease": [
+      "ExportBlockAsScl",
+      "ExportBlocksAsScl",
+      "ImportBlockFromScl",
+      "ImportBlocksFromScl"
+    ],
     "hmiTemplateJsonCount": 8,
     "plcTemplateJsonCount": 9,
     "projectBlueprintJsonCount": 1,
@@ -73,7 +80,7 @@
     ]
   },
   "validationSnapshot": {
-    "performedAt": "2026-05-12T22:00:00+08:00",
+    "performedAt": "2026-05-26T11:08:00+08:00",
     "expectedCoreFilesPresent": true,
     "blueprintRequiredBundleFilesPresent": true,
     "runtimeExePresent": true,

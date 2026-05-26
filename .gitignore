@@ -1,7 +1,10 @@
 *.log
+*.startup.log
 .vs/
 **/obj/
-**/bin/Debug/
+**/bin/
+**/bin-v20/
+TiaMcp_Output/
 *.user
 *.suo
 Thumbs.db

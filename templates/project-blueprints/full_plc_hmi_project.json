@@ -16,8 +16,6 @@
     "docs/mcp-ide-and-tool-visibility.md",
     "docs/hmi-plc-tag-binding-and-addressing.md",
     "docs/hmi-connection-driver-matrix.md",
-    "docs/hmi-button-event-standard.md",
-    "docs/hmi-minimal-sicar-template.md",
     "docs/scl-instruction-library.md",
     "docs/lad-instruction-library.md",
     "docs/optional-reference-materials.md",
@@ -44,10 +42,7 @@
     "templates/hmi/unified_trend_page_1024x768.json",
     "templates/hmi/unified_basic_tag_diagnostics_1024x768.json",
     "templates/hmi/unified_basic_event_log_1024x768.json",
-    "templates/hmi/hmi_tag_binding_snippets.json",
-    "templates/hmi/theme_minimal_sicar_tokens.json",
-    "templates/hmi/unified_minimal_sicar_page_set.json",
-    "templates/hmi/hmi_minimal_sicar_bindings.json"
+    "templates/hmi/hmi_tag_binding_snippets.json"
   ],
   "environment": {
     "tiaPortalLocationExample": "D:\\app\\TIA21\\Portal V21",
@@ -128,35 +123,11 @@
     "hmiSoftwarePathSource": "GetProjectTree",
     "bindingMode": "absolute-address",
     "bindingPolicy": "All HMI external tags use absolute addresses against DB_HMI_Interface (MemoryLayout=Standard). Symbolic binding is only acceptable when TIA confirms green resolution; default and recommended path is the address column below.",
-    "screenStyles": [
-      {
-        "style": "basic",
-        "description": "Original compact page set. Use for fast generation and minimum control count.",
-        "screenFiles": [
-          "templates/hmi/unified_overview_1280x800.json",
-          "templates/hmi/unified_basic_dashboard_1024x768.json",
-          "templates/hmi/unified_control_strip_1024x768.json",
-          "templates/hmi/unified_parameter_page_1024x768.json",
-          "templates/hmi/unified_trend_page_1024x768.json",
-          "templates/hmi/unified_basic_tag_diagnostics_1024x768.json",
-          "templates/hmi/unified_basic_event_log_1024x768.json"
-        ],
-        "bindingFile": "templates/hmi/hmi_tag_binding_snippets.json"
-      },
-      {
-        "style": "minimal-sicar",
-        "description": "Cleaner industrial page set inspired by SICAR-style HMI organization: header, side navigation, panel status, operation rows, alarms, diagnostics, and faceplate-like cards.",
-        "screenSetFile": "templates/hmi/unified_minimal_sicar_page_set.json",
-        "themeFile": "templates/hmi/theme_minimal_sicar_tokens.json",
-        "bindingFile": "templates/hmi/hmi_minimal_sicar_bindings.json",
-        "screenNames": ["Overview", "Operation", "Parameters", "Trend", "Diagnostics", "Events"]
-      }
-    ],
     "connection": {
       "tool": "EnsureUnifiedHmiConnection",
       "connectionName": "HMI_Connection_1",
       "plcNameSource": "GetProjectTree",
-      "driverSelection": "Pick CommunicationDriver from the actual PLC family. UNKNOWN/S7-1200/S7-1500 defaults to SIMATIC S7-1200/1500; readback of S7-300/400 is a validation failure. See docs/hmi-connection-driver-matrix.md."
+      "driverSelection": "Pick CommunicationDriver to match CPU family: S7-1200 / S7-1500 / S7-300/400. See docs/hmi-connection-driver-matrix.md."
     },
     "tagTable": {
       "tool": "EnsureUnifiedHmiTagTable",
@@ -269,8 +240,6 @@
       "All HMI designJson files parse.",
       "All screens referenced by buttonActions and dynamizations exist.",
       "Every button action references a button present on its screen.",
-      "Every command button has visible Events-tab scripts; PressedStateTags alone is not accepted.",
-      "Momentary command buttons have paired set-bit and reset-bit actions.",
       "Every dynamization references an item present on its screen.",
       "SaveProject succeeds."
     ]

@@ -55,18 +55,6 @@ The following action kinds may be analyzed or represented, but must not be direc
 - HMI write actions must not be promoted from blocked to applicable without explicit range checks, operator confirmation, permissions, TIA SyntaxCheck, and readback evidence.
 - Navigation and popup recipes are project-specific until a temporary TIA V21 project proves the exact API and ScriptCode shape.
 
-## Button Event Standard
-
-Every command button must have at least one visible event script in the TIA Events tab.
-For Start, Stop, Enable, Disable, Reset, and Apply buttons, use paired momentary actions:
-
-- `Down` or `Press`: `set-bit` on the target HMI tag.
-- `Up` or `Release`: `reset-bit` on the same target HMI tag.
-
-`BindUnifiedHmiButtonPressedTag` can be used as an auxiliary pressed-state binding, but it
-must not be the only action on a command button. A button with no visible event script is
-not accepted in delivery validation.
-
 ## Offline Recipe Example
 
 Input:

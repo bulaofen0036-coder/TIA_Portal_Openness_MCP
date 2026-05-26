@@ -682,7 +682,7 @@
                                          "connectionName",
                                          "plcName"
                                      ],
-                      "description":  "[L2][HMI-Unified] Create or verify the PLC-HMI communication connection. Resolves the actual PLC device/station/PROFINET node and CPU family from GetProjectTree software path, then writes Partner/Station/Node and a matching CommunicationDriver. For UNKNOWN/S7-1200/S7-1500 the driver must read back as 1200/1500 and must not remain S7-300/400. Call before PLC-backed HMI tags."
+                      "description":  "[L2][HMI-Unified] Create or verify the PLC-HMI communication connection. Resolves the actual PLC device/station/PROFINET node and CPU family from GetProjectTree software path, then writes Partner/Station/Node and a matching S7-1200/1500 or S7-300/400 CommunicationDriver. Call before PLC-backed HMI tags."
                   },
                   {
                       "name":  "EnsureUnifiedHmiDynamization",
@@ -733,7 +733,7 @@
                                          "connectionName",
                                          "address"
                                      ],
-                      "description":  "[L2][HMI-Unified] Create or verify a Unified HMI external tag. For PLC-backed tags pass plcTag and address in the same call; address must read back in Address or LogicalAddress. Delivery blueprint uses DB_HMI_Interface at DB200, Standard access, e.g. %DB200.DBX0.0. Requires EnsureUnifiedHmiConnection and EnsureUnifiedHmiTagTable."
+                      "description":  "[L2][HMI-Unified] Create or verify a Unified HMI external tag. Use plcTag for symbolic DB member diagnostics and address for the verified runtime PLC address (for this delivery blueprint: DB_HMI_Interface at DB200, Standard access, e.g. %DB200.DBX0.0). Requires EnsureUnifiedHmiConnection and EnsureUnifiedHmiTagTable."
                   },
                   {
                       "name":  "EnsureUnifiedHmiTagTable",
