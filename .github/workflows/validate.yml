@@ -1,0 +1,21 @@
+name: validate-bundle
+
+# Note: a full compile-CI is NOT possible on hosted runners — the build needs
+# Siemens.Engineering.dll from a licensed TIA Portal install, which GitHub
+# runners don't have. This offline check validates bundle integrity instead
+# (required files, JSON parse, blueprint list, tool roster). For compile checks,
+# use a self-hosted runner with TIA Portal installed.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  validate-bundle:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Offline bundle validation
+        shell: pwsh
+        run: ./scripts/Validate-Bundle.ps1
