@@ -428,7 +428,7 @@ $resp = Send-Request 'tools/call' @{ name='PlcBuildAndImport'; arguments=@{
 
 | You want… | Use | Why |
 |---|---|---|
-| Any contact / coil / SR / compare / Move / math ladder | **S7DCL text** (`.s7dcl` + `.s7res`), import via `ImportBlocksFromScl` (documents path) | Concise, LLM-writable, round-trips, no UId/wire bookkeeping. The only practical way to author general ladder. |
+| Any contact / coil / SR / compare / Move / math ladder | **S7DCL text** (`.s7dcl` + `.s7res`), import via `ImportBlocksFromDocuments` (documents path) | Concise, LLM-writable, round-trips, no UId/wire bookkeeping. The only practical way to author general ladder. |
 | A network that is purely *call one FC with parameters* | `ComposePlcLadFcBlockXml` / `BuildFlgNetCallXml` tool | The single supported XML builder — it **only** does FC-call networks |
 | General ladder as hand-written FlgNet XML | **avoid** | Brittle (decimal-vs-hex `UId`, manual wire graph, entity escaping). This is the usual cause of "梯形图报错". |
 
@@ -491,18 +491,18 @@ Element vocabulary: `Contact`/`Coil`/`S_Coil`/`R_Coil`, parallel branches joined
 `Move( in:=, out1=> )`, `Add`/`Sub`/`Mul`/`Div( in1:=, in2:=, out=> )`. `.s7res` `id:`
 values must match every `MLC_*` referenced in `.s7dcl`. For instructions not shown here
 (常闭/negated contact, edges, timers, `Calc`…), **export a real block that uses them with
-`ExportBlocksAsScl` and copy the exact `.s7dcl` syntax** — do not guess.
+`ExportBlocksAsDocuments` and copy the exact `.s7dcl` syntax** — do not guess.
 
 Import:
 ```
-ImportBlocksFromScl(softwarePath="<plc>", groupPath="", importPath="<dir-with-both-files>")
+ImportBlocksFromDocuments(softwarePath="<plc>", groupPath="", importPath="<dir-with-both-files>")
 CompileSoftware(softwarePath="<plc>")            ← errorCount must be 0
 ```
 
 > **Boundary (known TIA limitation):** importing **LAD** from SD documents can fail
 > unless every `.s7res` item also has an **`en-US`** tag, not only `zh-CN`. The
 > bundled samples round-tripped on a V21 zh-CN machine with `zh-CN` only, but if
-> `ImportBlocksFromScl` fails on a LAD block, **add an `en-US:` line beside each
+> `ImportBlocksFromDocuments` fails on a LAD block, **add an `en-US:` line beside each
 > `zh-CN:` in the `.s7res`** and retry. (See README "Known Limitations".)
 
 ### 9b. LAD via FlgNet XML (fallback — FC-call tool, or last-resort hand edit)
@@ -912,7 +912,7 @@ that is **not** evidence that the import pipeline is wrong.
 5. **Always** quote Description tags exactly when filtering tools by layer
    (`[L0]`, `[L1]`, `[L2]`).
 6. **For ladder, author S7DCL text (`.s7dcl` + `.s7res`, both UTF-8 *with* BOM)
-   and import with `ImportBlocksFromScl`** (§9a). Do **not** hand-write FlgNet XML
+   and import with `ImportBlocksFromDocuments`** (§9a). Do **not** hand-write FlgNet XML
    for contacts/coils/compare/math — the only XML LAD builder
    (`ComposePlcLadFcBlockXml`) does FC-call networks only.
 

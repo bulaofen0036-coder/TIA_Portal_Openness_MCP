@@ -1,5 +1,15 @@
 # Change Log
 
+## [0.0.36] - 2026-05-31
+
+### 削减工具表面 — 移除 4 个纯别名工具（破坏式，仅影响直呼旧名的脚本）
+
+- 移除 `ExportBlockAsScl` / `ExportBlocksAsScl` / `ImportBlockFromScl` / `ImportBlocksFromScl` 这 4 个工具。它们只是 `ExportAsDocuments` / `ExportBlocksAsDocuments` / `ImportFromDocuments` / `ImportBlocksFromDocuments` 的薄别名（一行 `=>` 转发），功能 **100% 由后者覆盖**。
+- 把别名里携带的「PREFERRED on V21+ / 比 SimaticML XML 更易读、diff 友好」引导文案**迁移到对应的 `*Documents` 工具描述**，并补上 `.s7dcl/SCL` 关键词，避免 AI 选型时丢失指引。
+- 同步更新 `skill/SKILL.md`（LAD/文本块导入改指 `ImportBlocksFromDocuments`/`ExportBlocksAsDocuments`）、两个 LAD-XML 工具描述、README（中/英）。
+- **目的**：消除模型在 Export/Import 簇里的重复选项（同一操作两个名字），降低工具表面膨胀。`*Documents` 一族保留，旧别名名不再注册。
+- 重建 V20/V21 exe（0.0.36）。
+
 ## [0.0.35] - 2026-05-31
 
 ### 内部清理（无用户可见行为变更）

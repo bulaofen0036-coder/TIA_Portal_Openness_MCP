@@ -1,4 +1,4 @@
-# TIA Portal MCP 完整交付包（**v0.0.35** / V20+V21 + S7DCL）
+# TIA Portal MCP 完整交付包（**v0.0.36** / V20+V21 + S7DCL）
 
 [English](README.en.md) · **中文**
 
@@ -16,9 +16,9 @@
 - **双版本支持（V20 + V21）**：包内含两个 exe — `bin/Release/net48/TiaMcpServer.exe`（V21 编译）与 `bin-v20/Release/net48/TiaMcpServer.exe`（V20 编译）。
   - 二者**必须分别使用**，不能互换：V21 用 split DLL（`Siemens.Engineering.Base/Step7/...`），V20 用单体 `Siemens.Engineering.dll`，IL 层面绑定不同。
   - 两份 exe 都接受新 CLI 参数 `--tia-portal-location <path>`，配合 `--tia-major-version <20|21>` 用于非标准安装位置。
-- **S7DCL 专用工具**：新增 4 个工具 `ExportBlockAsScl` / `ExportBlocksAsScl` / `ImportBlockFromScl` / `ImportBlocksFromScl`，是 `ExportAsDocuments` / `ImportFromDocuments` 这套的别名 + 加强描述，让 AI 模型更容易在 V20+ 项目里首选 SIMATIC SD 文本格式（`.s7dcl + .s7res`）而不是 SimaticML XML。XML 工具链未删，向后兼容。
+- **S7DCL/SCL 文本格式工具**：`ExportAsDocuments` / `ExportBlocksAsDocuments` / `ImportFromDocuments` / `ImportBlocksFromDocuments` 在 V20+ 项目里以 SIMATIC SD 文本格式（`.s7dcl + .s7res`）导入导出程序块，比 SimaticML XML 更易读、diff 友好；描述里标注「PREFERRED on V21+」引导 AI 优先选用。
 - **V21 端到端验证**（DemoProjects/MCP_Demo_Rich_20260523）：8 块导出 + 8 块导入回环 14.7s。
-- **V20 端到端验证**（江夏测试5T车_V20）：CompileSoftware → ExportBlocksAsScl，51 个 `.s7dcl` + 33 个 `.s7res` 全量导出成功。LAD 块以 `RUNG / I_Contact / Coil / TON{...}` 文本表达，diff 友好。
+- **V20 端到端验证**（江夏测试5T车_V20）：CompileSoftware → ExportBlocksAsDocuments，51 个 `.s7dcl` + 33 个 `.s7res` 全量导出成功。LAD 块以 `RUNG / I_Contact / Coil / TON{...}` 文本表达，diff 友好。
 
 **与 IDE 无关**：凡支持 MCP 的客户端（Cursor、VS Code、Claude Desktop、自研 HTTP 客户端等）均可使用同一 `TiaMcpServer.exe`。若某 IDE 中「看不到某个工具」，属于 **客户端工具描述符/缓存** 问题，不是交付包裁剪能力；见 `docs/mcp-ide-and-tool-visibility.md`。
 

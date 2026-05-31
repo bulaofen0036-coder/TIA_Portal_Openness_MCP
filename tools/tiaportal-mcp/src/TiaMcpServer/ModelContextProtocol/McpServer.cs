@@ -64,22 +64,21 @@ namespace TiaMcpServer.ModelContextProtocol
 
             try
             {
-                if (Portal.ConnectPortal())
+                // ConnectPortal 失败时抛 PortalException（结构化错误码），下方 catch 统一映射到 McpException
+                Portal.ConnectPortal();
+                return new ResponseConnect
                 {
-                    return new ResponseConnect
+                    Message = "Connected to TIA-Portal",
+                    Meta = new JsonObject
                     {
-                        Message = "Connected to TIA-Portal",
-                        Meta = new JsonObject
-                        {
-                            ["timestamp"] = DateTime.Now,
-                            ["success"] = true
-                        }
-                    };
-                }
-                else
-                {
-                    throw new McpException($"Failed to connect to TIA-Portal. LastError: {Portal.LastConnectError}", McpErrorCode.InternalError);
-                }
+                        ["timestamp"] = DateTime.Now,
+                        ["success"] = true
+                    }
+                };
+            }
+            catch (PortalException pex)
+            {
+                throw new McpException($"Failed to connect to TIA-Portal [{pex.Code}]: {pex.Message}", pex, McpErrorCode.InternalError);
             }
             catch (Exception ex) when (ex is not McpException)
             {
@@ -2322,7 +2321,7 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
-        [McpServerTool(Name = "BuildFlgNetCallXml"), Description("[L2][PLC-Builders][Offline] NARROW SCOPE: builds ONLY a LAD network that calls one FC with parameters. For general ladder (contacts/coils/SR/compare/Move/math) author S7DCL text and import with ImportBlocksFromScl — there is no XML builder for those, and hand-written FlgNet XML is the usual cause of import errors. Build a TIA V21 LAD FlgNet/v5 FC call network XML from structured JSON. Input: {callName,parameters:[{name,section,dataType,sourceKind?,symbolPath?|symbol?|value?}]}. It only returns XML; it does not connect to TIA Portal, import blocks, write files, or modify projects.")]
+        [McpServerTool(Name = "BuildFlgNetCallXml"), Description("[L2][PLC-Builders][Offline] NARROW SCOPE: builds ONLY a LAD network that calls one FC with parameters. For general ladder (contacts/coils/SR/compare/Move/math) author S7DCL text and import with ImportBlocksFromDocuments — there is no XML builder for those, and hand-written FlgNet XML is the usual cause of import errors. Build a TIA V21 LAD FlgNet/v5 FC call network XML from structured JSON. Input: {callName,parameters:[{name,section,dataType,sourceKind?,symbolPath?|symbol?|value?}]}. It only returns XML; it does not connect to TIA Portal, import blocks, write files, or modify projects.")]
         public static ResponseXmlBuild BuildFlgNetCallXml(
             [Description("flgNetJson: JSON object with callName/name and parameters[]. Global parameters use symbolPath[] or dotted symbol; constants use sourceKind='constant' and value.")] string flgNetJson)
         {
@@ -2364,7 +2363,7 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
-        [McpServerTool(Name = "ComposePlcLadFcBlockXml"), Description("[L2][PLC-Builders][Offline] NARROW SCOPE: every network must be an FC call; this cannot emit contacts/coils/SR/compare/Move/math. For general ladder, author S7DCL text (.s7dcl + .s7res) and import with ImportBlocksFromScl instead. Compose a TIA V21 LAD FC block XML containing one or more FlgNet/v5 FC-call networks. Each network is an FC call described as { callJson: { callName, parameters[] }, titleZhCn?, commentZhCn? }. Top-level: blockName, blockNumber, optional inputs/outputs members, optional commentZhCn / titleZhCn. Returns XML only; does not connect to TIA Portal or import. Pair with ImportBlock.")]
+        [McpServerTool(Name = "ComposePlcLadFcBlockXml"), Description("[L2][PLC-Builders][Offline] NARROW SCOPE: every network must be an FC call; this cannot emit contacts/coils/SR/compare/Move/math. For general ladder, author S7DCL text (.s7dcl + .s7res) and import with ImportBlocksFromDocuments instead. Compose a TIA V21 LAD FC block XML containing one or more FlgNet/v5 FC-call networks. Each network is an FC call described as { callJson: { callName, parameters[] }, titleZhCn?, commentZhCn? }. Top-level: blockName, blockNumber, optional inputs/outputs members, optional commentZhCn / titleZhCn. Returns XML only; does not connect to TIA Portal or import. Pair with ImportBlock.")]
         public static ResponseXmlBuild ComposePlcLadFcBlockXml(
             [Description("ladFcBlockJson: JSON object with blockName, blockNumber, networks[] (each with callJson{callName,parameters[]}, optional titleZhCn/commentZhCn), optional inputs[]/outputs[] interface members with commentZhCn, optional commentZhCn/titleZhCn block-level.")] string ladFcBlockJson)
         {
@@ -6923,54 +6922,7 @@ namespace TiaMcpServer.ModelContextProtocol
 
         #region documents
 
-        // ────────────────────────────────────────────────────────────────
-        // S7DCL/SCL textual-document aliases (V21-preferred for LAD/FBD/SCL blocks).
-        // These are thin wrappers around ExportAsDocuments/ExportBlocksAsDocuments/
-        // ImportFromDocuments/ImportBlocksFromDocuments. The "AsDocuments" names are
-        // kept for backward compatibility; use the *Scl variants from V21 onward
-        // for clearer intent — they emit/read the SIMATIC SD textual format
-        // (.s7dcl + .s7res) which is far more diff-friendly than legacy SimaticML XML.
-        // ────────────────────────────────────────────────────────────────
-
-        [McpServerTool(Name = "ExportBlockAsScl"), Description("[L2][PLC-Software] PREFERRED on V21+. Export a single program block to SIMATIC SD textual format (.s7dcl + .s7res) — far more readable/diff-friendly than SimaticML XML (ExportBlock). Requires TIA Portal V20 or newer. Alias of ExportAsDocuments.")]
-        public static ResponseExportAsDocuments ExportBlockAsScl(
-            [Description("softwarePath: defines the path in the project structure to the plc software")] string softwarePath,
-            [Description("blockPath: defines the path in the project structure to the block")] string blockPath,
-            [Description("exportPath: directory where the .s7dcl/.s7res files will be written")] string exportPath,
-            [Description("preservePath: preserves the path/structure of the plc software")] bool preservePath = false)
-            => ExportAsDocuments(softwarePath, blockPath, exportPath, preservePath);
-
-        [McpServerTool(Name = "ExportBlocksAsScl"), Description("[L2][PLC-Software] PREFERRED on V21+. Export multiple program blocks to SIMATIC SD textual format (.s7dcl + .s7res). Requires TIA Portal V20 or newer. Alias of ExportBlocksAsDocuments.")]
-        public static Task<ResponseExportBlocksAsDocuments> ExportBlocksAsScl(
-            IMcpServer server,
-            RequestContext<CallToolRequestParams> context,
-            [Description("softwarePath: defines the path in the project structure to the plc software")] string softwarePath,
-            [Description("exportPath: directory where .s7dcl/.s7res files will be written")] string exportPath,
-            [Description("regexName: regex to filter block names; empty for all")] string regexName = "",
-            [Description("preservePath: preserves the path/structure of the plc software")] bool preservePath = false)
-            => ExportBlocksAsDocuments(server, context, softwarePath, exportPath, regexName, preservePath);
-
-        [McpServerTool(Name = "ImportBlockFromScl"), Description("[L2][PLC-Software] PREFERRED on V21+. Import a single program block from SIMATIC SD textual documents (.s7dcl + .s7res). Requires TIA Portal V20 or newer. Alias of ImportFromDocuments.")]
-        public static ResponseImportFromDocuments ImportBlockFromScl(
-            [Description("softwarePath: defines the path in the project structure to the plc software")] string softwarePath,
-            [Description("groupPath: path within the PLC program where the block should be placed (empty for root)")] string groupPath,
-            [Description("importPath: directory containing the .s7dcl/.s7res files")] string importPath,
-            [Description("fileNameWithoutExtension: block file stem, e.g. 'MyFB' for MyFB.s7dcl")] string fileNameWithoutExtension,
-            [Description("importOption: ImportDocumentOptions value (None, Override, SkipInactiveCultures, ActivateInactiveCultures)")] string importOption = "Override")
-            => ImportFromDocuments(softwarePath, groupPath, importPath, fileNameWithoutExtension, importOption);
-
-        [McpServerTool(Name = "ImportBlocksFromScl"), Description("[L2][PLC-Software] PREFERRED on V21+. Import multiple program blocks from SIMATIC SD textual documents (.s7dcl + .s7res). Requires TIA Portal V20 or newer. Alias of ImportBlocksFromDocuments.")]
-        public static Task<ResponseImportBlocksFromDocuments> ImportBlocksFromScl(
-            IMcpServer server,
-            RequestContext<CallToolRequestParams> context,
-            [Description("softwarePath: defines the path in the project structure to the plc software")] string softwarePath,
-            [Description("groupPath: path within the PLC program where blocks should be placed (empty for root)")] string groupPath,
-            [Description("importPath: directory containing the .s7dcl/.s7res files")] string importPath,
-            [Description("regexName: regex to filter block file stems (empty for all)")] string regexName = "",
-            [Description("importOption: ImportDocumentOptions value (None, Override, SkipInactiveCultures, ActivateInactiveCultures)")] string importOption = "Override")
-            => ImportBlocksFromDocuments(server, context, softwarePath, groupPath, importPath, regexName, importOption);
-
-        [McpServerTool(Name = "ExportAsDocuments"), Description("[L2][PLC-Software]Export as documents (.s7dcl/.s7res) from a block in the plc software to path")]
+        [McpServerTool(Name = "ExportAsDocuments"), Description("[L2][PLC-Software] PREFERRED on V21+ for exporting one block. Exports a single program block to SIMATIC SD textual / SCL document format (.s7dcl + .s7res) — far more readable/diff-friendly than SimaticML XML (ExportBlock). Requires TIA Portal V20 or newer.")]
         public static ResponseExportAsDocuments ExportAsDocuments(
             [Description("softwarePath: defines the path in the project structure to the plc software")] string softwarePath,
             [Description("blockPath: defines the path in the project structure to the block")] string blockPath,
@@ -7006,7 +6958,7 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
-        [McpServerTool(Name = "ExportBlocksAsDocuments"), Description("[L2][PLC-Software]Export as documents (.s7dcl/.s7res) from blocks in the plc software to path")]
+        [McpServerTool(Name = "ExportBlocksAsDocuments"), Description("[L2][PLC-Software] PREFERRED on V21+ for batch export. Exports multiple program blocks to SIMATIC SD textual / SCL document format (.s7dcl + .s7res) — far more readable/diff-friendly than SimaticML XML. Requires TIA Portal V20 or newer.")]
         public static async Task<ResponseExportBlocksAsDocuments> ExportBlocksAsDocuments(
             IMcpServer server,
             RequestContext<CallToolRequestParams> context,
@@ -7176,7 +7128,7 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
-        [McpServerTool(Name = "ImportFromDocuments"), Description("[L2][PLC-Software]Import program block from SIMATIC SD documents (.s7dcl/.s7res) into PLC software (V20+)")]
+        [McpServerTool(Name = "ImportFromDocuments"), Description("[L2][PLC-Software] PREFERRED on V21+ for importing one block. Imports a single program block from SIMATIC SD textual / SCL documents (.s7dcl + .s7res) into PLC software. Requires TIA Portal V20 or newer.")]
         public static ResponseImportFromDocuments ImportFromDocuments(
             [Description("softwarePath: defines the path in the project structure to the plc software")] string softwarePath,
             [Description("groupPath: optional path within the PLC program where the block should be placed (empty for root)")] string groupPath,
@@ -7238,7 +7190,7 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
-        [McpServerTool(Name = "ImportBlocksFromDocuments"), Description("[L2][PLC-Software]Import program blocks from SIMATIC SD documents (.s7dcl/.s7res) into PLC software (V20+)")]
+        [McpServerTool(Name = "ImportBlocksFromDocuments"), Description("[L2][PLC-Software] PREFERRED on V21+ for batch import. Imports multiple program blocks from SIMATIC SD textual / SCL documents (.s7dcl + .s7res) into PLC software. Requires TIA Portal V20 or newer.")]
         public static async Task<ResponseImportBlocksFromDocuments> ImportBlocksFromDocuments(
             IMcpServer server,
             RequestContext<CallToolRequestParams> context,

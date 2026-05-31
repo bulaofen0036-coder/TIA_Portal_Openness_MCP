@@ -1,4 +1,4 @@
-# TIA Portal MCP Server (v0.0.35 · V20 + V21 · S7DCL)
+# TIA Portal MCP Server (v0.0.36 · V20 + V21 · S7DCL)
 
 **English** · [中文](README.md)
 
@@ -30,10 +30,10 @@ to run.
 - **Version-safe imports.** Generated Openness XML is normalized to the connected
   portal version on import, so a V20 portal no longer rejects blocks with
   *"engineering version 'V21' is not supported"*.
-- **S7DCL textual format.** `ExportBlockAsScl` / `ExportBlocksAsScl` /
-  `ImportBlockFromScl` / `ImportBlocksFromScl` prefer the diff-friendly SIMATIC SD
-  text format (`.s7dcl` + `.s7res`) on V20+. The SimaticML XML chain remains for
-  backward compatibility.
+- **S7DCL textual format.** `ExportAsDocuments` / `ExportBlocksAsDocuments` /
+  `ImportFromDocuments` / `ImportBlocksFromDocuments` read/write the diff-friendly
+  SIMATIC SD text format (`.s7dcl` + `.s7res`) on V20+ and are flagged *PREFERRED on
+  V21+*. The SimaticML XML chain remains for backward compatibility.
 - **183 tools** across project, hardware, PLC, HMI, and online operations,
   layered `[L0]`/`[L1]`/`[L2]` so a normal session only needs L0 + L1.
 
