@@ -258,8 +258,8 @@ namespace TiaMcpServer.Siemens
             }
             catch (Exception ex)
             {
-                LastConnectError = ex.ToString();
-                return false;
+                // 统一错误处理：硬失败抛结构化异常，替代 return false + LastConnectError 侧信道
+                throw new PortalException(PortalErrorCode.OpennessError, $"ConnectPortal failed: {FormatExceptionDetail(ex)}", inner: ex);
             }
         }
 
@@ -535,10 +535,15 @@ namespace TiaMcpServer.Siemens
         {
             _logger?.LogInformation($"Opening project: {projectPath}");
 
-            if (IsPortalNull() && !ConnectPortal())
+            if (IsPortalNull())
             {
-                LastConnectError = $"Portal is null and reconnect failed. LastError: {LastConnectError}";
-                return false;
+                // ConnectPortal 现以 PortalException 报硬失败；此处保留 OpenProject 原有 bool 契约
+                try { ConnectPortal(); }
+                catch (PortalException ex)
+                {
+                    LastConnectError = $"Portal is null and reconnect failed: {ex.Message}";
+                    return false;
+                }
             }
 
             if (_project != null)
