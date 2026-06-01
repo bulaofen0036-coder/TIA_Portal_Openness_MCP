@@ -3406,7 +3406,7 @@ namespace TiaMcpServer.ModelContextProtocol
             [Description("hmiSoftwarePath: path to HMI software (e.g. 'HMI_RT_1')")] string hmiSoftwarePath,
             [Description("screenName: target screen name")] string screenName,
             [Description("buttonName: HMI button item name")] string buttonName,
-            [Description("eventType: enum value, e.g. Click, Press, Release; use ListUnifiedHmiApiTypes('HmiButtonEventType') to inspect")] string eventType)
+            [Description("eventType: HmiButtonEventType value, e.g. Tapped, Down, Up; use ListUnifiedHmiApiTypes('HmiButtonEventType') to inspect")] string eventType)
         {
             try
             {
@@ -3461,7 +3461,7 @@ namespace TiaMcpServer.ModelContextProtocol
         [McpServerTool(Name = "BuildUnifiedHmiButtonActionScript"), Description("[L2][HMI-Unified]Build a safe Unified HMI button action script from a high-level action recipe without connecting to TIA.")]
         public static ResponseMessage BuildUnifiedHmiButtonActionScript(
             [Description("actionKind: set-bit, reset-bit, toggle-bit, open-popup, goto-screen, confirm-write")] string actionKind,
-            [Description("eventType: button event name, e.g. Tapped, Pressed, Released")] string eventType,
+            [Description("eventType: HmiButtonEventType value, e.g. Down (press), Up (release), Tapped — NOT Pressed/Released")] string eventType,
             [Description("targetTag: target HMI tag for set/reset/toggle actions")] string targetTag = "",
             [Description("targetScreen: target screen for goto-screen actions")] string targetScreen = "",
             [Description("targetPopup: target popup for open-popup actions")] string targetPopup = "")
@@ -3517,7 +3517,7 @@ namespace TiaMcpServer.ModelContextProtocol
             [Description("hmiSoftwarePath: path to HMI software (e.g. 'HMI_RT_1')")] string hmiSoftwarePath,
             [Description("screenName: target screen name")] string screenName,
             [Description("buttonName: HMI button item name")] string buttonName,
-            [Description("eventType: button event name, e.g. Tapped, Pressed, Released")] string eventType,
+            [Description("eventType: HmiButtonEventType value, e.g. Down (press), Up (release), Tapped — NOT Pressed/Released")] string eventType,
             [Description("actionKind: set-bit, reset-bit, or toggle-bit")] string actionKind,
             [Description("targetTag: verified target HMI tag")] string targetTag)
         {

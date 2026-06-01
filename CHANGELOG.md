@@ -25,6 +25,11 @@
 - 修复 6 个过时离线单测：UDT builder 现要求 `$.name`（测试补名）；工具描述标签由旧约定（`[Plc/Build]`/`Hardware/Network`/`HmiUnified`）更新为现行 `[L2][Domain]`。
 - 重建 V20/V21 exe（0.0.38）。
 
+### 真机测试修复（生成示例项目时发现，离线校验无法发现）
+
+- `FB_TimerCounterDemo.scl`：`Counter` 是 S7-SCL 保留字，作静态变量名导致外部源生成失败 → 改名 `CountAccum`；S7-1200 多重背景 `TON` 经外部源导入后编译报 IN/PT 形参无效 → 暂移除定时器，`DelayedDone` 以 `Enable` 驱动并加注释。
+- `EnsureUnifiedHmiButtonAction` / `EnsureUnifiedHmiButtonEventHandler` 的 `eventType` 参数描述错写 `Pressed`/`Released`/`Click`/`Press`/`Release`（`HmiButtonEventType` 枚举里都不存在，实际为 `None/Activated/Deactivated/Tapped/KeyDown/KeyUp/Down/Up/ContextTapped`）→ 改为正确示例 `Down`/`Up`/`Tapped`，避免按钮动作 SetScriptCode 失败。
+
 ## [0.0.37] - 2026-05-31
 
 ### 错误处理统一（E）— 消除 LastXxxError 侧信道，统一为 PortalException
