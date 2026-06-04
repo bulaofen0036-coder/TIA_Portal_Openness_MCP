@@ -26,6 +26,30 @@ to run.
 > Works with any MCP-capable client — Cursor, VS Code, Claude Desktop, or your
 > own HTTP client — using the same `TiaMcpServer.exe`.
 
+## ⚡ Fastest start (3 steps, no coding — CLI path)
+
+> First time? **No MCP client, no code.** Once TIA is installed, these 3 steps
+> generate your first project in minutes.
+> (Wiring an AI client like Cursor / Claude Desktop over MCP instead? See
+> [Quick Start](#quick-start) below.)
+
+1. **Prepare**: install **TIA Portal V20 or V21** + **.NET Framework 4.8**; add your
+   Windows user to the local **`Siemens TIA Openness`** group and log off/on once.
+   **Use the exe matching your installed version** — the bundle root ships
+   `tia.cmd` (V21) / `tia-v20.cmd` (V20); all other paths are auto-resolved.
+2. **Prewarm (optional, recommended)**: double-click `scripts\预热.bat` and leave the
+   window open. It keeps one headless TIA resident so every later command connects in
+   **~1s** (without it, each run cold-starts ~3 min). Press `Ctrl+C` to close.
+3. **Generate a project**: drag a ready-made template
+   `templates\project-blueprints\scaffold_spec_motor.json` (or
+   `scaffold_spec_start_stop.json`) **onto `scripts\生成工程.bat`** — it creates the
+   project → adds PLC/HMI → builds blocks → compiles → saves in one shot. Exit code
+   `0` means success.
+   - To customize: have any AI emit a spec per [`docs/AI_spec_prompt.md`](docs/AI_spec_prompt.md)
+     (YAML or JSON), then drag it onto `生成工程.bat`.
+   - CLI equivalent: add the bundle root to PATH, then `tia gen <spec>` (start with
+     `--dry-run` for an offline check).
+
 ## Highlights
 
 - **Stability-first public generation (v0.0.39).** `PlcBuildAndImport` now returns
