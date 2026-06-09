@@ -5922,7 +5922,7 @@ namespace TiaMcpServer.ModelContextProtocol
                         Message = $"Block info retrieved from '{blockPath}' in '{softwarePath}'",
                         Name = block.Name,
                         TypeName = block.GetType().Name,
-                        Namespace = block.Namespace,
+                        Namespace = Helper.GetOptionalStringProperty(block, "Namespace"),
                         ProgrammingLanguage = Enum.GetName(typeof(ProgrammingLanguage),block.ProgrammingLanguage),
                         MemoryLayout = Enum.GetName(typeof(MemoryLayout), block.MemoryLayout),
                         IsConsistent = block.IsConsistent,
@@ -5969,7 +5969,7 @@ namespace TiaMcpServer.ModelContextProtocol
                         {
                             Name = block.Name,
                             TypeName = block.GetType().Name,
-                            Namespace = block.Namespace,
+                            Namespace = Helper.GetOptionalStringProperty(block, "Namespace"),
                             ProgrammingLanguage = Enum.GetName(typeof(ProgrammingLanguage), block.ProgrammingLanguage),
                             MemoryLayout = Enum.GetName(typeof(MemoryLayout), block.MemoryLayout),
                             IsConsistent = block.IsConsistent,
@@ -6712,7 +6712,7 @@ namespace TiaMcpServer.ModelContextProtocol
                             {
                                 Name = b.Name,
                                 TypeName = b.GetType().Name,
-                                Namespace = b.Namespace,
+                                Namespace = Helper.GetOptionalStringProperty(b, "Namespace"),
                                 ProgrammingLanguage = Enum.GetName(typeof(ProgrammingLanguage), b.ProgrammingLanguage),
                                 MemoryLayout = Enum.GetName(typeof(MemoryLayout), b.MemoryLayout),
                                 IsConsistent = b.IsConsistent,
@@ -6754,7 +6754,7 @@ namespace TiaMcpServer.ModelContextProtocol
                             {
                                 Name = block.Name,
                                 TypeName = block.GetType().Name,
-                                Namespace = block.Namespace,
+                                Namespace = Helper.GetOptionalStringProperty(block, "Namespace"),
                                 ProgrammingLanguage = Enum.GetName(typeof(ProgrammingLanguage), block.ProgrammingLanguage),
                                 MemoryLayout = Enum.GetName(typeof(MemoryLayout), block.MemoryLayout),
                                 IsConsistent = block.IsConsistent,
@@ -6879,7 +6879,7 @@ namespace TiaMcpServer.ModelContextProtocol
                         Message = $"Type info retrieved from '{typePath}' in '{softwarePath}'",
                         Name = type.Name,
                         TypeName = type.GetType().Name,
-                        Namespace = type.Namespace,
+                        Namespace = Helper.GetOptionalStringProperty(type, "Namespace"),
                         IsConsistent = type.IsConsistent,
                         ModifiedDate = type.ModifiedDate,
                         IsKnowHowProtected = type.IsKnowHowProtected,
@@ -6923,7 +6923,7 @@ namespace TiaMcpServer.ModelContextProtocol
                         {
                             Name = type.Name,
                             TypeName = type.GetType().Name,
-                            Namespace = type.Namespace,
+                            Namespace = Helper.GetOptionalStringProperty(type, "Namespace"),
                             IsConsistent = type.IsConsistent,
                             ModifiedDate = type.ModifiedDate,
                             IsKnowHowProtected = type.IsKnowHowProtected,
@@ -7165,7 +7165,7 @@ namespace TiaMcpServer.ModelContextProtocol
                             {
                                 Name = t.Name,
                                 TypeName = t.GetType().Name,
-                                Namespace = t.Namespace,
+                                Namespace = Helper.GetOptionalStringProperty(t, "Namespace"),
                                 IsConsistent = t.IsConsistent,
                                 ModifiedDate = t.ModifiedDate,
                                 IsKnowHowProtected = t.IsKnowHowProtected,
@@ -7204,7 +7204,7 @@ namespace TiaMcpServer.ModelContextProtocol
                             {
                                 Name = type.Name,
                                 TypeName = type.GetType().Name,
-                                Namespace = type.Namespace,
+                                Namespace = Helper.GetOptionalStringProperty(type, "Namespace"),
                                 IsConsistent = type.IsConsistent,
                                 ModifiedDate = type.ModifiedDate,
                                 IsKnowHowProtected = type.IsKnowHowProtected,
@@ -7440,7 +7440,7 @@ namespace TiaMcpServer.ModelContextProtocol
                             {
                                 Name = block.Name,
                                 TypeName = block.GetType().Name,
-                                Namespace = block.Namespace,
+                                Namespace = Helper.GetOptionalStringProperty(block, "Namespace"),
                                 ProgrammingLanguage = Enum.GetName(typeof(ProgrammingLanguage), block.ProgrammingLanguage),
                                 MemoryLayout = Enum.GetName(typeof(MemoryLayout), block.MemoryLayout),
                                 IsConsistent = block.IsConsistent,
@@ -7676,7 +7676,7 @@ namespace TiaMcpServer.ModelContextProtocol
                             {
                                 Name = block.Name,
                                 TypeName = block.GetType().Name,
-                                Namespace = block.Namespace,
+                                Namespace = Helper.GetOptionalStringProperty(block, "Namespace"),
                                 ProgrammingLanguage = Enum.GetName(typeof(ProgrammingLanguage), block.ProgrammingLanguage),
                                 MemoryLayout = Enum.GetName(typeof(MemoryLayout), block.MemoryLayout),
                                 IsConsistent = block.IsConsistent,
@@ -7852,6 +7852,12 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
+#if TIA_V17
+        private static object ParseImportDocumentOption(string option)
+        {
+            throw new McpException("ImportFromDocuments requires TIA Portal V20 or newer. On TIA V17 use ImportBlock, ImportType, ImportPlcTagTable, or SCL external-source import.", McpErrorCode.InvalidParams);
+        }
+#else
         private static ImportDocumentOptions ParseImportDocumentOption(string option)
         {
             if (string.IsNullOrWhiteSpace(option)) return ImportDocumentOptions.Override;
@@ -7883,6 +7889,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     throw new McpException($"Invalid importOption '{option}'. Allowed: None, Override, SkipInactiveCultures, ActivateInactiveCultures", McpErrorCode.InvalidParams);
             }
         }
+#endif
 
         private static List<string> GetResMissingEnUsIds(string directory, string baseName)
         {

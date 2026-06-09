@@ -48,7 +48,6 @@ namespace TiaMcpServer.ModelContextProtocol
                                         members.Select(BuildMember)))),
                             new XElement("MemoryLayout", "Standard"),
                             new XElement("Name", dbName),
-                            new XElement("Namespace"),
                             new XElement("Number", dbNumber),
                             new XElement("ProgrammingLanguage", "DB")))));
         }

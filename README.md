@@ -86,6 +86,38 @@
 3. **首次调用顺序**  
    - `Bootstrap` → `Connect` → `OpenProject`（或 `CreateProject`）→ `GetProjectTree`，从树中读取真实的 `PLC_xxx` / `HMI_RT_xxx` 路径再继续。
 
+### V17 PLC-Software profile（preview）
+
+- 仓库现已包含独立编译目标：`tools/tiaportal-mcp/src/TiaMcpServer/TiaMcpServer.V17.csproj`
+- V17 运行时使用：
+  - `tools/tiaportal-mcp/src/TiaMcpServer/bin-v17/Release/net48/TiaMcpServer.exe`
+  - 并显式传 `--tool-profile plc-software-v17-phase1`
+  - 也可改用环境变量 `TIA_MCP_TOOL_PROFILE=plc-software-v17-phase1`
+- 当前 V17 支持边界：
+  - `project`
+  - `hardware`
+  - `PLC build/import`
+  - `compile/save`
+  - `readback`
+- 当前 V17 不支持或仅返回 gated 说明：
+  - `V20+ Documents / S7DCL`
+  - `Unified HMI`
+  - 自动下载到 PLC
+  - 在线写值
+  - `force`
+- 本地验证方式：
+  - `dotnet build tools/tiaportal-mcp/src/TiaMcpServer/TiaMcpServer.V17.csproj -c Release`
+  - `tools/list`
+  - 真实 TIA V17 临时工程 smoke
+- 当前已确认：
+  - `plc-software-v17-phase1` 运行时工具面可通过 `tools/list` 正常读出
+  - `ImportFromDocuments` / `ExportAsDocuments` 在 V17 下返回明确 gated 提示
+  - `SearchHardwareCatalog` fallback、V17 XML `Namespace` 兼容清洗、UDT/GlobalDB builder 去除空 `Namespace` 已落地
+- 当前环境注意事项：
+  - 在面包这台验证机上，TIA V17 Openness 的 `Connect` 冷启动可能卡在 `new TiaPortal(...)`
+  - 代码里已加入 attach 超时、启动超时与残留 portal 清理，便于给出明确错误而不是无限挂起
+  - 若遇到该情况，优先手动关闭残留 `Siemens.Automation.Portal.exe`，再重试 `Connect` 或先手动打开 TIA 后 `AttachToOpenProject`
+
 ---
 
 ## 脱机校验（不启动博途）

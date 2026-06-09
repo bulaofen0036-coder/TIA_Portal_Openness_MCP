@@ -8,6 +8,7 @@ namespace TiaMcpServer
         public string? Transport { get; set; } // "stdio" (default) or "http"
         public string? HttpPrefix { get; set; } // e.g. "http://127.0.0.1:8765/"
         public string? HttpApiKey { get; set; } // optional X-API-Key header value
+        public string? ToolProfile { get; set; } // optional tool surface profile, e.g. "plc-software-v17-phase1"
         public bool RunFlowLightTest { get; set; }
         public bool FixCurrentFlowBinding { get; set; }
         public bool ProbeS71200Device { get; set; }
@@ -743,6 +744,14 @@ namespace TiaMcpServer
                         if (i + 1 < args.Length)
                         {
                             options.HttpApiKey = args[i + 1];
+                            i++;
+                        }
+                        break;
+
+                    case "--tool-profile":
+                        if (i + 1 < args.Length)
+                        {
+                            options.ToolProfile = args[i + 1];
                             i++;
                         }
                         break;

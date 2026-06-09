@@ -12,6 +12,16 @@ namespace TiaMcpServer.Siemens
     {
         public static int TiaMajorVersion { get; set; }
 
+        // XML engineering version used by offline XML builders and compatibility patches.
+#if TIA_V17
+        public const string TiaXmlEngineeringVersion = "V17";
+        public static bool SupportsBlockNamespaceAttribute => false;
+#else
+        public static string TiaXmlEngineeringVersion =>
+            TiaMajorVersion > 0 ? $"V{TiaMajorVersion}" : "V21";
+        public static bool SupportsBlockNamespaceAttribute => TiaMajorVersion <= 0 || TiaMajorVersion >= 18;
+#endif
+
         // Optional explicit override (CLI --tia-portal-location), e.g. D:\app\TIA20\Portal V20.
         // Takes precedence over TiaPortalLocation env var and registry lookup.
         public static string? TiaPortalLocationOverride { get; set; }

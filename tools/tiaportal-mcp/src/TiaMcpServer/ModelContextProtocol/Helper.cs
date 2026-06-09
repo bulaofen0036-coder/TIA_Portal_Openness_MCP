@@ -1,7 +1,9 @@
-﻿using Siemens.Engineering;
+using Siemens.Engineering;
 using Siemens.Engineering.SW.Blocks;
+using Siemens.Engineering.SW.Types;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace TiaMcpServer.ModelContextProtocol
 {
@@ -30,15 +32,12 @@ namespace TiaMcpServer.ModelContextProtocol
             return attributes;
         }
 
-        // Convert non-primitive attribute values to a safe representation to avoid JSON cycle errors
-        // (e.g. CultureInfo.Parent.Parent.Parent... chain triggers JsonException at depth 64).
         private static object ToSerializableValue(object value)
         {
             if (value == null) return null!;
             var t = value.GetType();
             if (t.IsPrimitive || value is string || value is decimal || value is DateTime || value is TimeSpan || value is Guid || t.IsEnum)
                 return value;
-            // Anything else (CultureInfo, Siemens engineering objects, etc.) → string form
             try { return value.ToString(); }
             catch { return $"<{t.Name}>"; }
         }
@@ -58,7 +57,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 {
                     Name = block.Name,
                     TypeName = block.GetType().Name,
-                    Namespace = block.Namespace,
+                    Namespace = GetOptionalStringProperty(block, "Namespace"),
                     ProgrammingLanguage = Enum.GetName(typeof(ProgrammingLanguage), block.ProgrammingLanguage),
                     MemoryLayout = Enum.GetName(typeof(MemoryLayout), block.MemoryLayout),
                     IsConsistent = block.IsConsistent,
@@ -79,6 +78,55 @@ namespace TiaMcpServer.ModelContextProtocol
             groupInfo.Groups = groupList;
 
             return groupInfo;
+        }
+
+        public static string BuildBlockPath(PlcBlock block)
+        {
+            var parts = new List<string> { block.Name };
+            var parent = block.Parent;
+            while (parent != null)
+            {
+                if (parent is PlcBlockSystemGroup) break;
+                if (parent is PlcBlockGroup grp)
+                {
+                    parts.Insert(0, grp.Name);
+                    parent = grp.Parent;
+                    continue;
+                }
+                break;
+            }
+            return string.Join("/", parts);
+        }
+
+        public static string BuildTypePath(PlcType type)
+        {
+            var parts = new List<string> { type.Name };
+            var parent = type.Parent;
+            while (parent != null)
+            {
+                if (parent is PlcTypeSystemGroup) break;
+                if (parent is PlcTypeGroup grp)
+                {
+                    parts.Insert(0, grp.Name);
+                    parent = grp.Parent;
+                    continue;
+                }
+                break;
+            }
+            return string.Join("/", parts);
+        }
+
+        public static string? GetOptionalStringProperty(object target, string propertyName)
+        {
+            try
+            {
+                var prop = target.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+                return prop?.GetValue(target)?.ToString();
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }

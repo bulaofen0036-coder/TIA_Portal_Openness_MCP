@@ -44,8 +44,7 @@ namespace TiaMcpServer.ModelContextProtocol
                                     new XElement(InterfaceNs + "Section",
                                         new XAttribute("Name", "None"),
                                         normalizedMembers.Select(BuildMember)))),
-                            new XElement("Name", udtName),
-                            new XElement("Namespace")))));
+                            new XElement("Name", udtName)))));
         }
 
         // Backwards-compat: callers without a UDT name fall back to a placeholder.

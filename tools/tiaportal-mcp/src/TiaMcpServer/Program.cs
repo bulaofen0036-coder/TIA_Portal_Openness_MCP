@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Server;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -20,6 +21,7 @@ namespace TiaMcpServer
 {
     public class Program
     {
+        private const string PlcSoftwareV17Phase1ToolProfile = "plc-software-v17-phase1";
         private static readonly string DiagLogPath = Path.Combine(Path.GetTempPath(), "TiaMcpServer.log");
         private static readonly string DiagLogPathLocal = Path.Combine(AppContext.BaseDirectory, "TiaMcpServer.startup.log");
         private delegate void StructuredTextLine(StringBuilder st, params string[] parts);
@@ -50,6 +52,10 @@ namespace TiaMcpServer
                 LogDiag($"Args: {string.Join(" ", args)}");
 
                 var options = CliOptions.ParseArgs(args);
+                options.ToolProfile = ResolveToolProfile(options.ToolProfile);
+                LogDiag(string.IsNullOrWhiteSpace(options.ToolProfile)
+                    ? "Tool profile: full (default)"
+                    : $"Tool profile: {options.ToolProfile}");
 
                 // Default logging to stderr (mode 1) when the user doesn't pass --logging,
                 // so errors are visible out of the box. Users can opt out with --logging 0
@@ -276,7 +282,7 @@ namespace TiaMcpServer
                     return;
                 }
 
-                if (Engineering.TiaMajorVersion >= 20)
+                if (Engineering.TiaMajorVersion >= 17)
                 {
                     try
                     {
@@ -568,10 +574,10 @@ namespace TiaMcpServer
 
                 try
                 {
-                    builder.Services
+                    var mcpBuilder = builder.Services
                         .AddMcpServer()
-                        .WithStdioServerTransport()
-                        .WithToolsFromAssembly()
+                        .WithStdioServerTransport();
+                    RegisterProfileTools(mcpBuilder, options)
                         .WithPromptsFromAssembly();
                 }
                 catch (ReflectionTypeLoadException ex)
@@ -654,10 +660,10 @@ namespace TiaMcpServer
                     }
                 }
 
-                builder.Services
+                var mcpBuilder = builder.Services
                     .AddMcpServer()
-                    .WithStreamServerTransport(httpToMcp, mcpToHttp)
-                    .WithToolsFromAssembly()
+                    .WithStreamServerTransport(httpToMcp, mcpToHttp);
+                RegisterProfileTools(mcpBuilder, options)
                     .WithPromptsFromAssembly();
 
                 builder.Services.AddSingleton<TiaMcpServer.Siemens.Portal>();
@@ -671,6 +677,30 @@ namespace TiaMcpServer
 
             await HttpMcpServer.Run(options, httpToMcp, mcpToHttp, LogDiag).ConfigureAwait(false);
             await mcpTask.ConfigureAwait(false);
+        }
+
+        private static string ResolveToolProfile(string? cliProfile)
+        {
+            var profile = string.IsNullOrWhiteSpace(cliProfile)
+                ? Environment.GetEnvironmentVariable("TIA_MCP_TOOL_PROFILE")
+                : cliProfile;
+            return string.IsNullOrWhiteSpace(profile) ? string.Empty : profile.Trim();
+        }
+
+        private static bool IsPlcSoftwareV17Phase1Profile(CliOptions? options)
+        {
+            return string.Equals(options?.ToolProfile, PlcSoftwareV17Phase1ToolProfile, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static IMcpServerBuilder RegisterProfileTools(IMcpServerBuilder builder, CliOptions? options)
+        {
+            if (IsPlcSoftwareV17Phase1Profile(options))
+            {
+                LogDiag("Registering PLC-Software V17 phase1 tool surface only.");
+                return builder.WithTools(new[] { typeof(PlcSoftwareV17McpTools) });
+            }
+
+            return builder.WithTools(new[] { typeof(McpServer) });
         }
 
         private static void RunOnlineMonitoringSafetySelfTest()
