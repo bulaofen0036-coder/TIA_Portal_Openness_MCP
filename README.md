@@ -1,118 +1,116 @@
-# TIA Portal MCP 完整交付包（**v2.2.1** / V20+V21 + S7DCL + CLI + 在线只读监控）
+# TIA Portal MCP V17 分支
 
 [English](README.en.md) · **中文**
 
-> **当前分支说明**：如果你正在阅读 `v17` 分支或 `feat/v17-plc-software-profile` 分支，本分支的目标是 **TIA Portal V17 / Openness V17 的 PLC-Software Phase 1 支持**。
->
-> 它不是 V17 全功能版，也不是 V20/V21 主线入口；V20/V21 用户请继续使用 `master` 分支。
->
-> 当前 V17 范围只覆盖离线 PLC 工程主链路：项目、硬件、PLC build/import、编译保存和读回验证。
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Release](https://img.shields.io/github/v/release/bulaofen0036-coder/TIA_Portal_Openness_MCP)](https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP/releases) [![validate-bundle](https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP/actions/workflows/validate.yml/badge.svg)](https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP/actions/workflows/validate.yml)
+本分支面向 **TIA Portal V17 / Openness V17**。
 
-> **免费开源（MIT）**：服务器**无需任何 license key** 即可运行，**不含任何授权校验代码**。
+当前目标是 **PLC-Software Phase 1**：验证 MCP 能在 V17 下完成离线 PLC 工程主链路，包括项目、硬件、PLC 软件对象生成/导入、编译、保存和读回。
 
-![架构图](docs/assets/architecture.svg)
+这不是 V17 全功能版。当前不覆盖 HMI、PLCSIM 自动下载、在线写值、force 或生产设备下载。
 
-在 **Windows + TIA Portal V20 或 V21** 下，通过 **MCP（stdio 或 HTTP）** 驱动博途：建项目、加硬件、生成 PLC（Tag/UDT/DB/SCL/LAD）、生成 **WinCC Unified** 画面与事件、编译诊断、保存。  
-包内含 **已编译运行时**、Skill、静态工具清单、能力矩阵、PLC/HMI 模板、**一键可读的项目蓝图**与手册。**不要求**另行克隆源码仓库。
-
-## ⚡ 最快上手（3 步，零编程·CLI 路线）
-
-> 第一次用？**不需要 MCP 客户端、不需要写代码。** 装好 TIA 后照这 3 步，几分钟内生成第一个工程。
-> （想接 Cursor / Claude Desktop 等 AI 客户端走 MCP？跳到下方 [上手步骤](#上手步骤)。）
-
-1. **准备**：装好 **TIA Portal V20 或 V21** + **.NET Framework 4.8**；把当前 Windows 用户加入本地组 **`Siemens TIA Openness`**，注销重登一次。**装的是哪个版本就用哪个**——交付包根目录已备好 `tia.cmd`（V21）/ `tia-v20.cmd`（V20），其余路径自动选。
-2. **预热（可选但强烈推荐）**：双击 `scripts\预热.bat`，留着这个窗口。它常驻一个无界面 TIA，让之后每条命令 **~1 秒**连上（不预热则每次冷启动约 3 分钟）。用完按 `Ctrl+C` 关闭。
-3. **生成工程**：把现成模板 `templates\project-blueprints\scaffold_spec_motor.json`（或 `scaffold_spec_start_stop.json`）**拖到 `scripts\生成工程.bat` 图标上**——一条龙建项目→加 PLC/HMI→写块→编译→存盘。退出码 `0` 即成功。
-   - 想改成自己的需求：让任意 AI 照 [`docs/AI_spec_prompt.md`](docs/AI_spec_prompt.md) 产出一份 spec（YAML/JSON 都行），再拖给 `生成工程.bat`。
-   - 命令行等价写法：把根目录加进 PATH 后，`tia gen <spec>`（先 `--dry-run` 离线校验更稳）。
+`master` 分支继续保持现有主线；V17 相关 PR 只提交到 `v17` 分支。V17 分支的验证、bugfix 和后续维护由 `mianmianlingqi` 负责。后续如果有通用且稳定的修复，再单独拆成小 PR 回 `master`。
 
 ---
 
-## v2.0.0 新功能 —— `tia` 命令行（门槛最低、任意 AI 可用）
+## 当前状态
 
-> **同一个 exe 既是 MCP 服务，也是命令行。** 任意 AI 产出一份 YAML/JSON spec，任意工程师跑一条命令即可从零建/改工程——**不需要 MCP 客户端、不需要安装**。底层完全复用现有引擎。详见 [`docs/CLI_quickstart.md`](docs/CLI_quickstart.md)。
-
-- **`tia gen <spec.yaml|json>`**：一条命令从 spec 建完整工程（= `ScaffoldProject`）。`--dry-run` 离线校验、`--json` 机器可读。
-- **`tia patch <spec>`**：把 spec **增量 upsert 进已有工程**（spec 内 `projectPath` 指向 `.apXX`），未提及的元素不动；`--no-overwrite` 保护手改的 LAD 代码块。
-- 还有 `tia compile / describe / export / import / prewarm / schema / version`。退出码 **0=成功 / 1=有失败步骤 / 2=错误**。
-- **`tia` 命令入口**：交付包根目录的 `tia.cmd`（V21）/ `tia-v20.cmd`（V20）——把根目录加进 PATH 即可随处 `tia gen ...`，不必记忆深层 exe 路径。
-- **零编程上手**：把 spec 拖到 `scripts\生成工程.bat` 上即可（V21 缺失自动回退 V20）；`scripts\预热.bat` 常驻 headless 实例让后续命令 ~1s 连上。
-- **现成模板开箱即用**：`templates/project-blueprints/` 的启停/电机 spec 直接 `tia gen` 即可，`tia` 自动解析其中 `__BUNDLE__` 为交付包根目录，无需手改路径。
-- **让任意 AI 生成 spec**：见 [`docs/AI_spec_prompt.md`](docs/AI_spec_prompt.md) —— 通用契约「产出一份 spec」，不要求 AI 支持 MCP。
-- **YAML + JSON 双解析**：JSON 首选（零歧义），YAML 便于人读写；同一 spec 两者产出一致。
-
-> 仍是双 V20/V21 binary、仍是完整 MCP 服务（`tia` verb 之外行为不变）。CLI 与 MCP 共享同一引擎。
-
-## v1.0.0 新功能（快、好用、不出错）
-
-- **默认 headless 启动，连接快 ~10×**：连 TIA 默认无界面（`WithoutUserInterface`），冷启动从约 200–340s 降到约 10–28s。要肉眼看博途时，启动 exe 加 `--with-ui`（或生成完直接打开 `.ap21`）。
-- **`ScaffoldProject` —— 一句话生成完整工程**：传一个 JSON `spec`，一次调用完成「建项目 → 加 PLC/HMI 硬件 → UDT/DB/标签表 → SCL/LAD 块 → 编译 → HMI 连接/画面/变量 → 保存」，返回逐步报告。把约 20 步的 runbook 收成一次调用。`dryRun=true` 可离线校验 spec 再真跑。现成模板见 `templates/project-blueprints/scaffold_spec_start_stop.json`（启停）、`scaffold_spec_motor.json`（电机）。
-- **常驻实例，会话秒连（可选）**：开一个终端跑 `python scripts/prewarm_tia.py` 挂着，之后每个会话 `Connect` 约 0.8–1s。
-- **更不易出错**：HMI 软件路径自动探测（不再写死 `HMI_RT_1`）；连接对挂死/孤儿 TIA 实例加超时跳过；单块导入（`ImportFromDocuments`/`ImportBlock`）导入后回读确认并返回 `Meta.verified`。
-- 工具收敛至 **180**（下线 4 个 `Export*ToTemp` 变体，并为易混的 Export/Import 工具补消歧描述）。
-
-**本次更新（相对 20260512 包）**
-
-- **稳定生成硬门槛（v0.0.39）**：基于 v0.0.38，`PlcBuildAndImport` 会返回 `CapabilityDecision` / `CapabilityWarnings` / `RecommendedNextActions`；`ApplyUnifiedHmiScreenDesignJson(strict=true)` 默认遇到 HMI 属性写入失败即报错；`EnsureUnifiedHmiTag(requireVerifiedBinding=true)` 默认要求读回 `SymbolicVerified` 或 `AbsoluteVerified`，避免“生成成功但变量未真实链接”的公开版体验问题。
-- **双版本支持（V20 + V21）**：包内含两个 exe — `bin/Release/net48/TiaMcpServer.exe`（V21 编译）与 `bin-v20/Release/net48/TiaMcpServer.exe`（V20 编译）。
-  - 二者**必须分别使用**，不能互换：V21 用 split DLL（`Siemens.Engineering.Base/Step7/...`），V20 用单体 `Siemens.Engineering.dll`，IL 层面绑定不同。
-  - 两份 exe 都接受新 CLI 参数 `--tia-portal-location <path>`，配合 `--tia-major-version <20|21>` 用于非标准安装位置。
-- **S7DCL/SCL 文本格式工具**：`ExportAsDocuments` / `ExportBlocksAsDocuments` / `ImportFromDocuments` / `ImportBlocksFromDocuments` 在 V20+ 项目里以 SIMATIC SD 文本格式（`.s7dcl + .s7res`）导入导出程序块，比 SimaticML XML 更易读、diff 友好；描述里标注「PREFERRED on V21+」引导 AI 优先选用。
-- **V21 端到端验证**（DemoProjects/MCP_Demo_Rich_20260523）：8 块导出 + 8 块导入回环 14.7s。
-- **V20 端到端验证**（江夏测试5T车_V20）：CompileSoftware → ExportBlocksAsDocuments，51 个 `.s7dcl` + 33 个 `.s7res` 全量导出成功。LAD 块以 `RUNG / I_Contact / Coil / TON{...}` 文本表达，diff 友好。
-
-**与 IDE 无关**：凡支持 MCP 的客户端（Cursor、VS Code、Claude Desktop、自研 HTTP 客户端等）均可使用同一 `TiaMcpServer.exe`。若某 IDE 中「看不到某个工具」，属于 **客户端工具描述符/缓存** 问题，不是交付包裁剪能力；见 `docs/mcp-ide-and-tool-visibility.md`。
-
-**与源码仓库无关**：接收方只需解压本包；在 MCP 配置里把 `command` 指到本包内的 `tools\tiaportal-mcp\src\TiaMcpServer\bin\Release\net48\TiaMcpServer.exe`（见 `cursor-mcp.example.json`，将 `REPLACE_ME` 换成本包根目录）。其它文档若出现 `…\PID博途块\…` 等开发机路径，仅为作者构建位置，**不要求**克隆该仓库。
-
----
-
-## 上手步骤
-
-1. **环境准备**  
-   - .NET Framework **4.8**、**TIA Portal V20 或 V21** 已安装；  
-   - 当前用户加入 **`Siemens TIA Openness`** 本地组，注销重登；  
-   - 三选一定位博途安装根：  
-     a) 启动 exe 时传 `--tia-portal-location "D:\app\TIA20\Portal V20"`（推荐，非标准安装位置必用）；  
-     b) 用户环境变量 `TiaPortalLocation` 指向博途安装根；  
-     c) 让程序自动从注册表 `HKLM\SOFTWARE\Siemens\Automation\_InstalledSW\TIAP{20|21}\TIA_Opns\Path` 读取。  
-   - 当机器装了多个版本时显式传 `--tia-major-version 20`（或 21）以免自动选最高版；  
-   - 首次连接时在 TIA 弹窗中授权 **Openness**。
-
-2. **挂载 MCP**  
-   - 复制 `cursor-mcp.example.json` 片段到任意支持 MCP 的客户端（Cursor / VS Code / Claude Desktop / 自研 HTTP 客户端均可）；  
-   - 将路径中的 **`REPLACE_ME`** 替换为 **本包根目录**；
-   - **按 TIA 版本选 exe 路径**：  
-     - V21 → `…\tools\tiaportal-mcp\src\TiaMcpServer\bin\Release\net48\TiaMcpServer.exe`  
-     - V20 → `…\tools\tiaportal-mcp\src\TiaMcpServer\bin-v20\Release\net48\TiaMcpServer.exe`  
-   - 非标准安装位置必须在客户端 `args` 里加 `--tia-portal-location "<安装根>" --tia-major-version <20|21>`，例如 `"--tia-portal-location","D:\\app\\TIA20\\Portal V20","--tia-major-version","20"`。
-
-3. **首次调用顺序**  
-   - `Bootstrap` → `Connect` → `OpenProject`（或 `CreateProject`）→ `GetProjectTree`，从树中读取真实的 `PLC_xxx` / `HMI_RT_xxx` 路径再继续。
-
-### V17 分支 / PLC-Software Phase 1
-
-> `v17` 分支面向 **TIA Portal V17 / Openness V17**。
-> `master` 继续保持 V20/V21 主线；V17 的验证、bugfix 和后续维护由社区维护者 `mianmianlingqi` 负责。
-> V17 相关 PR 只提交到 `v17` 分支；后续通用且稳定的修复会再单独拆成小 PR 回 `master`。
-
-V17 当前是 **PLC-Software Phase 1**：重点验证离线工程主链路，不是 V17 全功能版，不覆盖 HMI、PLCSIM 下载或在线写值。
-
-| 项目 | V17 当前状态 |
-|------|--------------|
+| 项目 | 状态 |
+|------|------|
+| TIA 版本 | TIA Portal V17 / Openness V17 |
+| 分支定位 | V17 专用分支 |
+| 当前阶段 | PLC-Software Phase 1 |
 | 编译目标 | `tools/tiaportal-mcp/src/TiaMcpServer/TiaMcpServer.V17.csproj` |
 | 运行时输出 | `tools/tiaportal-mcp/src/TiaMcpServer/bin-v17/Release/net48/TiaMcpServer.exe` |
 | 工具 profile | `plc-software-v17-phase1` |
-| 主链路 | project / hardware / PLC build-import / compile-save / readback |
-| 维护范围 | V17 分支内验证、修复和文档 |
+| 维护者 | `mianmianlingqi` |
 
-V17 启动示例：
+---
+
+## 支持范围
+
+当前 V17 Phase 1 支持：
+
+- 创建、打开、保存和关闭 TIA 工程
+- 搜索硬件目录
+- 添加 S7-1200 / PLC 设备
+- 构建并导入 PLC tag table
+- 构建并导入 UDT
+- 构建并导入 global DB
+- 导入 PLC XML
+- 导入外部 SCL source
+- 从外部源生成 PLC blocks
+- 编译 PLC 软件并返回结构化诊断
+- 保存后关闭重开工程
+- 读回 software tree、blocks、types、tag tables
+- 对 V17 不支持的能力返回明确 gated message
+
+---
+
+## 不包含内容
+
+当前 V17 Phase 1 不包含：
+
+- HMI / 画面生成
+- PLCSIM 自动下载
+- 自动下载到 PLC
+- 在线写值
+- force
+- 生产设备下载
+- `V20+ Documents / S7DCL` 的真实导入导出
+- `.ap17` 工程文件
+- `bin` / `obj` / runtime 输出
+- 日志、截图、备份
+- 本机绝对路径产物
+- 临时验证工程
+
+其中 `ExportAsDocuments`、`ImportFromDocuments` 等 Documents/S7DCL 工具在 V17 下只返回明确门禁说明，例如：
+
+```text
+requires TIA Portal V20 or newer
+```
+
+---
+
+## 环境要求
+
+- Windows
+- .NET Framework 4.8
+- TIA Portal V17
+- TIA Portal Openness V17
+- 当前 Windows 用户已加入本地组 `Siemens TIA Openness`
+- 首次连接时在 TIA Portal 中确认 Openness 授权弹窗
+
+如果 TIA Portal V17 安装在非默认路径，启动时请显式传入：
+
+```text
+--tia-portal-location "<TIA Portal V17 install root>"
+```
+
+---
+
+## 构建
+
+在仓库根目录执行：
 
 ```powershell
 dotnet build .\tools\tiaportal-mcp\src\TiaMcpServer\TiaMcpServer.V17.csproj -c Release
+```
 
+构建产物：
+
+```text
+tools\tiaportal-mcp\src\TiaMcpServer\bin-v17\Release\net48\TiaMcpServer.exe
+```
+
+---
+
+## 启动 MCP
+
+V17 必须显式启用运行时 profile：
+
+```powershell
 .\tools\tiaportal-mcp\src\TiaMcpServer\bin-v17\Release\net48\TiaMcpServer.exe `
   --tool-profile plc-software-v17-phase1 `
   --tia-major-version 17 `
@@ -120,129 +118,126 @@ dotnet build .\tools\tiaportal-mcp\src\TiaMcpServer\TiaMcpServer.V17.csproj -c R
   --with-ui
 ```
 
-也可以用环境变量启用 V17 profile：
+也可以使用环境变量启用 profile：
 
 ```powershell
 $env:TIA_MCP_TOOL_PROFILE = "plc-software-v17-phase1"
 ```
 
-当前 V17 支持：
-
-- 创建、打开、保存和关闭工程
-- 搜索硬件目录并添加 S7-1200 / PLC 设备
-- 构建并导入 PLC tag table / UDT / global DB
-- 导入 PLC XML、外部 SCL source，并从外部源生成块
-- 编译 PLC 软件并返回结构化诊断
-- 保存后关闭重开，并读回 software tree、blocks、types、tag tables
-
-当前 V17 gated / 不包含：
-
-- `V20+ Documents / S7DCL`：在 V17 下返回明确 gated 说明
-- `Unified HMI`：不作为 V17 Phase 1 主路径
-- 自动下载到 PLC
-- 在线写值
-- force
-- `.ap17` 工程文件、bin/obj、日志、截图、备份、本机绝对路径产物
-
-已验证的 V17 验收项：
-
-- `dotnet build TiaMcpServer.V17.csproj -c Release`：通过
-- `tools/list`：`plc-software-v17-phase1` 可读出，当前工具数为 62
-- gated 抽查：`ImportFromDocuments` / `ExportAsDocuments` 在 V17 下返回 `requires TIA Portal V20 or newer`
-- 真实 TIA V17 PLC smoke：`CreateProject -> AddDeviceWithFallback -> PlcBuildAndImport -> CompileAndDiagnosePlc -> SaveProject -> Close/Open -> Readback`
-
-V17 连接注意事项：
-
-- 首次连接可能触发 TIA/Openness 授权或安全确认弹窗
-- V17 默认采用 GUI-first 策略：优先附着可见 TIA GUI；无可见实例时优先 `WithUserInterface` 启动
-- 可先运行 `DiagnosePortalConnectReadiness` 判断是否卡在确认框
-- 若返回 `ConfirmationRequired`，请先切到 TIA 界面确认，再重试 `Connect`
-- `--without-ui` 仅保留给明确需要 headless 的高级场景，不作为 V17 默认连接路径
+`tools/list` 是运行时工具面的权威来源。当前 V17 profile 已验证工具数为 `62`。
 
 ---
 
-## 脱机校验（不启动博途）
+## 推荐调用顺序
 
-在项目根执行：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Validate-Bundle.ps1
-```
-
-校验：运行时存在、蓝图列出的文件齐全、`manifest/tools-list.json` 与清单工具数一致、各 PLC/HMI JSON 可解析。  
-加 `-Strict` 时对清单与矩阵有更严比对（可选）。
-
----
-
-## 两条工作路径
-
-| 目标 | 读什么 | MCP 顺序概要 |
-|------|--------|----------------|
-| **从零生成 PLC + Unified HMI 全套** | `templates/project-blueprints/full_plc_hmi_project.json` + `docs/full-project-generation-runbook.md` | `Bootstrap` → `CreateProject` → 硬件与网络 → **PLC：`PlcBuildAndImport` 每项先 `dryRun=true`** → `CompileAndDiagnosePlc` → **HMI：`EnsureUnified*` + `ApplyUnifiedHmiScreenDesignJson` + `BindUnifiedHmiTagDynamization` + `EnsureUnifiedHmiButtonAction`** → `SaveProject` |
-| **只验证 MCP/LAD/SCL 导入链路** | `templates/mcp-full-e2e-verify/README.md` | 在已有工程中按说明导入块与标签，再编译 |
-
----
-
-## 文档地图
-
-| 路径 | 说明 |
-|------|------|
-| `tools/tiaportal-mcp/skill/SKILL.md` | **主规范**：工具分层、参数陷阱、Unified HMI schema、LAD/SCL 边界 |
-| `manifest/tools-list.json` | 静态工具名与层级；**运行时权威列表**以连上服务器后的 `tools/list` 为准 |
-| `docs/tool-capability-matrix.md` | 能力矩阵（静态索引） |
-| `docs/full-project-generation-runbook.md` | 完整项目生成步骤 |
-| `docs/basic-plc-template-library.md` | PLC 指令与模板说明 |
-| `docs/scl-instruction-library.md` | **SCL 指令库**（控制流、缩放、定时计数、PID、斜坡、UDT 等中性模板） |
-| `docs/lad-instruction-library.md` | **LAD 指令库**（触点/线圈/比较/算术/定时/计数与 XML 注意点） |
-| `docs/hmi-plc-tag-binding-and-addressing.md` | **HMI↔PLC**：默认绝对地址、`DB200` 字节排布、红字排障 |
-| `docs/hmi-connection-driver-matrix.md` | **通讯驱动选择**（按 CPU 系列匹配 CommunicationDriver） |
-| `docs/mcp-ide-and-tool-visibility.md` | IDE 无关与工具列表权威来源（`tools/list`） |
-| `docs/optional-reference-materials.md` | 与仓库 `reference` 目录配合的样板工程说明 |
-| `docs/plc-network-patterns-expanded.md` | PLC 网络/指令扩展模式（加长程序段的写法） |
-| `docs/tools/*.md` | 分主题：PLC 构建、硬件、HMI 动作等 |
-| `手册/quickstart.md` | 英语速启 + 与本 README 对照 |
-| `手册/openness-limitations.md` | Openness **不能做** 的事项 |
-| `手册/error-model.md` | 错误形态说明 |
-| `手册/TIA_NL_INTENT_RECIPES.md` | 自然语言 → 工具序列索引 |
-| `templates/plc/README.md` / `templates/hmi/README.md` | 模板索引 |
-
----
-
-## 标准闭环（缩写）
+首次使用建议按以下顺序验证：
 
 ```text
-Bootstrap → Connect → CreateProject → AddDeviceWithFallback → AddHardwareCatalogDeviceWithProbe
-→ ConnectDeviceNodesToProfinetSubnet → GetProjectTree → ValidateAutomationContext
-→ PlcBuildAndImport(dryRun=true 逐项) → PlcBuildAndImport(dryRun=false 按导入顺序)
-→ CompileAndDiagnosePlc → EnsureUnifiedHmiConnection → EnsureUnifiedHmiTagTable → EnsureUnifiedHmiTag
-→ EnsureUnifiedHmiScreen → ApplyUnifiedHmiScreenDesignJson → BindUnifiedHmiTagDynamization
-→ EnsureUnifiedHmiButtonAction → SaveProject → Disconnect
+Bootstrap
+-> DiagnosePortalConnectReadiness
+-> Connect
+-> CreateProject
+-> GetProjectTree
+-> SearchHardwareCatalog
+-> AddDeviceWithFallback
+-> PlcBuildAndImport
+-> CompileAndDiagnosePlc
+-> SaveProject
+-> CloseProject
+-> OpenProject
+-> GetSoftwareTree
+-> GetBlocksWithHierarchy
+-> GetTypes
+-> GetPlcTagTables
+```
+
+`softwarePath` 不要硬猜。请先通过 `GetProjectTree` 或 `GetSoftwareTree` 读回真实 PLC 软件路径，再传给 PLC 相关工具。
+
+---
+
+## Connect 注意事项
+
+V17 Openness 在部分机器上可能出现人工确认阻塞：
+
+- 首次 attach / launch 可能弹出 TIA/Openness 授权或安全确认框
+- V17 默认采用 GUI-first 策略，优先附着可见 TIA GUI
+- 无可见实例时优先 `WithUserInterface` 启动，便于用户看到确认弹窗
+- 可先运行 `DiagnosePortalConnectReadiness` 判断是否疑似卡在确认框
+- 若返回 `ConfirmationRequired`，请切到 TIA Portal 界面确认，再重试 `Connect`
+- `--without-ui` 仅保留给明确需要 headless 的高级场景，不作为 V17 默认路径
+
+---
+
+## 已验证内容
+
+本分支已在本地 TIA Portal V17 / Openness V17 环境验证：
+
+- `dotnet build TiaMcpServer.V17.csproj -c Release` 通过
+- `tools/list` 可读出 `plc-software-v17-phase1` 工具面
+- V17 profile 工具数为 `62`
+- 必需 PLC 主链路工具均存在
+- HMI / download / online write / force 工具未暴露在该 profile 中
+- `ExportAsDocuments` / `ImportFromDocuments` 在 V17 下返回明确 gated 提示
+- 真实 V17 PLC smoke 通过：
+
+```text
+CreateProject
+-> AddDeviceWithFallback
+-> PlcBuildAndImport
+-> CompileAndDiagnosePlc
+-> SaveProject
+-> CloseProject
+-> OpenProject
+-> Readback
+```
+
+真实 smoke 中已验证对象：
+
+- `TT_PRSmoke`
+- `UDT_PRSmokeState`
+- `DB_PRSmoke`
+
+编译诊断结果：
+
+```text
+errorCount = 0
+warningCount = 0
 ```
 
 ---
 
-## 能力范围与边界
+## 贡献约定
 
-**可做**：项目与硬件、PROFINET、PLC 声明式导入、LAD XML 导入、Unified HMI 连接/变量（默认绝对地址）/画面/按钮 Down·Up/动态化、编译诊断、保存。  
+V17 分支接受面向 TIA Portal V17 / Openness V17 的 PR。
 
-**包内不含**：西门子安装介质、现场导出工程、业务专用工艺。`reference/` 仅作为风格与指令参考，不参与自动化生成；详见 `manifest/package-manifest.json` 中 `notBundled`。
+请不要提交：
 
-## HMI 绑定策略
+- `.ap17` 工程文件
+- `bin` / `obj`
+- 运行时输出
+- 日志
+- 截图
+- 备份目录
+- 本机绝对路径产物
+- 临时验证工程
+- token、cookie、证书或其他敏感信息
 
-- **统一采用绝对地址**：HMI 接口 DB `DB_HMI_Interface` 使用 **非优化（Standard）** 访问，字节偏移见 `templates/plc/plcbuild-json/db_hmi_interface.json` 的 `absoluteLayout`。  
-- **变量调用必须传地址**：调用 `EnsureUnifiedHmiTag` 时，按蓝图 `tags[]` 同时传 `plcTag` 和 `address`。例如 `plcTag="DB_HMI_Interface.CmdEnable"`、`address="%DB200.DBX0.0"`；读回时应看到 `Connection=HMI_Connection_1` 且 `Address/LogicalAddress` 为 `%DB200...`。  
-- **通讯驱动按实际 PLC 设备选**：`EnsureUnifiedHmiConnection` 的 `plcName` 使用 `GetProjectTree` 的 PLC 软件节点；工具会解析实际 PLC 设备、站点、PN 节点和 CPU 系列，写入 Partner/Station/Node 与对应驱动。详见 `docs/hmi-connection-driver-matrix.md`。  
-- **导入顺序**：先 PLC 编译通过 → 建 HMI 连接 → 建变量表 → 建画面 → `BindUnifiedHmiTagDynamization` → `EnsureUnifiedHmiButtonAction`。
+建议每个 V17 PR 附带：
+
+- build 结果
+- `tools/list` 结果摘要
+- gated 工具抽查结果
+- 如涉及真实 TIA 行为，附 smoke 验证摘要
 
 ---
 
-## 内容索引（路径）
+## 相关文档
 
-| 路径 | 说明 |
+| 文档 | 用途 |
 |------|------|
-| `tools/tiaportal-mcp/src/TiaMcpServer/bin/Release/net48/` | `TiaMcpServer.exe` 与依赖 |
-| `scripts/Validate-Bundle.ps1` | 交付包完整性校验 |
-| `templates/project-blueprints/full_plc_hmi_project.json` | 完整项目蓝图 |
-| `templates/plc/` | Tag、UDT、DB、FC、FB、LAD 配方、SCL 示例 |
-| `templates/hmi/` | Unified 多页 `designJson` |
-| `templates/mcp-full-e2e-verify/` | E2E 验证用导入素材 |
+| `手册/quickstart.md` | 快速启动和 MCP 基础调用方式 |
+| `tools/tiaportal-mcp/skill/SKILL.md` | MCP 工具使用规范 |
+| `docs/tool-capability-matrix.md` | 静态能力矩阵 |
+| `manifest/tools-list.json` | 静态工具清单 |
+
+注意：静态工具清单可能与运行时 profile 不完全一致。V17 下请以启动后的 `tools/list` 为准。
