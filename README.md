@@ -2,6 +2,12 @@
 
 [English](README.en.md) · **中文**
 
+> **当前分支说明**：如果你正在阅读 `v17` 分支或 `feat/v17-plc-software-profile` 分支，本分支的目标是 **TIA Portal V17 / Openness V17 的 PLC-Software Phase 1 支持**。
+>
+> 它不是 V17 全功能版，也不是 V20/V21 主线入口；V20/V21 用户请继续使用 `master` 分支。
+>
+> 当前 V17 范围只覆盖离线 PLC 工程主链路：项目、硬件、PLC build/import、编译保存和读回验证。
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Release](https://img.shields.io/github/v/release/bulaofen0036-coder/TIA_Portal_Openness_MCP)](https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP/releases) [![validate-bundle](https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP/actions/workflows/validate.yml/badge.svg)](https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP/actions/workflows/validate.yml)
 
 > **免费开源（MIT）**：服务器**无需任何 license key** 即可运行，**不含任何授权校验代码**。
@@ -92,7 +98,7 @@
 > `master` 继续保持 V20/V21 主线；V17 的验证、bugfix 和后续维护由社区维护者 `mianmianlingqi` 负责。
 > V17 相关 PR 只提交到 `v17` 分支；后续通用且稳定的修复会再单独拆成小 PR 回 `master`。
 
-V17 当前是 **PLC-Software Phase 1**：重点验证离线工程主链路，不覆盖 HMI、PLCSIM 下载或在线写值。
+V17 当前是 **PLC-Software Phase 1**：重点验证离线工程主链路，不是 V17 全功能版，不覆盖 HMI、PLCSIM 下载或在线写值。
 
 | 项目 | V17 当前状态 |
 |------|--------------|
