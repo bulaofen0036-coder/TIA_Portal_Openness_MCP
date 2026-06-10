@@ -719,7 +719,7 @@ namespace TiaMcpServer
                 return builder.WithTools(new[] { typeof(PlcSoftwareV17McpTools) });
             }
 
-            return builder.WithTools(new[] { typeof(McpServer) });
+            return builder.WithToolsFromAssembly();
         }
 
         private static void RunOnlineMonitoringSafetySelfTest()
