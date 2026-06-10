@@ -86,38 +86,72 @@
 3. **首次调用顺序**  
    - `Bootstrap` → `Connect` → `OpenProject`（或 `CreateProject`）→ `GetProjectTree`，从树中读取真实的 `PLC_xxx` / `HMI_RT_xxx` 路径再继续。
 
-### V17 PLC-Software profile（preview）
+### V17 分支 / PLC-Software Phase 1
 
-- 仓库现已包含独立编译目标：`tools/tiaportal-mcp/src/TiaMcpServer/TiaMcpServer.V17.csproj`
-- V17 运行时使用：
-  - `tools/tiaportal-mcp/src/TiaMcpServer/bin-v17/Release/net48/TiaMcpServer.exe`
-  - 并显式传 `--tool-profile plc-software-v17-phase1`
-  - 也可改用环境变量 `TIA_MCP_TOOL_PROFILE=plc-software-v17-phase1`
-- 当前 V17 支持边界：
-  - `project`
-  - `hardware`
-  - `PLC build/import`
-  - `compile/save`
-  - `readback`
-- 当前 V17 不支持或仅返回 gated 说明：
-  - `V20+ Documents / S7DCL`
-  - `Unified HMI`
-  - 自动下载到 PLC
-  - 在线写值
-  - `force`
-- 本地验证方式：
-  - `dotnet build tools/tiaportal-mcp/src/TiaMcpServer/TiaMcpServer.V17.csproj -c Release`
-  - `tools/list`
-  - 真实 TIA V17 临时工程 smoke
-- 当前已确认：
-  - `plc-software-v17-phase1` 运行时工具面可通过 `tools/list` 正常读出
-  - `ImportFromDocuments` / `ExportAsDocuments` 在 V17 下返回明确 gated 提示
-  - `SearchHardwareCatalog` fallback、V17 XML `Namespace` 兼容清洗、UDT/GlobalDB builder 去除空 `Namespace` 已落地
-- 当前环境注意事项：
-  - 在部分 V17 机器上，`Connect` / `AttachToOpenProject` 可能卡在等待 TIA/Openness 的人工确认弹窗
-  - V17 现默认采用 GUI-first 连接策略：优先附着可见 TIA GUI；无可见实例时优先 `WithUserInterface` 启动
-  - 可先运行 `DiagnosePortalConnectReadiness` 判断是否卡在确认框；若返回 `ConfirmationRequired`，请先切到 TIA 界面确认，再重试 `Connect`
-  - `--without-ui` 仅保留给明确知道自己要走 headless 的高级场景，不再作为 V17 默认连接路径
+> `v17` 分支面向 **TIA Portal V17 / Openness V17**。
+> `master` 继续保持 V20/V21 主线；V17 的验证、bugfix 和后续维护由社区维护者 `mianmianlingqi` 负责。
+> V17 相关 PR 只提交到 `v17` 分支；后续通用且稳定的修复会再单独拆成小 PR 回 `master`。
+
+V17 当前是 **PLC-Software Phase 1**：重点验证离线工程主链路，不覆盖 HMI、PLCSIM 下载或在线写值。
+
+| 项目 | V17 当前状态 |
+|------|--------------|
+| 编译目标 | `tools/tiaportal-mcp/src/TiaMcpServer/TiaMcpServer.V17.csproj` |
+| 运行时输出 | `tools/tiaportal-mcp/src/TiaMcpServer/bin-v17/Release/net48/TiaMcpServer.exe` |
+| 工具 profile | `plc-software-v17-phase1` |
+| 主链路 | project / hardware / PLC build-import / compile-save / readback |
+| 维护范围 | V17 分支内验证、修复和文档 |
+
+V17 启动示例：
+
+```powershell
+dotnet build .\tools\tiaportal-mcp\src\TiaMcpServer\TiaMcpServer.V17.csproj -c Release
+
+.\tools\tiaportal-mcp\src\TiaMcpServer\bin-v17\Release\net48\TiaMcpServer.exe `
+  --tool-profile plc-software-v17-phase1 `
+  --tia-major-version 17 `
+  --tia-portal-location "<TIA Portal V17 install root>" `
+  --with-ui
+```
+
+也可以用环境变量启用 V17 profile：
+
+```powershell
+$env:TIA_MCP_TOOL_PROFILE = "plc-software-v17-phase1"
+```
+
+当前 V17 支持：
+
+- 创建、打开、保存和关闭工程
+- 搜索硬件目录并添加 S7-1200 / PLC 设备
+- 构建并导入 PLC tag table / UDT / global DB
+- 导入 PLC XML、外部 SCL source，并从外部源生成块
+- 编译 PLC 软件并返回结构化诊断
+- 保存后关闭重开，并读回 software tree、blocks、types、tag tables
+
+当前 V17 gated / 不包含：
+
+- `V20+ Documents / S7DCL`：在 V17 下返回明确 gated 说明
+- `Unified HMI`：不作为 V17 Phase 1 主路径
+- 自动下载到 PLC
+- 在线写值
+- force
+- `.ap17` 工程文件、bin/obj、日志、截图、备份、本机绝对路径产物
+
+已验证的 V17 验收项：
+
+- `dotnet build TiaMcpServer.V17.csproj -c Release`：通过
+- `tools/list`：`plc-software-v17-phase1` 可读出，当前工具数为 62
+- gated 抽查：`ImportFromDocuments` / `ExportAsDocuments` 在 V17 下返回 `requires TIA Portal V20 or newer`
+- 真实 TIA V17 PLC smoke：`CreateProject -> AddDeviceWithFallback -> PlcBuildAndImport -> CompileAndDiagnosePlc -> SaveProject -> Close/Open -> Readback`
+
+V17 连接注意事项：
+
+- 首次连接可能触发 TIA/Openness 授权或安全确认弹窗
+- V17 默认采用 GUI-first 策略：优先附着可见 TIA GUI；无可见实例时优先 `WithUserInterface` 启动
+- 可先运行 `DiagnosePortalConnectReadiness` 判断是否卡在确认框
+- 若返回 `ConfirmationRequired`，请先切到 TIA 界面确认，再重试 `Connect`
+- `--without-ui` 仅保留给明确需要 headless 的高级场景，不作为 V17 默认连接路径
 
 ---
 
