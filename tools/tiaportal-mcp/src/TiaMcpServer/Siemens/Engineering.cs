@@ -27,10 +27,13 @@ namespace TiaMcpServer.Siemens
         public static string? TiaPortalLocationOverride { get; set; }
 
         // When true, launch TIA Portal with its full GUI (slower cold start, allows visual inspection).
-        // Default false = headless (WithoutUserInterface), which starts much faster. Set via --with-ui.
+        // V17 defaults to GUI-first unless the caller explicitly forces headless mode.
         // Lives here (not on Portal) because Program.Main must set it without forcing the CLR to load the
         // Portal type — Portal's Siemens.Engineering field types would be needed before Resolver is wired up.
         public static bool LaunchWithUserInterface { get; set; } = false;
+
+        // Explicit headless override for advanced/CLI scenarios.
+        public static bool ForceWithoutUserInterface { get; set; } = false;
 
         public static Assembly? Resolver(object sender, ResolveEventArgs args)
         {

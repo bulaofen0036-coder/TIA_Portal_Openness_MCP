@@ -114,9 +114,10 @@
   - `ImportFromDocuments` / `ExportAsDocuments` 在 V17 下返回明确 gated 提示
   - `SearchHardwareCatalog` fallback、V17 XML `Namespace` 兼容清洗、UDT/GlobalDB builder 去除空 `Namespace` 已落地
 - 当前环境注意事项：
-  - 在面包这台验证机上，TIA V17 Openness 的 `Connect` 冷启动可能卡在 `new TiaPortal(...)`
-  - 代码里已加入 attach 超时、启动超时与残留 portal 清理，便于给出明确错误而不是无限挂起
-  - 若遇到该情况，优先手动关闭残留 `Siemens.Automation.Portal.exe`，再重试 `Connect` 或先手动打开 TIA 后 `AttachToOpenProject`
+  - 在部分 V17 机器上，`Connect` / `AttachToOpenProject` 可能卡在等待 TIA/Openness 的人工确认弹窗
+  - V17 现默认采用 GUI-first 连接策略：优先附着可见 TIA GUI；无可见实例时优先 `WithUserInterface` 启动
+  - 可先运行 `DiagnosePortalConnectReadiness` 判断是否卡在确认框；若返回 `ConfirmationRequired`，请先切到 TIA 界面确认，再重试 `Connect`
+  - `--without-ui` 仅保留给明确知道自己要走 headless 的高级场景，不再作为 V17 默认连接路径
 
 ---
 

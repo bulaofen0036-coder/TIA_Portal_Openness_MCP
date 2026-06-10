@@ -86,9 +86,11 @@ TIA_MCP_TOOL_PROFILE=plc-software-v17-phase1
   3. run a real temporary TIA V17 PLC smoke project
 
 - Environment note:
-  - on some V17 machines, `Connect` may hang while Openness cold-starts `TiaPortal`
-  - this branch adds attach timeout, launch timeout, and orphan portal cleanup to make the failure mode explicit
-  - if this occurs, close leftover `Siemens.Automation.Portal.exe`, retry `Connect`, or open TIA manually first and then use `AttachToOpenProject`
+  - on some V17 machines, `Connect` or `AttachToOpenProject` may block while waiting for a TIA/Openness confirmation dialog
+  - V17 now defaults to a GUI-first connect path so the confirmation is visible to the user
+  - run `DiagnosePortalConnectReadiness` first if you suspect a confirmation dialog is blocking attach/launch
+  - if the response indicates `ConfirmationRequired`, confirm the dialog in TIA and then rerun `Connect`
+  - `--without-ui` remains available only as an explicit advanced override for headless scenarios
 
 ---
 

@@ -112,6 +112,10 @@ namespace TiaMcpServer
         public string? ProjectName { get; set; }
         public int? TiaStepTimeoutSeconds { get; set; }
         public bool PortalWithUserInterface { get; set; } // --with-ui: launch TIA with full GUI (slower) instead of headless
+        public bool PortalWithoutUserInterface { get; set; } // --without-ui: explicitly force headless launch
+        public bool RunInternalPortalProbe { get; set; }
+        public string? InternalPortalProbeAction { get; set; }
+        public int? InternalPortalProbePid { get; set; }
 
         public static CliOptions ParseArgs(string[] args)
         {
@@ -722,6 +726,30 @@ namespace TiaMcpServer
                     case "-with-ui":
                     case "--with-ui":
                         options.PortalWithUserInterface = true;
+                        break;
+
+                    case "--without-ui":
+                        options.PortalWithoutUserInterface = true;
+                        break;
+
+                    case "--internal-portal-probe":
+                        options.RunInternalPortalProbe = true;
+                        break;
+
+                    case "--internal-portal-probe-action":
+                        if (i + 1 < args.Length)
+                        {
+                            options.InternalPortalProbeAction = args[i + 1];
+                            i++;
+                        }
+                        break;
+
+                    case "--internal-portal-probe-pid":
+                        if (i + 1 < args.Length && int.TryParse(args[i + 1], out int probePid))
+                        {
+                            options.InternalPortalProbePid = probePid;
+                            i++;
+                        }
                         break;
 
                     case "--transport":

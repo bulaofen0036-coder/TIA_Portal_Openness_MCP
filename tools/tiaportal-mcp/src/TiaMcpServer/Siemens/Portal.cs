@@ -168,6 +168,7 @@ namespace TiaMcpServer.Siemens
                 try { result = proc.Attach(); }
                 catch (Exception ex) { error = ex; }
             }) { IsBackground = true };
+            worker.SetApartmentState(System.Threading.ApartmentState.STA);
             worker.Start();
             if (!worker.Join(timeoutMs))
             {
@@ -190,6 +191,7 @@ namespace TiaMcpServer.Siemens
                 catch (Exception ex) { error = ex; }
             }) { IsBackground = true };
 
+            worker.SetApartmentState(System.Threading.ApartmentState.STA);
             worker.Start();
             if (!worker.Join(timeoutMs))
             {
@@ -266,202 +268,12 @@ namespace TiaMcpServer.Siemens
 
         public bool ConnectPortal()
         {
-            _logger?.LogInformation("Connecting to TIA Portal...");
-
-            try
-            {
-                LastConnectError = null;
-                _project = null;
-                _session = null;
-                _portal = null;
-
-                // connect to running TIA Portal
-                var processes = TiaPortal.GetProcesses()
-                    .OrderByDescending(proc => HasVisibleMainWindow(proc.Id))
-                    .ThenByDescending(proc => GetProcessStartTimeOrMin(proc.Id))
-                    .ToList();
-                _logger?.LogInformation($"TIA Portal process count: {processes.Count}");
-                if (processes.Any())
-                {
-                    // IMPORTANT: multiple Siemens.Automation.Portal.exe can run at once.
-                    // Attaching to processes.First() is unstable and often attaches to an instance
-                    // without the user's open project, causing "project already opened by user" errors.
-                    //
-                    // Strategy:
-                    // - Try attach each process
-                    // - Prefer the first instance that exposes LocalSessions/Projects (i.e. has an open project)
-                    // - Otherwise fall back to the first attachable instance
-                    TiaPortal? firstAttachable = null;
-                    string? firstAttachableInfo = null;
-
-                    foreach (var proc in processes)
-                    {
-                        TiaPortal? candidate = null;
-                        try
-                        {
-                            _logger?.LogInformation($"Trying attach to TIA Portal process PID={proc.Id}");
-                            candidate = AttachWithTimeout(proc, 30000);
-                            _logger?.LogInformation(candidate == null
-                                ? $"Attach returned null/timed out for PID={proc.Id} — skipping"
-                                : $"Attach succeeded for PID={proc.Id}");
-                            if (candidate == null) continue;
-
-                            // record first attachable in case none has projects
-                            if (firstAttachable == null)
-                            {
-                                firstAttachable = candidate;
-                                firstAttachableInfo = $"PID={proc.Id}";
-                            }
-
-                            // Prefer instance with an open project/session
-                            bool hasSession = false;
-                            bool hasProject = false;
-                            try { hasSession = candidate.LocalSessions.Any(); } catch { }
-                            try { hasProject = candidate.Projects.Any(); } catch { }
-                            _logger?.LogInformation($"Portal PID={proc.Id}: hasSession={hasSession}, hasProject={hasProject}");
-
-                            if (hasSession || hasProject)
-                            {
-                                _portal = candidate;
-                                _logger?.LogInformation($"Selected attached TIA Portal PID={proc.Id}");
-
-                                if (hasSession)
-                                {
-                                    try
-                                    {
-                                        _session = _portal.LocalSessions.First();
-                                        _project = _session.Project;
-                                    }
-                                    catch { }
-                                }
-
-                                if (_project == null && hasProject)
-                                {
-                                    try { _project = _portal.Projects.First(); } catch { }
-                                }
-
-                                return true;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger?.LogWarning(ex, $"Attach failed for TIA Portal PID={proc.Id}");
-                            LastConnectError = ex.ToString();
-                        }
-                        finally
-                        {
-                            // If this candidate wasn't selected and isn't firstAttachable, dispose it.
-                            if (candidate != null && candidate != _portal && candidate != firstAttachable)
-                            {
-                                try { candidate.Dispose(); } catch { }
-                            }
-                        }
-                    }
-
-                    // fallback to first attachable instance
-                    if (firstAttachable != null)
-                    {
-                        _portal = firstAttachable;
-                        _logger?.LogInformation($"Falling back to first attachable TIA Portal ({firstAttachableInfo})");
-                        LastConnectError = $"Attached to first available portal ({firstAttachableInfo}), but it has no visible projects/sessions.";
-                        return true;
-                    }
-
-                    LastConnectError = "No attachable TIA Portal process found; starting a new TIA Portal instance.";
-                    _logger?.LogInformation(LastConnectError);
-                }
-
-                // start new TIA Portal. Headless (WithoutUserInterface) is the default because it
-                // starts far faster than booting the full GUI; --with-ui flips it for visual inspection.
-                var launchMode = Engineering.LaunchWithUserInterface
-                    ? TiaPortalMode.WithUserInterface
-                    : TiaPortalMode.WithoutUserInterface;
-                _logger?.LogInformation($"Starting a new TIA Portal instance ({launchMode}).");
-                _portal = LaunchPortalWithTimeout(launchMode, 120000);
-                _logger?.LogInformation($"Started TIA Portal instance ({launchMode}) successfully.");
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                // 统一错误处理：硬失败抛结构化异常，替代 return false + LastConnectError 侧信道
-                throw new PortalException(PortalErrorCode.OpennessError, $"ConnectPortal failed: {FormatExceptionDetail(ex)}", inner: ex);
-            }
+            return ConnectPortalSafe();
         }
 
         public List<string> ListPortalProcessProjects()
         {
-            var lines = new List<string>();
-            IReadOnlyList<TiaPortalProcess> processes;
-            try
-            {
-                processes = TiaPortal.GetProcesses().ToList();
-            }
-            catch (Exception ex)
-            {
-                lines.Add("GetProcesses error: " + FormatExceptionDetail(ex));
-                return lines;
-            }
-
-            lines.Add("TIA Portal process count: " + processes.Count);
-            foreach (var proc in processes)
-            {
-                TiaPortal? candidate = null;
-                try
-                {
-                    lines.Add("PID=" + proc.Id + " attach: trying");
-                    candidate = proc.Attach();
-                    if (candidate == null)
-                    {
-                        lines.Add("PID=" + proc.Id + " attach: <null>");
-                        continue;
-                    }
-
-                    lines.Add("PID=" + proc.Id + " attach: OK");
-                    try
-                    {
-                        var any = false;
-                        foreach (var s in candidate.LocalSessions)
-                        {
-                            any = true;
-                            lines.Add("PID=" + proc.Id + " sessionProject=" + (s.Project?.Name ?? "<null>"));
-                        }
-                        if (!any) lines.Add("PID=" + proc.Id + " sessions=<empty>");
-                    }
-                    catch (Exception ex)
-                    {
-                        lines.Add("PID=" + proc.Id + " sessions error: " + FormatExceptionDetail(ex));
-                    }
-
-                    try
-                    {
-                        var any = false;
-                        foreach (var p in candidate.Projects)
-                        {
-                            any = true;
-                            lines.Add("PID=" + proc.Id + " project=" + (p?.Name ?? "<null>"));
-                        }
-                        if (!any) lines.Add("PID=" + proc.Id + " projects=<empty>");
-                    }
-                    catch (Exception ex)
-                    {
-                        lines.Add("PID=" + proc.Id + " projects error: " + FormatExceptionDetail(ex));
-                    }
-                }
-                catch (Exception ex)
-                {
-                    lines.Add("PID=" + proc.Id + " attach error: " + FormatExceptionDetail(ex));
-                }
-                finally
-                {
-                    if (candidate != null && candidate != _portal)
-                    {
-                        try { candidate.Dispose(); } catch { }
-                    }
-                }
-            }
-
-            return lines;
+            return ListPortalProcessProjectsSafe();
         }
 
         public bool IsConnected()
@@ -540,55 +352,7 @@ namespace TiaMcpServer.Siemens
 
         public bool AttachToOpenProject(string projectName)
         {
-            _logger?.LogInformation($"Attaching to open project: {projectName}");
-
-            if (string.IsNullOrWhiteSpace(projectName)) return false;
-            projectName = projectName.Trim();
-
-            // Connect 之后 TIA 的 LocalSessions / Projects 是异步填充的，
-            // 这里轮询最多 15s，避免 Connect+Attach 并行或刚启动时刷出 false。
-            var deadline = DateTime.UtcNow.AddSeconds(15);
-            while (true)
-            {
-                try
-                {
-                    if (_portal != null && TryAttachProjectInPortal(_portal, projectName))
-                    {
-                        return true;
-                    }
-
-                    foreach (var proc in TiaPortal.GetProcesses())
-                    {
-                        try
-                        {
-                            var candidate = proc.Attach();
-                            if (candidate == null) continue;
-                            if (TryAttachProjectInPortal(candidate, projectName))
-                            {
-                                if (_portal != null && !ReferenceEquals(_portal, candidate))
-                                {
-                                    try { _portal.Dispose(); } catch { }
-                                }
-
-                                _portal = candidate;
-                                return true;
-                            }
-
-                            if (!ReferenceEquals(_portal, candidate))
-                            {
-                                try { candidate.Dispose(); } catch { }
-                            }
-                        }
-                        catch { }
-                    }
-                }
-                catch { }
-
-                if (DateTime.UtcNow >= deadline) break;
-                System.Threading.Thread.Sleep(500);
-            }
-
-            return false;
+            return AttachToOpenProjectSafe(projectName);
         }
 
         private bool TryAttachProjectInPortal(TiaPortal portal, string projectName)
@@ -771,9 +535,11 @@ namespace TiaMcpServer.Siemens
         public bool CreateProject(string directoryPath, string projectName)
         {
             _logger?.LogInformation($"Creating project: dir={directoryPath}, name={projectName}");
+            LastConnectError = null;
 
             if (IsPortalNull())
             {
+                LastConnectError = "CreateProject failed because TIA Portal is not connected.";
                 return false;
             }
 
@@ -796,10 +562,18 @@ namespace TiaMcpServer.Siemens
 
                 var created = _portal!.Projects.Create(di, projectName);
                 _project = created;
+                LastConnectError = null;
                 return _project != null;
+            }
+            catch (TargetInvocationException tie) when (tie.InnerException != null)
+            {
+                LastConnectError = $"Projects.Create failed: {tie.InnerException.GetType().FullName}: {tie.InnerException.Message}";
+                _logger?.LogError(tie.InnerException, "CreateProject failed: dir={Dir}, name={Name}", directoryPath, projectName);
+                return false;
             }
             catch (Exception ex)
             {
+                LastConnectError = $"Projects.Create failed: {ex.GetType().FullName}: {ex.Message}";
                 _logger?.LogError(ex, "CreateProject failed: dir={Dir}, name={Name}", directoryPath, projectName);
                 return false;
             }
@@ -3433,13 +3207,9 @@ namespace TiaMcpServer.Siemens
             var plc = GetPlcSoftware(softwarePath);
             if (plc == null) return null;
 
-            // common shapes: plc.TagTables OR plc.TagTableGroup.TagTables
-            object? tables =
-                TryGetPropertyValue(plc, "TagTables") ??
-                TryGetPropertyValue(TryGetPropertyValue(plc, "TagTableGroup", "TagTableFolder") ?? plc, "TagTables");
-
+            var tables = ResolvePlcTagTablesCollection(plc);
             if (tables == null) return new List<string>();
-            return TryListNamesFromCollection(tables, new[] { "TagTables" }, "TagTables");
+            return TryListNamesFromCollection(tables, Array.Empty<string>(), "TagTables");
         }
 
         public bool ExportPlcTagTable(string softwarePath, string tagTableName, string exportPath)
@@ -3448,11 +3218,10 @@ namespace TiaMcpServer.Siemens
             var plc = GetPlcSoftware(softwarePath);
             if (plc == null) return false;
 
-            object? tablesRoot = TryGetPropertyValue(plc, "TagTables") ??
-                                 TryGetPropertyValue(plc, "TagTableGroup", "TagTableFolder") ??
-                                 plc;
-
-            var table = TryFindByNameInCollection(tablesRoot, new[] { "TagTables" }, tagTableName);
+            var tables = ResolvePlcTagTablesCollection(plc);
+            var table = tables == null
+                ? null
+                : FindExistingByName(tables, tagTableName) ?? TryFindByNameInCollection(tables, Array.Empty<string>(), tagTableName);
             if (table == null) return false;
             return TryExportEngineeringObject(table, exportPath, out _);
         }
@@ -3466,11 +3235,10 @@ namespace TiaMcpServer.Siemens
 
             try
             {
-                object root = TryGetPropertyValue(plc, "TagTableGroup", "TagTableFolder") ?? plc;
+                object root = ResolvePlcTagTableGroup(plc) ?? plc;
                 var group = TryResolveChildGroupByPath(root, folderPath) ?? root;
 
-                // TagTables collection lives on group
-                var tables = TryGetPropertyValue(group, "TagTables") ?? TryGetPropertyValue(root, "TagTables");
+                var tables = TryGetPropertyValue(group, "TagTables") ?? ResolvePlcTagTablesCollection(plc);
                 if (tables == null)
                     throw new PortalException(PortalErrorCode.NotFound, $"TagTables collection not found. plcType={plc.GetType().FullName} groupType={group.GetType().FullName}");
 
@@ -3490,6 +3258,26 @@ namespace TiaMcpServer.Siemens
             {
                 throw new PortalException(PortalErrorCode.ImportFailed, ex.Message, null, ex);
             }
+        }
+
+        private static object? ResolvePlcTagTableGroup(PlcSoftware plc)
+        {
+            return TryGetPropertyValue(plc,
+                "TagTableGroup",
+                "TagTableFolder",
+                "PlcTagTableGroup",
+                "PlcTagTableFolder");
+        }
+
+        private static object? ResolvePlcTagTablesCollection(PlcSoftware plc)
+        {
+            var direct = TryGetPropertyValue(plc, "TagTables", "PlcTagTables", "Tables");
+            if (direct != null) return direct;
+
+            var group = ResolvePlcTagTableGroup(plc);
+            return group == null
+                ? null
+                : TryGetPropertyValue(group, "TagTables", "PlcTagTables", "Tables");
         }
 
         public ResponseImportBatch ImportPlcTagTablesFromDirectory(string softwarePath, string folderPath, string dir, string regexName = "", bool overwrite = true)

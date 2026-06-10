@@ -33,6 +33,11 @@ namespace TiaMcpServer.ModelContextProtocol
         [McpServerTool(Name = "ListPortalProcessProjects"), Description("[L1][V17-Phase1] 列出可见 TIA Portal 进程和工程。")]
         public static ResponseStringList ListPortalProcessProjects() => McpServer.ListPortalProcessProjects();
 
+        [McpServerTool(Name = "DiagnosePortalConnectReadiness"), Description("[L0][V17-Phase1] 只读诊断 V17 Connect 是否卡在人工确认。")]
+        public static ResponsePortalConnectReadiness DiagnosePortalConnectReadiness(
+            [Description("为 true 时返回当前 portal 相关窗口摘要。")] bool includeWindows = true)
+            => McpServer.DiagnosePortalConnectReadiness(includeWindows);
+
         [McpServerTool(Name = "GetState"), Description("[L0][V17-Phase1] 获取连接和当前工程状态。")]
         public static ResponseState GetState() => McpServer.GetState();
 
