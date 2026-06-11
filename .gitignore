@@ -2,10 +2,13 @@
 *.startup.log
 .vs/
 **/obj/
+**/obj-v17/
 **/obj-v20/
 **/bin/Debug/
+**/bin-v17/Debug/
 **/bin-v20/Debug/
 **/bin/Release/
+**/bin-v17/Release/
 **/bin-v20/Release/
 TiaMcp_Output/
 *.user

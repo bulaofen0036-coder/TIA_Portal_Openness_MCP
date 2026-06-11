@@ -8,7 +8,10 @@ namespace TiaMcpServer.Siemens
         InvalidParams,
         InvalidState,
         OpennessError,
-        NotSupportedOnVersion
+        NotSupportedOnVersion,
+        Timeout,
+        ConfirmationRequired,
+        ConnectionProbeFailed
     }
 }
 

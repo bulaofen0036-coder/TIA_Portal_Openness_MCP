@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Server;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -11,6 +12,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 using TiaMcpServer.ModelContextProtocol;
@@ -20,6 +22,7 @@ namespace TiaMcpServer
 {
     public class Program
     {
+        private const string PlcSoftwareV17Phase1ToolProfile = "plc-software-v17-phase1";
         private static readonly string DiagLogPath = Path.Combine(Path.GetTempPath(), "TiaMcpServer.log");
         private static readonly string DiagLogPathLocal = Path.Combine(AppContext.BaseDirectory, "TiaMcpServer.startup.log");
         private delegate void StructuredTextLine(StringBuilder st, params string[] parts);
@@ -50,6 +53,10 @@ namespace TiaMcpServer
                 LogDiag($"Args: {string.Join(" ", args)}");
 
                 var options = CliOptions.ParseArgs(args);
+                options.ToolProfile = ResolveToolProfile(options.ToolProfile);
+                LogDiag(string.IsNullOrWhiteSpace(options.ToolProfile)
+                    ? "Tool profile: full (default)"
+                    : $"Tool profile: {options.ToolProfile}");
 
                 // Default logging to stderr (mode 1) when the user doesn't pass --logging,
                 // so errors are visible out of the box. Users can opt out with --logging 0
@@ -88,13 +95,25 @@ namespace TiaMcpServer
                 // 这里只注册程序集解析器，不初始化 Openness，也不连接或打开 TIA 项目。
                 AppDomain.CurrentDomain.AssemblyResolve += Engineering.Resolver;
 
-                // Headless by default for fast startup; --with-ui launches the full GUI for inspection.
-                // Flag lives on Engineering (Siemens-free) so setting it here doesn't force the CLR to
-                // load the Portal type (its Siemens.Engineering fields) at Main's JIT time.
-                Engineering.LaunchWithUserInterface = options.PortalWithUserInterface;
-                LogDiag(options.PortalWithUserInterface
-                    ? "TIA Portal will launch WITH user interface (--with-ui); slower cold start."
-                    : "TIA Portal will launch headless (WithoutUserInterface) for faster startup; pass --with-ui to show the GUI.");
+                // V17 defaults to GUI-first because attach/launch may require an interactive Openness
+                // confirmation. --without-ui is retained as an explicit advanced override.
+                Engineering.ForceWithoutUserInterface = options.PortalWithoutUserInterface;
+                Engineering.LaunchWithUserInterface = options.PortalWithUserInterface
+                    || (Engineering.TiaMajorVersion == 17 && !options.PortalWithoutUserInterface);
+                if (Engineering.ForceWithoutUserInterface)
+                {
+                    LogDiag("TIA Portal will launch headless (WithoutUserInterface) due to explicit --without-ui override.");
+                }
+                else if (Engineering.LaunchWithUserInterface)
+                {
+                    LogDiag(Engineering.TiaMajorVersion == 17
+                        ? "TIA Portal V17 defaults to WITH user interface for interactive-safe Connect."
+                        : "TIA Portal will launch WITH user interface (--with-ui); slower cold start.");
+                }
+                else
+                {
+                    LogDiag("TIA Portal will launch headless (WithoutUserInterface) for faster startup; pass --with-ui to show the GUI.");
+                }
 
                 // CLI verb dispatch: `tia gen|patch|compile|export|import|describe|prewarm|schema|version`.
                 // Engine config (assembly resolver, version, headless) is already applied above, so verb
@@ -276,7 +295,7 @@ namespace TiaMcpServer
                     return;
                 }
 
-                if (Engineering.TiaMajorVersion >= 20)
+                if (Engineering.TiaMajorVersion >= 17)
                 {
                     try
                     {
@@ -301,6 +320,12 @@ namespace TiaMcpServer
                         LogDiag(ex.ToString());
                         throw;
                     }
+                }
+
+                if (options.RunInternalPortalProbe)
+                {
+                    RunInternalPortalProbe(options);
+                    return;
                 }
 
                 // Ensure user is in user group 'Siemens TIA Openness'.
@@ -568,10 +593,10 @@ namespace TiaMcpServer
 
                 try
                 {
-                    builder.Services
+                    var mcpBuilder = builder.Services
                         .AddMcpServer()
-                        .WithStdioServerTransport()
-                        .WithToolsFromAssembly()
+                        .WithStdioServerTransport();
+                    RegisterProfileTools(mcpBuilder, options)
                         .WithPromptsFromAssembly();
                 }
                 catch (ReflectionTypeLoadException ex)
@@ -654,10 +679,10 @@ namespace TiaMcpServer
                     }
                 }
 
-                builder.Services
+                var mcpBuilder = builder.Services
                     .AddMcpServer()
-                    .WithStreamServerTransport(httpToMcp, mcpToHttp)
-                    .WithToolsFromAssembly()
+                    .WithStreamServerTransport(httpToMcp, mcpToHttp);
+                RegisterProfileTools(mcpBuilder, options)
                     .WithPromptsFromAssembly();
 
                 builder.Services.AddSingleton<TiaMcpServer.Siemens.Portal>();
@@ -671,6 +696,30 @@ namespace TiaMcpServer
 
             await HttpMcpServer.Run(options, httpToMcp, mcpToHttp, LogDiag).ConfigureAwait(false);
             await mcpTask.ConfigureAwait(false);
+        }
+
+        private static string ResolveToolProfile(string? cliProfile)
+        {
+            var profile = string.IsNullOrWhiteSpace(cliProfile)
+                ? Environment.GetEnvironmentVariable("TIA_MCP_TOOL_PROFILE")
+                : cliProfile;
+            return string.IsNullOrWhiteSpace(profile) ? string.Empty : profile.Trim();
+        }
+
+        private static bool IsPlcSoftwareV17Phase1Profile(CliOptions? options)
+        {
+            return string.Equals(options?.ToolProfile, PlcSoftwareV17Phase1ToolProfile, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static IMcpServerBuilder RegisterProfileTools(IMcpServerBuilder builder, CliOptions? options)
+        {
+            if (IsPlcSoftwareV17Phase1Profile(options))
+            {
+                LogDiag("Registering PLC-Software V17 phase1 tool surface only.");
+                return builder.WithTools(new[] { typeof(PlcSoftwareV17McpTools) });
+            }
+
+            return builder.WithToolsFromAssembly();
         }
 
         private static void RunOnlineMonitoringSafetySelfTest()
@@ -1785,8 +1834,6 @@ namespace TiaMcpServer
             Directory.CreateDirectory(projectDirectory);
 
             LogDiag("Listing TIA Portal processes/projects");
-            var connect = McpServer.Connect();
-            LogDiag(connect.Message ?? "Connect completed");
             var list = McpServer.ListPortalProcessProjects();
 
             var reportPath = Path.Combine(projectDirectory, "TIA_PORTAL_PROCESS_PROJECTS_REPORT.txt");
@@ -1795,6 +1842,136 @@ namespace TiaMcpServer
             foreach (var item in list.Items ?? Array.Empty<string>()) sb.AppendLine(item);
             File.WriteAllText(reportPath, sb.ToString(), Encoding.UTF8);
             LogDiag("TIA Portal process/project report written: " + reportPath);
+        }
+
+        private static void RunInternalPortalProbe(CliOptions options)
+        {
+            var action = (options.InternalPortalProbeAction ?? string.Empty).Trim().ToLowerInvariant();
+            var portal = new Portal();
+
+            object result;
+            switch (action)
+            {
+                case "attach_pid":
+                    result = RunStaProbe(() =>
+                    {
+                        if (!options.InternalPortalProbePid.HasValue)
+                            throw new InvalidOperationException("internal portal probe requires --internal-portal-probe-pid for attach_pid");
+
+                        var proc = global::Siemens.Engineering.TiaPortal.GetProcesses().FirstOrDefault(p => p.Id == options.InternalPortalProbePid.Value);
+                        if (proc == null)
+                            throw new InvalidOperationException($"TIA Portal process not found: PID={options.InternalPortalProbePid.Value}");
+
+                        using var attached = proc.Attach();
+                        return new
+                        {
+                            action = action,
+                            success = attached != null,
+                            processId = options.InternalPortalProbePid.Value,
+                            apartmentState = Thread.CurrentThread.GetApartmentState().ToString()
+                        };
+                    });
+                    break;
+
+                case "inspect_attached_portal":
+                    result = RunStaProbe(() =>
+                    {
+                        if (!options.InternalPortalProbePid.HasValue)
+                            throw new InvalidOperationException("internal portal probe requires --internal-portal-probe-pid for inspect_attached_portal");
+
+                        var proc = global::Siemens.Engineering.TiaPortal.GetProcesses().FirstOrDefault(p => p.Id == options.InternalPortalProbePid.Value);
+                        if (proc == null)
+                            throw new InvalidOperationException($"TIA Portal process not found: PID={options.InternalPortalProbePid.Value}");
+
+                        using var attached = proc.Attach();
+                        bool hasSessions = false;
+                        bool hasProjects = false;
+                        try
+                        {
+                            hasSessions = attached.LocalSessions.Any();
+                        }
+                        catch { }
+
+                        try
+                        {
+                            hasProjects = attached.Projects.Any();
+                        }
+                        catch { }
+
+                        return new
+                        {
+                            action = action,
+                            success = true,
+                            processId = options.InternalPortalProbePid.Value,
+                            hasSessions,
+                            hasProjects,
+                            sessionProjectNames = Array.Empty<string>(),
+                            projectNames = Array.Empty<string>(),
+                            apartmentState = Thread.CurrentThread.GetApartmentState().ToString()
+                        };
+                    });
+                    break;
+
+                case "launch_with_ui":
+                case "launch_without_ui":
+                    result = RunStaProbe(() =>
+                    {
+                        var mode = action == "launch_with_ui"
+                            ? global::Siemens.Engineering.TiaPortalMode.WithUserInterface
+                            : global::Siemens.Engineering.TiaPortalMode.WithoutUserInterface;
+                        using var launched = new global::Siemens.Engineering.TiaPortal(mode);
+                        return new
+                        {
+                            action = action,
+                            success = launched != null,
+                            launchMode = mode.ToString(),
+                            apartmentState = Thread.CurrentThread.GetApartmentState().ToString()
+                        };
+                    });
+                    break;
+
+                default:
+                    throw new InvalidOperationException($"Unsupported --internal-portal-probe-action: '{options.InternalPortalProbeAction}'");
+            }
+
+            var json = System.Text.Json.JsonSerializer.Serialize(result);
+            Console.Out.WriteLine(json);
+        }
+
+        private static object RunStaProbe(Func<object> fn)
+        {
+            object? result = null;
+            Exception? error = null;
+            var worker = new Thread(() =>
+            {
+                try { result = fn(); }
+                catch (Exception ex) { error = ex; }
+            });
+            worker.SetApartmentState(ApartmentState.STA);
+            worker.IsBackground = false;
+            worker.Start();
+            worker.Join();
+
+            if (error != null)
+            {
+                return new
+                {
+                    action = "probe",
+                    success = false,
+                    errorType = error.GetType().FullName,
+                    errorMessage = error.Message,
+                    apartmentState = ApartmentState.STA.ToString()
+                };
+            }
+
+            return result ?? new
+            {
+                action = "probe",
+                success = false,
+                errorType = "System.InvalidOperationException",
+                errorMessage = "STA probe returned null result.",
+                apartmentState = ApartmentState.STA.ToString()
+            };
         }
 
         private static async Task RunCapabilitySelfTest(CliOptions options)

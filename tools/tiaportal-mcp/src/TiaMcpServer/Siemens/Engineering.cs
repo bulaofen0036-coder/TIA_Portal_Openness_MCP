@@ -12,15 +12,28 @@ namespace TiaMcpServer.Siemens
     {
         public static int TiaMajorVersion { get; set; }
 
+        // XML engineering version used by offline XML builders and compatibility patches.
+#if TIA_V17
+        public const string TiaXmlEngineeringVersion = "V17";
+        public static bool SupportsBlockNamespaceAttribute => false;
+#else
+        public static string TiaXmlEngineeringVersion =>
+            TiaMajorVersion > 0 ? $"V{TiaMajorVersion}" : "V21";
+        public static bool SupportsBlockNamespaceAttribute => TiaMajorVersion <= 0 || TiaMajorVersion >= 18;
+#endif
+
         // Optional explicit override (CLI --tia-portal-location), e.g. D:\app\TIA20\Portal V20.
         // Takes precedence over TiaPortalLocation env var and registry lookup.
         public static string? TiaPortalLocationOverride { get; set; }
 
         // When true, launch TIA Portal with its full GUI (slower cold start, allows visual inspection).
-        // Default false = headless (WithoutUserInterface), which starts much faster. Set via --with-ui.
+        // V17 defaults to GUI-first unless the caller explicitly forces headless mode.
         // Lives here (not on Portal) because Program.Main must set it without forcing the CLR to load the
         // Portal type — Portal's Siemens.Engineering field types would be needed before Resolver is wired up.
         public static bool LaunchWithUserInterface { get; set; } = false;
+
+        // Explicit headless override for advanced/CLI scenarios.
+        public static bool ForceWithoutUserInterface { get; set; } = false;
 
         public static Assembly? Resolver(object sender, ResolveEventArgs args)
         {

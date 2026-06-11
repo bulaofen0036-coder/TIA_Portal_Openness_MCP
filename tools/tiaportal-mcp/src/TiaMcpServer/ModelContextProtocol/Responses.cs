@@ -79,6 +79,17 @@ namespace TiaMcpServer.ModelContextProtocol
 
     public class ResponseConnect : ResponseMessage
     {
+        public string? Stage { get; set; }
+        public string? Strategy { get; set; }
+        public IEnumerable<int>? AttemptedPids { get; set; }
+        public string? LaunchMode { get; set; }
+        public bool? NeedsUserConfirmation { get; set; }
+        public IEnumerable<string>? DetectedPromptTitles { get; set; }
+        public IEnumerable<int>? DetectedPromptPids { get; set; }
+        public long? ElapsedMs { get; set; }
+        public IEnumerable<int>? CleanupPids { get; set; }
+        public IEnumerable<string>? Recommendations { get; set; }
+        public string? ErrorCode { get; set; }
     }
 
     public class ResponseDisconnect : ResponseMessage
@@ -227,6 +238,42 @@ namespace TiaMcpServer.ModelContextProtocol
     public class ResponseStringList : ResponseMessage
     {
         public IEnumerable<string>? Items { get; set; }
+    }
+
+    public class PortalProcessDiagnostic
+    {
+        public int? ProcessId { get; set; }
+        public bool? HasVisibleWindow { get; set; }
+        public string? SortKey { get; set; }
+        public string? ProbeStatus { get; set; }
+        public long? ElapsedMs { get; set; }
+        public bool? HasSessions { get; set; }
+        public bool? HasProjects { get; set; }
+        public IEnumerable<string>? SessionProjectNames { get; set; }
+        public IEnumerable<string>? ProjectNames { get; set; }
+        public string? ErrorType { get; set; }
+        public string? ErrorMessage { get; set; }
+    }
+
+    public class PortalWindowObservation
+    {
+        public int? ProcessId { get; set; }
+        public string? ProcessName { get; set; }
+        public string? Title { get; set; }
+        public string? ClassName { get; set; }
+        public bool? IsNewWindow { get; set; }
+    }
+
+    public class ResponsePortalConnectReadiness : ResponseMessage
+    {
+        public string? Stage { get; set; }
+        public string? Strategy { get; set; }
+        public bool? NeedsUserConfirmation { get; set; }
+        public int? VisibleProcessCount { get; set; }
+        public IEnumerable<PortalProcessDiagnostic>? Processes { get; set; }
+        public IEnumerable<PortalWindowObservation>? Windows { get; set; }
+        public IEnumerable<string>? Recommendations { get; set; }
+        public long? ElapsedMs { get; set; }
     }
 
     public class ResponseExportFile : ResponseMessage

@@ -9,7 +9,9 @@ using Siemens.Engineering.Online;
 using Siemens.Engineering.Online.Configurations;
 using Siemens.Engineering.SW.Alarm;
 using Siemens.Engineering.SW.OpcUa;
+#if !TIA_V17
 using Siemens.Engineering.HmiUnified;
+#endif
 using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.Multiuser;
@@ -20,6 +22,7 @@ using Siemens.Engineering.SW.Types;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -37,6 +40,11 @@ namespace TiaMcpServer.Siemens
 {
     public partial class Portal
     {
+        private sealed class Utf8StringWriter : StringWriter
+        {
+            public override Encoding Encoding => new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+        }
+
         // closing parantheses for regex characters ommitted, because they are not relevant for regex detection
         private readonly char[] _regexChars = ['.', '^', '$', '*', '+', '?', '(', '[', '{', '\\', '|'];
 
@@ -160,6 +168,7 @@ namespace TiaMcpServer.Siemens
                 try { result = proc.Attach(); }
                 catch (Exception ex) { error = ex; }
             }) { IsBackground = true };
+            worker.SetApartmentState(System.Threading.ApartmentState.STA);
             worker.Start();
             if (!worker.Join(timeoutMs))
             {
@@ -170,200 +179,101 @@ namespace TiaMcpServer.Siemens
             return result;
         }
 
-        public bool ConnectPortal()
+        private TiaPortal LaunchPortalWithTimeout(TiaPortalMode mode, int timeoutMs)
         {
-            _logger?.LogInformation("Connecting to TIA Portal...");
+            TiaPortal? result = null;
+            Exception? error = null;
+            var portalProcessesBeforeLaunch = SnapshotPortalProcessIds();
 
+            var worker = new System.Threading.Thread(() =>
+            {
+                try { result = new TiaPortal(mode); }
+                catch (Exception ex) { error = ex; }
+            }) { IsBackground = true };
+
+            worker.SetApartmentState(System.Threading.ApartmentState.STA);
+            worker.Start();
+            if (!worker.Join(timeoutMs))
+            {
+                var cleanedPortalPids = CleanupNewPortalProcesses(portalProcessesBeforeLaunch);
+                var cleanupNote = cleanedPortalPids.Count > 0
+                    ? $" Cleaned up portal PID(s): {string.Join(", ", cleanedPortalPids)}."
+                    : string.Empty;
+                throw new PortalException(
+                    PortalErrorCode.OpennessError,
+                    $"Starting TIA Portal ({mode}) timed out after {timeoutMs}ms.{cleanupNote} Start TIA Portal manually once, close orphaned Siemens.Automation.Portal processes, then retry Connect or AttachToOpenProject.",
+                    inner: new TimeoutException($"Launching TIA Portal ({mode}) exceeded {timeoutMs}ms."));
+            }
+
+            if (error != null) throw error;
+            return result ?? throw new PortalException(
+                PortalErrorCode.OpennessError,
+                $"Starting TIA Portal ({mode}) returned null.");
+        }
+
+        private static HashSet<int> SnapshotPortalProcessIds()
+        {
+            return Process.GetProcessesByName("Siemens.Automation.Portal")
+                .Select(p => p.Id)
+                .ToHashSet();
+        }
+
+        private static List<int> CleanupNewPortalProcesses(HashSet<int> portalProcessesBeforeLaunch)
+        {
+            var killed = new List<int>();
+
+            foreach (var proc in Process.GetProcessesByName("Siemens.Automation.Portal"))
+            {
+                try
+                {
+                    if (portalProcessesBeforeLaunch.Contains(proc.Id))
+                        continue;
+
+                    killed.Add(proc.Id);
+                    proc.Kill();
+                }
+                catch
+                {
+                    // best effort only
+                }
+            }
+
+            return killed;
+        }
+
+        private static bool HasVisibleMainWindow(int processId)
+        {
             try
             {
-                LastConnectError = null;
-                _project = null;
-                _session = null;
-                _portal = null;
-
-                // connect to running TIA Portal
-                var processes = TiaPortal.GetProcesses();
-                _logger?.LogInformation($"TIA Portal process count: {processes.Count()}");
-                if (processes.Any())
-                {
-                    // IMPORTANT: multiple Siemens.Automation.Portal.exe can run at once.
-                    // Attaching to processes.First() is unstable and often attaches to an instance
-                    // without the user's open project, causing "project already opened by user" errors.
-                    //
-                    // Strategy:
-                    // - Try attach each process
-                    // - Prefer the first instance that exposes LocalSessions/Projects (i.e. has an open project)
-                    // - Otherwise fall back to the first attachable instance
-                    TiaPortal? firstAttachable = null;
-                    string? firstAttachableInfo = null;
-
-                    foreach (var proc in processes)
-                    {
-                        TiaPortal? candidate = null;
-                        try
-                        {
-                            _logger?.LogInformation($"Trying attach to TIA Portal process PID={proc.Id}");
-                            candidate = AttachWithTimeout(proc, 30000);
-                            _logger?.LogInformation(candidate == null
-                                ? $"Attach returned null/timed out for PID={proc.Id} — skipping"
-                                : $"Attach succeeded for PID={proc.Id}");
-                            if (candidate == null) continue;
-
-                            // record first attachable in case none has projects
-                            if (firstAttachable == null)
-                            {
-                                firstAttachable = candidate;
-                                firstAttachableInfo = $"PID={proc.Id}";
-                            }
-
-                            // Prefer instance with an open project/session
-                            bool hasSession = false;
-                            bool hasProject = false;
-                            try { hasSession = candidate.LocalSessions.Any(); } catch { }
-                            try { hasProject = candidate.Projects.Any(); } catch { }
-                            _logger?.LogInformation($"Portal PID={proc.Id}: hasSession={hasSession}, hasProject={hasProject}");
-
-                            if (hasSession || hasProject)
-                            {
-                                _portal = candidate;
-                                _logger?.LogInformation($"Selected attached TIA Portal PID={proc.Id}");
-
-                                if (hasSession)
-                                {
-                                    try
-                                    {
-                                        _session = _portal.LocalSessions.First();
-                                        _project = _session.Project;
-                                    }
-                                    catch { }
-                                }
-
-                                if (_project == null && hasProject)
-                                {
-                                    try { _project = _portal.Projects.First(); } catch { }
-                                }
-
-                                return true;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger?.LogWarning(ex, $"Attach failed for TIA Portal PID={proc.Id}");
-                            LastConnectError = ex.ToString();
-                        }
-                        finally
-                        {
-                            // If this candidate wasn't selected and isn't firstAttachable, dispose it.
-                            if (candidate != null && candidate != _portal && candidate != firstAttachable)
-                            {
-                                try { candidate.Dispose(); } catch { }
-                            }
-                        }
-                    }
-
-                    // fallback to first attachable instance
-                    if (firstAttachable != null)
-                    {
-                        _portal = firstAttachable;
-                        _logger?.LogInformation($"Falling back to first attachable TIA Portal ({firstAttachableInfo})");
-                        LastConnectError = $"Attached to first available portal ({firstAttachableInfo}), but it has no visible projects/sessions.";
-                        return true;
-                    }
-
-                    LastConnectError = "No attachable TIA Portal process found; starting a new TIA Portal instance.";
-                    _logger?.LogInformation(LastConnectError);
-                }
-
-                // start new TIA Portal. Headless (WithoutUserInterface) is the default because it
-                // starts far faster than booting the full GUI; --with-ui flips it for visual inspection.
-                var launchMode = Engineering.LaunchWithUserInterface
-                    ? TiaPortalMode.WithUserInterface
-                    : TiaPortalMode.WithoutUserInterface;
-                _logger?.LogInformation($"Starting a new TIA Portal instance ({launchMode}).");
-                _portal = new TiaPortal(launchMode);
-
-                return true;
+                var process = Process.GetProcessById(processId);
+                return process.MainWindowHandle != IntPtr.Zero;
             }
-            catch (Exception ex)
+            catch
             {
-                // 统一错误处理：硬失败抛结构化异常，替代 return false + LastConnectError 侧信道
-                throw new PortalException(PortalErrorCode.OpennessError, $"ConnectPortal failed: {FormatExceptionDetail(ex)}", inner: ex);
+                return false;
             }
+        }
+
+        private static DateTime GetProcessStartTimeOrMin(int processId)
+        {
+            try
+            {
+                return Process.GetProcessById(processId).StartTime;
+            }
+            catch
+            {
+                return DateTime.MinValue;
+            }
+        }
+
+        public bool ConnectPortal()
+        {
+            return ConnectPortalSafe();
         }
 
         public List<string> ListPortalProcessProjects()
         {
-            var lines = new List<string>();
-            IReadOnlyList<TiaPortalProcess> processes;
-            try
-            {
-                processes = TiaPortal.GetProcesses().ToList();
-            }
-            catch (Exception ex)
-            {
-                lines.Add("GetProcesses error: " + FormatExceptionDetail(ex));
-                return lines;
-            }
-
-            lines.Add("TIA Portal process count: " + processes.Count);
-            foreach (var proc in processes)
-            {
-                TiaPortal? candidate = null;
-                try
-                {
-                    lines.Add("PID=" + proc.Id + " attach: trying");
-                    candidate = proc.Attach();
-                    if (candidate == null)
-                    {
-                        lines.Add("PID=" + proc.Id + " attach: <null>");
-                        continue;
-                    }
-
-                    lines.Add("PID=" + proc.Id + " attach: OK");
-                    try
-                    {
-                        var any = false;
-                        foreach (var s in candidate.LocalSessions)
-                        {
-                            any = true;
-                            lines.Add("PID=" + proc.Id + " sessionProject=" + (s.Project?.Name ?? "<null>"));
-                        }
-                        if (!any) lines.Add("PID=" + proc.Id + " sessions=<empty>");
-                    }
-                    catch (Exception ex)
-                    {
-                        lines.Add("PID=" + proc.Id + " sessions error: " + FormatExceptionDetail(ex));
-                    }
-
-                    try
-                    {
-                        var any = false;
-                        foreach (var p in candidate.Projects)
-                        {
-                            any = true;
-                            lines.Add("PID=" + proc.Id + " project=" + (p?.Name ?? "<null>"));
-                        }
-                        if (!any) lines.Add("PID=" + proc.Id + " projects=<empty>");
-                    }
-                    catch (Exception ex)
-                    {
-                        lines.Add("PID=" + proc.Id + " projects error: " + FormatExceptionDetail(ex));
-                    }
-                }
-                catch (Exception ex)
-                {
-                    lines.Add("PID=" + proc.Id + " attach error: " + FormatExceptionDetail(ex));
-                }
-                finally
-                {
-                    if (candidate != null && candidate != _portal)
-                    {
-                        try { candidate.Dispose(); } catch { }
-                    }
-                }
-            }
-
-            return lines;
+            return ListPortalProcessProjectsSafe();
         }
 
         public bool IsConnected()
@@ -442,55 +352,7 @@ namespace TiaMcpServer.Siemens
 
         public bool AttachToOpenProject(string projectName)
         {
-            _logger?.LogInformation($"Attaching to open project: {projectName}");
-
-            if (string.IsNullOrWhiteSpace(projectName)) return false;
-            projectName = projectName.Trim();
-
-            // Connect 之后 TIA 的 LocalSessions / Projects 是异步填充的，
-            // 这里轮询最多 15s，避免 Connect+Attach 并行或刚启动时刷出 false。
-            var deadline = DateTime.UtcNow.AddSeconds(15);
-            while (true)
-            {
-                try
-                {
-                    if (_portal != null && TryAttachProjectInPortal(_portal, projectName))
-                    {
-                        return true;
-                    }
-
-                    foreach (var proc in TiaPortal.GetProcesses())
-                    {
-                        try
-                        {
-                            var candidate = proc.Attach();
-                            if (candidate == null) continue;
-                            if (TryAttachProjectInPortal(candidate, projectName))
-                            {
-                                if (_portal != null && !ReferenceEquals(_portal, candidate))
-                                {
-                                    try { _portal.Dispose(); } catch { }
-                                }
-
-                                _portal = candidate;
-                                return true;
-                            }
-
-                            if (!ReferenceEquals(_portal, candidate))
-                            {
-                                try { candidate.Dispose(); } catch { }
-                            }
-                        }
-                        catch { }
-                    }
-                }
-                catch { }
-
-                if (DateTime.UtcNow >= deadline) break;
-                System.Threading.Thread.Sleep(500);
-            }
-
-            return false;
+            return AttachToOpenProjectSafe(projectName);
         }
 
         private bool TryAttachProjectInPortal(TiaPortal portal, string projectName)
@@ -673,9 +535,11 @@ namespace TiaMcpServer.Siemens
         public bool CreateProject(string directoryPath, string projectName)
         {
             _logger?.LogInformation($"Creating project: dir={directoryPath}, name={projectName}");
+            LastConnectError = null;
 
             if (IsPortalNull())
             {
+                LastConnectError = "CreateProject failed because TIA Portal is not connected.";
                 return false;
             }
 
@@ -698,10 +562,18 @@ namespace TiaMcpServer.Siemens
 
                 var created = _portal!.Projects.Create(di, projectName);
                 _project = created;
+                LastConnectError = null;
                 return _project != null;
+            }
+            catch (TargetInvocationException tie) when (tie.InnerException != null)
+            {
+                LastConnectError = $"Projects.Create failed: {tie.InnerException.GetType().FullName}: {tie.InnerException.Message}";
+                _logger?.LogError(tie.InnerException, "CreateProject failed: dir={Dir}, name={Name}", directoryPath, projectName);
+                return false;
             }
             catch (Exception ex)
             {
+                LastConnectError = $"Projects.Create failed: {ex.GetType().FullName}: {ex.Message}";
                 _logger?.LogError(ex, "CreateProject failed: dir={Dir}, name={Name}", directoryPath, projectName);
                 return false;
             }
@@ -1265,21 +1137,21 @@ namespace TiaMcpServer.Siemens
             try
             {
                 var catalog = _portal == null ? null : TryGetPropertyValue(_portal, "HardwareCatalog");
-                if (catalog == null)
-                    throw new PortalException(PortalErrorCode.InvalidState, "TIA Portal HardwareCatalog is not available. Connect to TIA Portal first.");
-
-                foreach (var filter in BuildHardwareCatalogFilters(normalizedKeyword))
+                if (catalog != null)
                 {
-                    foreach (var entry in FindHardwareCatalogEntries(catalog, filter))
+                    foreach (var filter in BuildHardwareCatalogFilters(normalizedKeyword))
                     {
-                        var candidate = CatalogEntryToHardwareCandidate(entry, normalizedKeyword);
-                        if (candidate == null) continue;
+                        foreach (var entry in FindHardwareCatalogEntries(catalog, filter))
+                        {
+                            var candidate = CatalogEntryToHardwareCandidate(entry, normalizedKeyword);
+                            if (candidate == null) continue;
 
-                        var key = candidate.TypeIdentifierNormalized
-                                  ?? candidate.TypeIdentifier
-                                  ?? $"{candidate.ArticleNumber}|{candidate.Description}|{candidate.CatalogPath}";
-                        if (!seen.Add(key)) continue;
-                        results.Add(candidate);
+                            var key = candidate.TypeIdentifierNormalized
+                                      ?? candidate.TypeIdentifier
+                                      ?? $"{candidate.ArticleNumber}|{candidate.Description}|{candidate.CatalogPath}";
+                            if (!seen.Add(key)) continue;
+                            results.Add(candidate);
+                        }
                     }
                 }
             }
@@ -1290,6 +1162,18 @@ namespace TiaMcpServer.Siemens
             catch (Exception ex)
             {
                 _logger?.LogWarning(ex, "HardwareCatalog search failed");
+            }
+
+            if (results.Count == 0)
+            {
+                foreach (var candidate in SearchKnownHardwareCatalogFallbacks(normalizedKeyword))
+                {
+                    var key = candidate.TypeIdentifierNormalized
+                              ?? candidate.TypeIdentifier
+                              ?? $"{candidate.ArticleNumber}|{candidate.Description}|{candidate.CatalogPath}";
+                    if (!seen.Add(key)) continue;
+                    results.Add(candidate);
+                }
             }
 
             return results
@@ -1590,6 +1474,94 @@ namespace TiaMcpServer.Siemens
             return ScoreGsdCandidateText(text, keyword, preferredDap)
                    + (string.Equals(c.Source, "HardwareCatalog", StringComparison.OrdinalIgnoreCase) ? 30 : 0)
                    + (!string.IsNullOrWhiteSpace(c.TypeIdentifier) ? 50 : 0);
+        }
+
+        private static IEnumerable<HardwareCatalogCandidate> SearchKnownHardwareCatalogFallbacks(string keyword)
+        {
+            foreach (var candidate in GetKnownHardwareCatalogFallbackCandidates())
+            {
+                var text = string.Join(" ", new[]
+                {
+                    candidate.ArticleNumber,
+                    candidate.CatalogPath,
+                    candidate.Description,
+                    candidate.TypeIdentifier,
+                    candidate.TypeIdentifierNormalized,
+                    candidate.TypeName,
+                    candidate.Version
+                }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+                if (string.IsNullOrWhiteSpace(text)) continue;
+                if (!ContainsAllKeywordTokens(text, keyword) && !ContainsAnyKeywordToken(text, keyword)) continue;
+                yield return candidate;
+            }
+        }
+
+        private static IEnumerable<HardwareCatalogCandidate> GetKnownHardwareCatalogFallbackCandidates()
+        {
+            yield return BuildKnownHardwareCandidate(
+                articleNumber: "6ES7211-1BE40-0XB0",
+                description: "CPU 1211C AC/DC/Rly",
+                typeName: "S7-1200",
+                version: "V4.7",
+                catalogPath: "Fallback/S7-1200");
+
+            yield return BuildKnownHardwareCandidate(
+                articleNumber: "6ES7513-1AM03-0AB0",
+                description: "CPU 1513-1 PN",
+                typeName: "S7-1500",
+                version: "V3.0",
+                catalogPath: "Fallback/S7-1500");
+
+            yield return BuildKnownHardwareCandidate(
+                articleNumber: "6ES7516-3AN03-0AB0",
+                description: "CPU 1516-3 PN/DP",
+                typeName: "S7-1500",
+                version: "V3.0",
+                catalogPath: "Fallback/S7-1500");
+
+            yield return BuildKnownHardwareCandidate(
+                articleNumber: "6ES7515-2AM02-0AB0",
+                description: "CPU 1515-2 PN",
+                typeName: "S7-1500",
+                version: "V3.1",
+                catalogPath: "Fallback/S7-1500");
+
+            yield return BuildKnownHardwareCandidate(
+                articleNumber: "6ES7513-1AL03-0AB0",
+                description: "CPU 1513 PN",
+                typeName: "S7-1500",
+                version: "V2.9",
+                catalogPath: "Fallback/S7-1500");
+
+            yield return BuildKnownHardwareCandidate(
+                articleNumber: "6ES7512-1AK02-0AB0",
+                description: "CPU 1512C-1 PN",
+                typeName: "S7-1500",
+                version: "V2.9",
+                catalogPath: "Fallback/S7-1500");
+        }
+
+        private static HardwareCatalogCandidate BuildKnownHardwareCandidate(
+            string articleNumber,
+            string description,
+            string typeName,
+            string version,
+            string catalogPath)
+        {
+            return new HardwareCatalogCandidate
+            {
+                Source = "KnownDeviceFallback",
+                Keyword = articleNumber,
+                ArticleNumber = articleNumber,
+                CatalogPath = catalogPath,
+                Description = description,
+                TypeIdentifier = articleNumber,
+                TypeIdentifierNormalized = NormalizeCatalogSearchText(articleNumber),
+                TypeName = typeName,
+                Version = version,
+                Insertable = true
+            };
         }
 
         private static int ScoreHardwareCatalogCandidate(HardwareCatalogCandidate c, string keyword, string? preferredText = null)
@@ -2292,9 +2264,17 @@ namespace TiaMcpServer.Siemens
                 sb.AppendLine(Capability.Describe(TiaFeature.HardwareHmiConnection) + " Skipping hardware HMI connection creation.");
                 return sb.ToString();
             }
-#else
+#elif !TIA_V17
             var connectionCompositionType = typeof(global::Siemens.Engineering.HW.CommunicationConnections.ConnectionComposition);
             var hmiConnectionType = typeof(global::Siemens.Engineering.HW.CommunicationConnections.HmiConnection);
+#else
+            var connectionCompositionType = Type.GetType("Siemens.Engineering.HW.CommunicationConnections.ConnectionComposition, Siemens.Engineering");
+            var hmiConnectionType = Type.GetType("Siemens.Engineering.HW.CommunicationConnections.HmiConnection, Siemens.Engineering");
+            if (connectionCompositionType == null || hmiConnectionType == null)
+            {
+                sb.AppendLine(Capability.Describe(TiaFeature.HardwareHmiConnection) + " Skipping hardware HMI connection creation.");
+                return sb.ToString();
+            }
 #endif
             var candidates = deepScan
                 ? BuildHardwareHmiConnectionCandidates(plcNode, hmiNode).ToList()
@@ -2461,13 +2441,18 @@ namespace TiaMcpServer.Siemens
             var serviceTypes = commConnT != null
                 ? new[] { commConnT, typeof(NetworkInterface), typeof(NetworkPort) }
                 : new[] { typeof(NetworkInterface), typeof(NetworkPort) };
-#else
+#elif !TIA_V17
             var serviceTypes = new[]
             {
                 typeof(global::Siemens.Engineering.HW.CommunicationConnections.ConnectionComposition),
                 typeof(NetworkInterface),
                 typeof(NetworkPort)
             };
+#else
+            var commConnT = Type.GetType("Siemens.Engineering.HW.CommunicationConnections.ConnectionComposition, Siemens.Engineering");
+            var serviceTypes = commConnT != null
+                ? new[] { commConnT, typeof(NetworkInterface), typeof(NetworkPort) }
+                : new[] { typeof(NetworkInterface), typeof(NetworkPort) };
 #endif
 
             lines.Add("DeepScan: " + deepScan);
@@ -3222,13 +3207,9 @@ namespace TiaMcpServer.Siemens
             var plc = GetPlcSoftware(softwarePath);
             if (plc == null) return null;
 
-            // common shapes: plc.TagTables OR plc.TagTableGroup.TagTables
-            object? tables =
-                TryGetPropertyValue(plc, "TagTables") ??
-                TryGetPropertyValue(TryGetPropertyValue(plc, "TagTableGroup", "TagTableFolder") ?? plc, "TagTables");
-
+            var tables = ResolvePlcTagTablesCollection(plc);
             if (tables == null) return new List<string>();
-            return TryListNamesFromCollection(tables, new[] { "TagTables" }, "TagTables");
+            return TryListNamesFromCollection(tables, Array.Empty<string>(), "TagTables");
         }
 
         public bool ExportPlcTagTable(string softwarePath, string tagTableName, string exportPath)
@@ -3237,11 +3218,10 @@ namespace TiaMcpServer.Siemens
             var plc = GetPlcSoftware(softwarePath);
             if (plc == null) return false;
 
-            object? tablesRoot = TryGetPropertyValue(plc, "TagTables") ??
-                                 TryGetPropertyValue(plc, "TagTableGroup", "TagTableFolder") ??
-                                 plc;
-
-            var table = TryFindByNameInCollection(tablesRoot, new[] { "TagTables" }, tagTableName);
+            var tables = ResolvePlcTagTablesCollection(plc);
+            var table = tables == null
+                ? null
+                : FindExistingByName(tables, tagTableName) ?? TryFindByNameInCollection(tables, Array.Empty<string>(), tagTableName);
             if (table == null) return false;
             return TryExportEngineeringObject(table, exportPath, out _);
         }
@@ -3255,11 +3235,10 @@ namespace TiaMcpServer.Siemens
 
             try
             {
-                object root = TryGetPropertyValue(plc, "TagTableGroup", "TagTableFolder") ?? plc;
+                object root = ResolvePlcTagTableGroup(plc) ?? plc;
                 var group = TryResolveChildGroupByPath(root, folderPath) ?? root;
 
-                // TagTables collection lives on group
-                var tables = TryGetPropertyValue(group, "TagTables") ?? TryGetPropertyValue(root, "TagTables");
+                var tables = TryGetPropertyValue(group, "TagTables") ?? ResolvePlcTagTablesCollection(plc);
                 if (tables == null)
                     throw new PortalException(PortalErrorCode.NotFound, $"TagTables collection not found. plcType={plc.GetType().FullName} groupType={group.GetType().FullName}");
 
@@ -3279,6 +3258,26 @@ namespace TiaMcpServer.Siemens
             {
                 throw new PortalException(PortalErrorCode.ImportFailed, ex.Message, null, ex);
             }
+        }
+
+        private static object? ResolvePlcTagTableGroup(PlcSoftware plc)
+        {
+            return TryGetPropertyValue(plc,
+                "TagTableGroup",
+                "TagTableFolder",
+                "PlcTagTableGroup",
+                "PlcTagTableFolder");
+        }
+
+        private static object? ResolvePlcTagTablesCollection(PlcSoftware plc)
+        {
+            var direct = TryGetPropertyValue(plc, "TagTables", "PlcTagTables", "Tables");
+            if (direct != null) return direct;
+
+            var group = ResolvePlcTagTableGroup(plc);
+            return group == null
+                ? null
+                : TryGetPropertyValue(group, "TagTables", "PlcTagTables", "Tables");
         }
 
         public ResponseImportBatch ImportPlcTagTablesFromDirectory(string softwarePath, string folderPath, string dir, string regexName = "", bool overwrite = true)
@@ -4294,11 +4293,13 @@ namespace TiaMcpServer.Siemens
                 return (classic.Name, "Classic", TryListScreens(classic));
             }
 
+#if !TIA_V17
             // Unified (HmiSoftware)
             if (sw is HmiSoftware unified)
             {
                 return (unified.Name, "Unified", TryListScreens(unified));
             }
+#endif
 
             return (sw.ToString(), "Unknown", new List<string>());
         }
@@ -11088,6 +11089,32 @@ namespace TiaMcpServer.Siemens
                         $"<Engineering version=\"V{major}\" />");
                 }
 
+                if (major > 0 && major <= 17)
+                {
+                    try
+                    {
+                        var doc = XDocument.Parse(fixedText, LoadOptions.PreserveWhitespace);
+                        var emptyNamespaceNodes = doc
+                            .Descendants()
+                            .Where(x => x.Name.LocalName == "Namespace" && string.IsNullOrWhiteSpace(x.Value))
+                            .ToList();
+
+                        if (emptyNamespaceNodes.Count > 0)
+                        {
+                            foreach (var node in emptyNamespaceNodes)
+                                node.Remove();
+
+                            using var sw = new Utf8StringWriter();
+                            doc.Save(sw, SaveOptions.None);
+                            fixedText = sw.ToString();
+                        }
+                    }
+                    catch
+                    {
+                        // best effort only; if sanitization fails, fall back to version/BOM normalization
+                    }
+                }
+
                 // Already correct: version matches (or unknown) AND a BOM is present -> import as-is.
                 if (fixedText == text && hasBom) return path;
 
@@ -11293,11 +11320,12 @@ namespace TiaMcpServer.Siemens
             }
             catch (Exception ex)
             {
-                var pex = ex as PortalException ?? new PortalException(PortalErrorCode.ImportFailed, "Import failed", null, ex);
+                var inner = UnwrapImportError(ex);
+                var pex = ex as PortalException ?? new PortalException(PortalErrorCode.ImportFailed, $"Import failed: {inner}", null, ex);
                 pex.Data["softwarePath"] = softwarePath;
                 pex.Data["groupPath"] = groupPath;
                 pex.Data["importPath"] = importPath;
-                _logger?.LogError(pex, "ImportType failed for {SoftwarePath} group={GroupPath} file={ImportPath}", softwarePath, groupPath, importPath);
+                _logger?.LogError(pex, "ImportType failed for {SoftwarePath} group={GroupPath} file={ImportPath}: {Inner}", softwarePath, groupPath, importPath, inner);
                 throw pex;
             }
         }
@@ -11580,6 +11608,10 @@ namespace TiaMcpServer.Siemens
 
         public bool ExportAsDocuments(string softwarePath, string blockPath, string exportPath, bool preservePath = false)
         {
+#if TIA_V17
+            Capability.RequireSupported(TiaFeature.DocumentExport);
+            return false;
+#else
             _logger?.LogInformation($"Exporting block as documents by path: {blockPath}");
             var success = false;
             try
@@ -11672,11 +11704,16 @@ namespace TiaMcpServer.Siemens
                 throw pex;
             }
             return success;
+#endif
         }
 
         // TIA portal crashes when exporting blocks as documents, :-(
         public IEnumerable<PlcBlock>? ExportBlocksAsDocuments(string softwarePath, string exportPath, string regexName = "", bool preservePath = false)
         {
+#if TIA_V17
+            Capability.RequireSupported(TiaFeature.DocumentExport);
+            return null;
+#else
             _logger?.LogInformation("Exporting blocks as documents...");
 
             if (IsProjectNull())
@@ -11823,8 +11860,22 @@ namespace TiaMcpServer.Siemens
             }
 
             return exportList;
+#endif
         }
 
+#if TIA_V17
+        public bool ImportFromDocuments(string softwarePath, string groupPath, string importPath, string fileNameWithoutExtension, object option)
+        {
+            Capability.RequireSupported(TiaFeature.DocumentExport);
+            return false;
+        }
+
+        public IEnumerable<PlcBlock>? ImportBlocksFromDocuments(string softwarePath, string groupPath, string importPath, string regexName, object option, bool preservePath = false)
+        {
+            Capability.RequireSupported(TiaFeature.DocumentExport);
+            return null;
+        }
+#else
         public bool ImportFromDocuments(string softwarePath, string groupPath, string importPath, string fileNameWithoutExtension, ImportDocumentOptions option)
         {
             _logger?.LogInformation($"Importing block from documents: {fileNameWithoutExtension} in {importPath}");
@@ -11957,6 +12008,7 @@ namespace TiaMcpServer.Siemens
 
             return imported;
         }
+#endif
 
         #endregion
 
@@ -12184,11 +12236,14 @@ namespace TiaMcpServer.Siemens
                 sb.AppendLine($"{GetTreePrefix(ancestorStates, !hasOtherItems && !hasSoftware)}HmiTarget: {hmiTarget.Name} [HMI Program]");
             }
 
+#if !TIA_V17
             //Unified HMI software: dlls will only exist on TIA Portal V19 and newer.
             if (Engineering.TiaMajorVersion >= 19)
                 TryGetUnifiedSoftware(sb, deviceItem, ancestorStates, softwareContainer, hasSoftware);
+#endif
         }
 
+#if !TIA_V17
         private bool TryGetUnifiedSoftware(StringBuilder sb, DeviceItem deviceItem, List<bool> ancestorStates, SoftwareContainer? softwareContainer, bool hasSoftware)
         {
             if (softwareContainer?.Software is HmiSoftware hmiSoftware)
@@ -12201,6 +12256,7 @@ namespace TiaMcpServer.Siemens
 
             return hasSoftware;
         }
+#endif
 
         private void GetProjectTreeUngroupedDeviceGroup(StringBuilder sb, DeviceSystemGroup ungroupedDevicesGroup, List<bool> ancestorStates)
         {

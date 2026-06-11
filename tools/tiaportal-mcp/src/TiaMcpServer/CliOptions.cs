@@ -8,6 +8,7 @@ namespace TiaMcpServer
         public string? Transport { get; set; } // "stdio" (default) or "http"
         public string? HttpPrefix { get; set; } // e.g. "http://127.0.0.1:8765/"
         public string? HttpApiKey { get; set; } // optional X-API-Key header value
+        public string? ToolProfile { get; set; } // optional tool surface profile, e.g. "plc-software-v17-phase1"
         public bool RunFlowLightTest { get; set; }
         public bool FixCurrentFlowBinding { get; set; }
         public bool ProbeS71200Device { get; set; }
@@ -111,6 +112,10 @@ namespace TiaMcpServer
         public string? ProjectName { get; set; }
         public int? TiaStepTimeoutSeconds { get; set; }
         public bool PortalWithUserInterface { get; set; } // --with-ui: launch TIA with full GUI (slower) instead of headless
+        public bool PortalWithoutUserInterface { get; set; } // --without-ui: explicitly force headless launch
+        public bool RunInternalPortalProbe { get; set; }
+        public string? InternalPortalProbeAction { get; set; }
+        public int? InternalPortalProbePid { get; set; }
 
         public static CliOptions ParseArgs(string[] args)
         {
@@ -723,6 +728,30 @@ namespace TiaMcpServer
                         options.PortalWithUserInterface = true;
                         break;
 
+                    case "--without-ui":
+                        options.PortalWithoutUserInterface = true;
+                        break;
+
+                    case "--internal-portal-probe":
+                        options.RunInternalPortalProbe = true;
+                        break;
+
+                    case "--internal-portal-probe-action":
+                        if (i + 1 < args.Length)
+                        {
+                            options.InternalPortalProbeAction = args[i + 1];
+                            i++;
+                        }
+                        break;
+
+                    case "--internal-portal-probe-pid":
+                        if (i + 1 < args.Length && int.TryParse(args[i + 1], out int probePid))
+                        {
+                            options.InternalPortalProbePid = probePid;
+                            i++;
+                        }
+                        break;
+
                     case "--transport":
                         if (i + 1 < args.Length)
                         {
@@ -743,6 +772,14 @@ namespace TiaMcpServer
                         if (i + 1 < args.Length)
                         {
                             options.HttpApiKey = args[i + 1];
+                            i++;
+                        }
+                        break;
+
+                    case "--tool-profile":
+                        if (i + 1 < args.Length)
+                        {
+                            options.ToolProfile = args[i + 1];
                             i++;
                         }
                         break;

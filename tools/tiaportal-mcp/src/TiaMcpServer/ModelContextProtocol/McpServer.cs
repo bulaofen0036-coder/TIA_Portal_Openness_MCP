@@ -66,15 +66,7 @@ namespace TiaMcpServer.ModelContextProtocol
             {
                 // ConnectPortal 失败时抛 PortalException（结构化错误码），下方 catch 统一映射到 McpException
                 Portal.ConnectPortal();
-                return new ResponseConnect
-                {
-                    Message = "Connected to TIA-Portal",
-                    Meta = new JsonObject
-                    {
-                        ["timestamp"] = DateTime.Now,
-                        ["success"] = true
-                    }
-                };
+                return Portal.GetLastConnectResponse(success: true);
             }
             catch (PortalException pex)
             {
@@ -106,6 +98,20 @@ namespace TiaMcpServer.ModelContextProtocol
             catch (Exception ex) when (ex is not McpException)
             {
                 throw new McpException($"Unexpected error listing TIA Portal processes: {ex.Message}", ex, McpErrorCode.InternalError);
+            }
+        }
+
+        [McpServerTool(Name = "DiagnosePortalConnectReadiness"), Description("[L0][Diagnostics]Read-only V17-safe portal connect readiness probe. It inspects visible TIA processes, runs bounded attach/inspect probes, and reports suspected confirmation dialogs without modifying any project.")]
+        public static ResponsePortalConnectReadiness DiagnosePortalConnectReadiness(
+            [Description("When true, include current portal-related top-level windows in the response.")] bool includeWindows = true)
+        {
+            try
+            {
+                return Portal.DiagnosePortalConnectReadiness(includeWindows);
+            }
+            catch (Exception ex) when (ex is not McpException)
+            {
+                throw new McpException($"Unexpected error diagnosing TIA Portal connect readiness: {ex.Message}", ex, McpErrorCode.InternalError);
             }
         }
 
@@ -344,8 +350,22 @@ namespace TiaMcpServer.ModelContextProtocol
                 {
                     try
                     {
-                        var processProjects = Portal.ListPortalProcessProjects();
-                        Add("tia.processes", "Visible TIA Portal processes", processProjects.Any() ? "pass" : "warn", string.Join(Environment.NewLine, processProjects));
+                        var processProbe = Portal.DiagnosePortalConnectReadiness(includeWindows: true);
+                        var lines = new List<string>
+                        {
+                            $"VisibleProcessCount={processProbe.VisibleProcessCount}",
+                            $"NeedsUserConfirmation={processProbe.NeedsUserConfirmation}",
+                            $"Strategy={processProbe.Strategy}"
+                        };
+                        foreach (var proc in processProbe.Processes ?? Enumerable.Empty<PortalProcessDiagnostic>())
+                        {
+                            lines.Add($"PID={proc.ProcessId} status={proc.ProbeStatus} hasSessions={proc.HasSessions} hasProjects={proc.HasProjects} elapsedMs={proc.ElapsedMs}");
+                        }
+                        foreach (var win in processProbe.Windows ?? Enumerable.Empty<PortalWindowObservation>())
+                        {
+                            lines.Add($"WINDOW PID={win.ProcessId} title={win.Title} class={win.ClassName}");
+                        }
+                        Add("tia.processes", "Visible TIA Portal processes", (processProbe.Processes?.Any() ?? false) ? "pass" : "warn", string.Join(Environment.NewLine, lines));
                     }
                     catch (Exception ex)
                     {
@@ -1059,6 +1079,10 @@ namespace TiaMcpServer.ModelContextProtocol
 
                 throw new McpException($"Failed to attach to open project '{projectName}'", McpErrorCode.InternalError);
             }
+            catch (PortalException pex) when (pex.Code == PortalErrorCode.ConfirmationRequired)
+            {
+                throw new McpException($"Failed to attach to open project '{projectName}' [{pex.Code}]: {pex.Message}", pex, McpErrorCode.InternalError);
+            }
             catch (Exception ex) when (ex is not McpException)
             {
                 throw new McpException($"Unexpected error attaching to open project '{projectName}': {ex.Message}", ex, McpErrorCode.InternalError);
@@ -1078,7 +1102,11 @@ namespace TiaMcpServer.ModelContextProtocol
                 }
                 var ok = Portal.CreateProject(directoryPath, projectName);
                 if (!ok)
-                    throw new McpException($"Failed to create project '{projectName}' in '{directoryPath}'", McpErrorCode.InternalError);
+                {
+                    var detail = Portal.LastConnectError;
+                    var suffix = string.IsNullOrWhiteSpace(detail) ? "" : $": {detail}";
+                    throw new McpException($"Failed to create project '{projectName}' in '{directoryPath}'{suffix}", McpErrorCode.InternalError);
+                }
 
                 return new ResponseMessage
                 {
@@ -5922,7 +5950,7 @@ namespace TiaMcpServer.ModelContextProtocol
                         Message = $"Block info retrieved from '{blockPath}' in '{softwarePath}'",
                         Name = block.Name,
                         TypeName = block.GetType().Name,
-                        Namespace = block.Namespace,
+                        Namespace = Helper.GetOptionalStringProperty(block, "Namespace"),
                         ProgrammingLanguage = Enum.GetName(typeof(ProgrammingLanguage),block.ProgrammingLanguage),
                         MemoryLayout = Enum.GetName(typeof(MemoryLayout), block.MemoryLayout),
                         IsConsistent = block.IsConsistent,
@@ -5969,7 +5997,7 @@ namespace TiaMcpServer.ModelContextProtocol
                         {
                             Name = block.Name,
                             TypeName = block.GetType().Name,
-                            Namespace = block.Namespace,
+                            Namespace = Helper.GetOptionalStringProperty(block, "Namespace"),
                             ProgrammingLanguage = Enum.GetName(typeof(ProgrammingLanguage), block.ProgrammingLanguage),
                             MemoryLayout = Enum.GetName(typeof(MemoryLayout), block.MemoryLayout),
                             IsConsistent = block.IsConsistent,
@@ -6712,7 +6740,7 @@ namespace TiaMcpServer.ModelContextProtocol
                             {
                                 Name = b.Name,
                                 TypeName = b.GetType().Name,
-                                Namespace = b.Namespace,
+                                Namespace = Helper.GetOptionalStringProperty(b, "Namespace"),
                                 ProgrammingLanguage = Enum.GetName(typeof(ProgrammingLanguage), b.ProgrammingLanguage),
                                 MemoryLayout = Enum.GetName(typeof(MemoryLayout), b.MemoryLayout),
                                 IsConsistent = b.IsConsistent,
@@ -6754,7 +6782,7 @@ namespace TiaMcpServer.ModelContextProtocol
                             {
                                 Name = block.Name,
                                 TypeName = block.GetType().Name,
-                                Namespace = block.Namespace,
+                                Namespace = Helper.GetOptionalStringProperty(block, "Namespace"),
                                 ProgrammingLanguage = Enum.GetName(typeof(ProgrammingLanguage), block.ProgrammingLanguage),
                                 MemoryLayout = Enum.GetName(typeof(MemoryLayout), block.MemoryLayout),
                                 IsConsistent = block.IsConsistent,
@@ -6879,7 +6907,7 @@ namespace TiaMcpServer.ModelContextProtocol
                         Message = $"Type info retrieved from '{typePath}' in '{softwarePath}'",
                         Name = type.Name,
                         TypeName = type.GetType().Name,
-                        Namespace = type.Namespace,
+                        Namespace = Helper.GetOptionalStringProperty(type, "Namespace"),
                         IsConsistent = type.IsConsistent,
                         ModifiedDate = type.ModifiedDate,
                         IsKnowHowProtected = type.IsKnowHowProtected,
@@ -6923,7 +6951,7 @@ namespace TiaMcpServer.ModelContextProtocol
                         {
                             Name = type.Name,
                             TypeName = type.GetType().Name,
-                            Namespace = type.Namespace,
+                            Namespace = Helper.GetOptionalStringProperty(type, "Namespace"),
                             IsConsistent = type.IsConsistent,
                             ModifiedDate = type.ModifiedDate,
                             IsKnowHowProtected = type.IsKnowHowProtected,
@@ -7165,7 +7193,7 @@ namespace TiaMcpServer.ModelContextProtocol
                             {
                                 Name = t.Name,
                                 TypeName = t.GetType().Name,
-                                Namespace = t.Namespace,
+                                Namespace = Helper.GetOptionalStringProperty(t, "Namespace"),
                                 IsConsistent = t.IsConsistent,
                                 ModifiedDate = t.ModifiedDate,
                                 IsKnowHowProtected = t.IsKnowHowProtected,
@@ -7204,7 +7232,7 @@ namespace TiaMcpServer.ModelContextProtocol
                             {
                                 Name = type.Name,
                                 TypeName = type.GetType().Name,
-                                Namespace = type.Namespace,
+                                Namespace = Helper.GetOptionalStringProperty(type, "Namespace"),
                                 IsConsistent = type.IsConsistent,
                                 ModifiedDate = type.ModifiedDate,
                                 IsKnowHowProtected = type.IsKnowHowProtected,
@@ -7440,7 +7468,7 @@ namespace TiaMcpServer.ModelContextProtocol
                             {
                                 Name = block.Name,
                                 TypeName = block.GetType().Name,
-                                Namespace = block.Namespace,
+                                Namespace = Helper.GetOptionalStringProperty(block, "Namespace"),
                                 ProgrammingLanguage = Enum.GetName(typeof(ProgrammingLanguage), block.ProgrammingLanguage),
                                 MemoryLayout = Enum.GetName(typeof(MemoryLayout), block.MemoryLayout),
                                 IsConsistent = block.IsConsistent,
@@ -7676,7 +7704,7 @@ namespace TiaMcpServer.ModelContextProtocol
                             {
                                 Name = block.Name,
                                 TypeName = block.GetType().Name,
-                                Namespace = block.Namespace,
+                                Namespace = Helper.GetOptionalStringProperty(block, "Namespace"),
                                 ProgrammingLanguage = Enum.GetName(typeof(ProgrammingLanguage), block.ProgrammingLanguage),
                                 MemoryLayout = Enum.GetName(typeof(MemoryLayout), block.MemoryLayout),
                                 IsConsistent = block.IsConsistent,
@@ -7852,6 +7880,12 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
+#if TIA_V17
+        private static object ParseImportDocumentOption(string option)
+        {
+            throw new McpException("ImportFromDocuments requires TIA Portal V20 or newer. On TIA V17 use ImportBlock, ImportType, ImportPlcTagTable, or SCL external-source import.", McpErrorCode.InvalidParams);
+        }
+#else
         private static ImportDocumentOptions ParseImportDocumentOption(string option)
         {
             if (string.IsNullOrWhiteSpace(option)) return ImportDocumentOptions.Override;
@@ -7883,6 +7917,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     throw new McpException($"Invalid importOption '{option}'. Allowed: None, Override, SkipInactiveCultures, ActivateInactiveCultures", McpErrorCode.InvalidParams);
             }
         }
+#endif
 
         private static List<string> GetResMissingEnUsIds(string directory, string baseName)
         {
