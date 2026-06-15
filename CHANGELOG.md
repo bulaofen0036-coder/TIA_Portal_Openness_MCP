@@ -1,5 +1,15 @@
 # Change Log
 
+## [2.2.4] - 2026-06-15 - 一键配置：把 MCP 注册进 AI 宿主，零手改 JSON
+
+降低上手门槛。新增内置一键配置，**无需第三方软件、无需手改配置文件**：
+
+- **新增 CLI 子命令 `tia config`**：自动把 `tia-portal` 注册进 **Claude Desktop / Cursor** 的配置文件——自动写入**正确的 exe 绝对路径**（不再有 `REPLACE_ME`）与**自动检测的 TIA 版本**；**合并**进现有配置（保留你已有的其它 MCP server），原文件自动备份为 `*.bak`。
+  - `tia config`：写入所有已知宿主；`--host claude|cursor` 指定其一；`--print` 只打印片段供手动粘贴（如 Claude Code）。
+- **双击脚本**：交付包根目录新增 `配置MCP.bat`（V21）/ `配置MCP-v20.bat`（V20），双击即配，窗口显示结果。
+- 取代原先需要手改 `cursor-mcp.example.json` 里 `REPLACE_ME` 的繁琐步骤。
+- 纯新增，不改动现有工具与行为；工具数不变（189）。
+
 ## [2.2.3] - 2026-06-15 - 笨 AI 健壮性：自愈连接 + 可恢复错误指引 + 操作规则
 
 > 注：v2.2.2 版本号已被既有的「S7DCL skill 文档」Release 占用，故本代码版本顺延为 2.2.3。

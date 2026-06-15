@@ -1,4 +1,4 @@
-# TIA Portal MCP 完整交付包（**v2.2.3** / V20+V21 + S7DCL + CLI + 在线只读监控）
+# TIA Portal MCP 完整交付包（**v2.2.4** / V20+V21 + S7DCL + CLI + 在线只读监控 + 一键配置）
 
 [English](README.en.md) · **中文**
 

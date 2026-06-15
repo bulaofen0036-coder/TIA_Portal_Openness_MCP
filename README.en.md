@@ -1,4 +1,4 @@
-# TIA Portal MCP Server (v2.2.3 · V20 + V21 · S7DCL · CLI · read-only online monitoring)
+# TIA Portal MCP Server (v2.2.4 · V20 + V21 · S7DCL · CLI · read-only online monitoring · one-click config)
 
 **English** · [中文](README.md)
 

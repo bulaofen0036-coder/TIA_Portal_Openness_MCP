@@ -1,6 +1,6 @@
 ﻿{
   "schemaVersion": "2026-05-25",
-  "bundleVersion": "2.2.3",
+  "bundleVersion": "2.2.4",
   "packageName": "TIA_MCP_交付包_20260525_V20S7DCL_184330",
   "packageType": "tia-portal-mcp-complete-offline-delivery-bundle",
   "generatedAt": "2026-05-31T20:30:00+08:00",
@@ -53,7 +53,7 @@
   "cli": {
     "description": "Same exe also runs as a declarative CLI: `tia <verb>`. Any AI can emit a YAML/JSON spec; any engineer runs one command. No MCP client required.",
     "exe": "tools/tiaportal-mcp/src/TiaMcpServer/bin/Release/net48/TiaMcpServer.exe",
-    "verbs": ["gen", "patch", "compile", "export", "import", "describe", "prewarm", "schema", "version", "help"],
+    "verbs": ["gen", "patch", "compile", "export", "import", "describe", "prewarm", "config", "schema", "version", "help"],
     "specFormats": ["json", "yaml"],
     "exitCodes": { "0": "success", "1": "completed with failed steps", "2": "error" }
   },

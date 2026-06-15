@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>Latest</LangVersion>
     <OutputType>Exe</OutputType>
-    <AssemblyVersion>2.2.3</AssemblyVersion>
+    <AssemblyVersion>2.2.4</AssemblyVersion>
     <AssemblyName>TiaMcpServer</AssemblyName>
     <BaseOutputPath>.\bin-v20</BaseOutputPath>
     <BaseIntermediateOutputPath>.\obj-v20\</BaseIntermediateOutputPath>

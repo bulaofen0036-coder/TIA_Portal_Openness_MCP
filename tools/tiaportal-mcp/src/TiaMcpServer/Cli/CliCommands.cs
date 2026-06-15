@@ -16,7 +16,7 @@ namespace TiaMcpServer.Cli
     public static class CliCommands
     {
         private static readonly string[] Verbs =
-            { "gen", "patch", "compile", "export", "import", "describe", "prewarm", "schema", "version", "help", "--help", "-h" };
+            { "gen", "patch", "compile", "export", "import", "describe", "prewarm", "config", "schema", "version", "help", "--help", "-h" };
 
         public static bool IsVerb(string s) => Array.IndexOf(Verbs, s.ToLowerInvariant()) >= 0;
 
@@ -34,6 +34,7 @@ namespace TiaMcpServer.Cli
                     case "import": return Import(args);
                     case "describe": return Describe(args);
                     case "prewarm": return Prewarm(args);
+                    case "config": return Config(args);
                     case "schema": Console.WriteLine(SchemaText); return 0;
                     case "version": Console.WriteLine("tia " + AssemblyVersion()); return 0;
                     default: PrintUsage(); return 0;
@@ -154,6 +155,38 @@ namespace TiaMcpServer.Cli
             return 0;
         }
 
+        // One-click MCP registration into AI hosts (Claude Desktop / Cursor), no manual JSON editing.
+        private static int Config(string[] args)
+        {
+            string exe = McpConfigInstaller.OwnExePath();
+            int ver = int.TryParse(Opt(args, "--tia-major-version"), out var v) && v > 0
+                ? v
+                : (TiaMcpServer.Siemens.Engineering.DetectTiaMajorVersion() ?? 21);
+
+            if (Flag(args, "--print"))
+            {
+                Console.WriteLine("Paste this into your MCP host config (mcpServers):");
+                Console.WriteLine(McpConfigInstaller.Snippet(exe, ver));
+                return 0;
+            }
+
+            string only = Opt(args, "--host"); // claude | cursor | (default: all)
+            int done = 0, failed = 0;
+            foreach (var h in McpConfigInstaller.KnownHosts())
+            {
+                if (!string.IsNullOrEmpty(only) &&
+                    h.Name.IndexOf(only, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                try { Console.WriteLine("  [ok]     " + McpConfigInstaller.Apply(h.ConfigPath, exe, ver)); done++; }
+                catch (Exception ex) { Console.Error.WriteLine("  [failed] " + h.Name + ": " + ex.Message); failed++; }
+            }
+
+            Console.WriteLine(done > 0
+                ? $"Configured {done} host(s) for TIA V{ver}. Restart the AI client to load it. (original config backed up as *.bak)"
+                : "No host config written. Targeted host not found, or use `config --print` to copy the snippet manually.");
+            Console.WriteLine("For other hosts (e.g. Claude Code), run `config --print` and paste the snippet.");
+            return failed > 0 && done == 0 ? 1 : 0;
+        }
+
         // ---- helpers ----
 
         private static void EnsureConnectedOpen(string projectPath)
@@ -211,6 +244,7 @@ USAGE
   tia export   <project.apXX> --plc NAME --out DIR --block PATH [--scl]
   tia import   <project.apXX> --plc NAME --from DIR [--no-overwrite]
   tia prewarm  [--stop]                                   Hold a headless instance open (~1s attach after)
+  tia config   [--host claude|cursor] [--print]           One-click: register this MCP into Claude Desktop / Cursor
   tia schema                                              Print the spec field reference
   tia version
 
