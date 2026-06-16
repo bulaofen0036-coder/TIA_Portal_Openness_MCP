@@ -1,5 +1,15 @@
 # Change Log
 
+## [2.2.5] - 2026-06-16 - 读组态IP + 块路径修复 + softwarePath 容错 + 文档诚实化
+
+继续降门槛 / 提正确率 / 成熟化，改动均经真机或离线验证：
+
+- **新增只读工具 `ExportDeviceAml`**：导出设备硬件组态为 AutomationML(CAx) `.aml`，内含**组态 IP / 子网 / 网关 / PROFINET 设备名**——补上 `GetDeviceItemNetworkInfo` 读不到已组态 IP 的缺口。真机验证（江夏 安全PLC / S7-1200 station_3）：读出 IP=192.168.0.32 / 网关 .254 / 掩码 255.255.255.0。
+- **修复块路径解析**：`GetBlockInfo` 等对根级块自动跳过开头的 `Program blocks`/`程序块` 根容器段——裸名 `FR12E02v2` 与带前缀 `Program blocks/FR12E02v2` 现在都能命中（此前加前缀报 "Block not found"）。真机验证通过。
+- **`softwarePath` 容错解析**：精确匹配失败时自动兜底——容忍多余空格/大小写、单 PLC 工程任意 token 自动认到唯一 PLC、唯一子串匹配（`"PLC"`→`"PLC_1"`、`"安全"`→`"安全PLC"`）；仍无法解析时列表工具（`GetPlcTagTables`/`GetPlcExternalSources`/`GetPlcWatchTables`）报错附 `Available PLC paths: …`。纯匹配逻辑 `Guard.MatchPlcName` 16 个离线用例全过。
+- **文档诚实化**：§13 下载 V21 转换 bug 从"已修复"更正为**"已知问题，用 TIA UI 兜底"**（代码实为未修，roadmap 列 P0）；对标表、roadmap、verify 文档同步纠正。
+- 工具数 189 → 190（仅新增 `ExportDeviceAml`）。
+
 ## [2.2.4] - 2026-06-15 - 一键配置：把 MCP 注册进 AI 宿主，零手改 JSON
 
 降低上手门槛。新增内置一键配置，**无需第三方软件、无需手改配置文件**：

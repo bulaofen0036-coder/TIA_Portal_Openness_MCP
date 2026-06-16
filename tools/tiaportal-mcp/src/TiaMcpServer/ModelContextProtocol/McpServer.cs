@@ -4325,7 +4325,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     };
                 }
 
-                throw new McpException($"PLC software not found at '{softwarePath}'", McpErrorCode.InternalError);
+                throw new McpException($"PLC software not found at '{softwarePath}'.{Portal.AvailablePlcPathsSuffix()}", McpErrorCode.InternalError);
             }
             catch (Exception ex) when (ex is not McpException)
             {
@@ -4350,7 +4350,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     };
                 }
 
-                throw new McpException($"PLC software not found at '{softwarePath}'", McpErrorCode.InternalError);
+                throw new McpException($"PLC software not found at '{softwarePath}'.{Portal.AvailablePlcPathsSuffix()}", McpErrorCode.InternalError);
             }
             catch (Exception ex) when (ex is not McpException)
             {
@@ -4452,7 +4452,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     };
                 }
 
-                throw new McpException($"PLC software not found at '{softwarePath}'", McpErrorCode.InternalError);
+                throw new McpException($"PLC software not found at '{softwarePath}'.{Portal.AvailablePlcPathsSuffix()}", McpErrorCode.InternalError);
             }
             catch (Exception ex) when (ex is not McpException)
             {

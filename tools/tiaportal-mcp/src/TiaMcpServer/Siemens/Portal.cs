@@ -3288,7 +3288,78 @@ namespace TiaMcpServer.Siemens
                 return plcSoftware;
             }
 
-            return null;
+            // Low-barrier fallback: tolerate a sloppy softwarePath (wrong case / extra spaces /
+            // a single-PLC project / a unique substring like "PLC" -> "PLC_1"). Exact resolution
+            // above is tried first, so this only runs when it misses.
+            return ResolvePlcSoftwareFuzzy(softwarePath);
+        }
+
+        private PlcSoftware? ResolvePlcSoftwareFuzzy(string softwarePath)
+        {
+            var all = GetAllPlcSoftware();
+            if (all.Count == 0) return null;
+
+            var matched = Guard.MatchPlcName(all.Select(p => p.Name).ToList(), softwarePath);
+            if (matched == null) return null;
+
+            return all.FirstOrDefault(p => string.Equals(p.Name, matched, StringComparison.Ordinal))
+                ?? all.FirstOrDefault(p => string.Equals(p.Name, matched, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Enumerate every PlcSoftware in the open project (devices + device groups), de-duplicated by
+        // name. Used for tolerant softwarePath resolution and "Available PLC paths" error hints.
+        public List<PlcSoftware> GetAllPlcSoftware()
+        {
+            var result = new List<PlcSoftware>();
+            if (_project == null) return result;
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            void Collect(IEnumerable<DeviceItem>? roots)
+            {
+                if (roots == null) return;
+                var stack = new Stack<DeviceItem>(roots.Where(x => x != null));
+                while (stack.Count > 0)
+                {
+                    var it = stack.Pop();
+                    if (it == null) continue;
+                    try
+                    {
+                        if (it.GetService<SoftwareContainer>()?.Software is PlcSoftware plc &&
+                            !string.IsNullOrEmpty(plc.Name) && seen.Add(plc.Name))
+                        {
+                            result.Add(plc);
+                        }
+                    }
+                    catch { }
+                    try { if (it.DeviceItems != null) foreach (var ch in it.DeviceItems) if (ch != null) stack.Push(ch); } catch { }
+                }
+            }
+
+            void WalkDevices(DeviceComposition? devices)
+            {
+                if (devices == null) return;
+                foreach (var d in devices) { try { Collect(d.DeviceItems); } catch { } }
+            }
+            void WalkGroups(DeviceUserGroupComposition? groups)
+            {
+                if (groups == null) return;
+                foreach (var g in groups) { try { WalkDevices(g.Devices); WalkGroups(g.Groups); } catch { } }
+            }
+
+            try { WalkDevices(_project.Devices); } catch { }
+            try { WalkGroups(_project.DeviceGroups); } catch { }
+            return result;
+        }
+
+        // " Available PLC paths: a, b, c" suffix for not-found error messages (empty when none).
+        public string AvailablePlcPathsSuffix()
+        {
+            try
+            {
+                var names = GetAllPlcSoftware().Select(p => p.Name).Where(n => !string.IsNullOrWhiteSpace(n)).Distinct().ToList();
+                return names.Count > 0 ? " Available PLC paths: " + string.Join(", ", names) : string.Empty;
+            }
+            catch { return string.Empty; }
         }
 
         public List<string>? GetPlcTagTables(string softwarePath)

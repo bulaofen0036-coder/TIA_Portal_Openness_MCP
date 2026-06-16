@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>Latest</LangVersion>
     <OutputType>Exe</OutputType>
-    <AssemblyVersion>2.2.4</AssemblyVersion>
+    <AssemblyVersion>2.2.5</AssemblyVersion>
     <BaseOutputPath>.\bin</BaseOutputPath>
     <PlatformTarget>x64</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>

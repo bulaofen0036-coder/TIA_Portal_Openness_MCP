@@ -26,6 +26,39 @@ Never guess paths. Never invent SCL/LAD XML. If a tool exists for the task, use
 it; otherwise inspect with `DescribeObject`/`DescribeService` first, then call
 `InvokeObject`/`InvokeService`.
 
+## 0.1 弱模型 / 新手：你一辈子只需要这 15 个工具（其余 180 个先忽略）
+
+This server exposes ~196 tools. **You do NOT need most of them.** A small or
+non-expert model should pick **only** from this whitelist and ignore everything
+else unless one of these tools' output explicitly tells you to call another:
+
+| 想做的事 | 用这个，别的别碰 |
+|---|---|
+| 开局/看环境 | `Bootstrap` → 然后照它返回的 `recommendedNextTool` 做 |
+| 连接 TIA | `Connect`（新工程）或 `AttachToOpenProject`（已打开的工程） |
+| 看工程里有什么 | `GetProjectTree`（拿真实 `softwarePath`，如 `PLC_1`），细看用 `GetSoftwareTree` / `GetBlocks` |
+| **做一个完整项目** | `ScaffoldProject`（一次调用搞定 PLC+HMI，见 §0.5） |
+| 加一段 PLC 逻辑/变量/DB/UDT | `PlcBuildAndImport`（先 `dryRun=true`，见 §6.2/§10） |
+| 复杂 SCL（带 FOR/CASE/表达式） | `ImportPlcExternalSource` → `GenerateBlocksFromExternalSource`（§14） |
+| 编译验证 | `CompileAndDiagnosePlc`（必须 `errorCount=0`） |
+| 存盘/收尾 | `SaveProject` → `Disconnect` |
+| 环境报错/装不上 | **`Doctor`** — 一次性体检(TIA装没装/Openness组/连接状态)，每项给出修复办法；`fix=true`(默认)会自动把你加进 Openness 组(可能弹 UAC) |
+
+**铁律(弱模型尤其要守):** ① 永远先 `Bootstrap`(或装不上时先 `Doctor`)，照
+`recommendedNextTool` 走。② 路径只从 `GetProjectTree` 拿，绝不自己编。③ 写操作前先
+`dryRun=true`。④ 收尾必须 `CompileAndDiagnosePlc`(0 错) + `SaveProject`。⑤ 拿不准
+参数名时，照本表/§8 的"精确参数名"抄，不要猜。HMI 美化看 §12，库复用看 §15。
+
+**降门槛三件套(已内置，弱模型友好):**
+- **Lite 工具档位** — 启动 server 时设环境变量 `TIA_MCP_PROFILE=lite`，`tools/list`
+  只暴露 ~38 个 L0/L1 核心工具(而非全部 ~196)，弱模型不会在工具海里选错。默认仍是
+  full；要全量工具就别设这个变量。(已实测：full=190 工具含 L2，lite=38 工具无 L2。)
+- **参数容错** — `softwarePath` 现在容忍多余空格/大小写，单 PLC 工程或唯一匹配时
+  传"PLC"也能自动认到 `PLC_1`；找不到时报错会**列出可用 PLC 路径**。少数易错工具
+  接受别名(`tableJson`↔`tagTableJson`、`screenJson`↔`designJson`、
+  `blockJson`↔`fcBlockJson`、`name`↔`projectName`)。即便如此，**优先传准确值**。
+- **一键自检自修** — 见上表 `Doctor`。
+
 ## 0.5 Fastest path — generate a whole project in ONE call (`ScaffoldProject`)
 
 When the user asks to **create/generate a complete project** (PLC + HMI, "做一个启停/电机/控制项目"), do **not** hand-orchestrate the 20-step runbook. Call **`ScaffoldProject`** once with a single JSON `spec`; it auto-connects, creates the project, adds PLC (+optional Unified HMI) hardware, builds UDTs/DBs/tag tables, imports SCL + LAD blocks, compiles, sets up the HMI connection/screens/tags, and saves — returning a per-step report with compile error counts. This is one model turn instead of twenty, and far less error-prone.
@@ -933,26 +966,27 @@ handler, then runs SyntaxCheck.
 End-to-end recipe (Connect → tags → screen → design → button actions → Save)
 matches **§12** in this file; exercise it on your own Unified RT project.
 
-## 13. Real download — V21 cast bug (KNOWN ISSUE, 2026-05-11)
+## 13. Real download — V21 cast bug (KNOWN ISSUE, not yet fixed — use the TIA UI)
 
-`DownloadToPlc(softwarePath=…)` currently fails with:
+`DownloadToPlc(softwarePath=…)` currently fails on V21 with:
 
 ```
 类型 "Siemens.Engineering.Connection.ConnectionConfiguration" 的对象
 无法转换为类型 "Siemens.Engineering.Connection.IConfiguration"
 ```
 
-Root cause: V21 Openness changed the `DownloadProvider.Configuration` type
-hierarchy. `Portal.cs::DownloadToPlc` invokes the `Download(IConfiguration,…)`
-overload via reflection but passes the raw `ConnectionConfiguration` instance
-which V21 no longer makes castable to `IConfiguration`. The right binding is
-likely `provider.Configurations.TargetConfigurations[0]` or similar — needs a
-focused V21 API audit.
+Root cause: `Portal.cs::DownloadToPlc` invokes `Download(IConfiguration,…)` via
+reflection but passes the raw `ConnectionConfiguration` from
+`DownloadProvider.Configuration`, which V21 no longer makes castable to
+`IConfiguration`. **This is not fixed in code yet.** A proper fix must pre-apply a
+network route (`Configuration.Modes[].PcInterfaces[].TargetInterfaces[]` +
+`ApplyConfiguration`) before the invoke. Tracked as P0 in
+`docs/server-maturity-roadmap.md`.
 
-Workaround until fixed: use the TIA Portal UI for the actual CPU download.
-`CheckDownloadReadiness` still works correctly (`ready=true` means project
-side is consistent and the network configuration exists; it does NOT mean the
-CPU is currently reachable — check `GetOnlineState.isReachable`).
+**Workaround: perform the actual CPU download from the TIA Portal UI.**
+`CheckDownloadReadiness` still works and is useful — but it is project-side only
+(`ready=true` ⇒ blocks consistent + a network configuration exists; it does **not**
+mean the CPU is reachable — check `GetOnlineState.isReachable`).
 
 ## 14. SCL external source files (`DeletePlcExternalSource` / `ImportPlcExternalSource` / `GenerateBlocksFromExternalSource`)
 
@@ -992,7 +1026,91 @@ that is **not** evidence that the import pipeline is wrong.
   `ImportBlock`**; hand-writing `<StructuredText v4>` token XML is possible but
   extremely verbose.
 
-## 15. Hard rules
+## 15. Reusable libraries, master copies & types (泛用性 — reuse across projects)
+
+Don't re-author the same UDT/FB/screen for every project. The roster already
+exposes a reuse path; document and use it instead of regenerating.
+
+| Need | Tool(s) | Notes |
+|---|---|---|
+| Inspect a `.al`/global library before pulling from it | `ProbeGlobalLibrary`, `AnalyzeGlobalLibraryPackage` | Read-only; lists master copies + types + folder layout |
+| Plan which library items map to this project | `PlanGlobalLibraryTemplateReuse` | Returns a copy plan; review before importing |
+| Pull a master copy (block/screen/faceplate) into the project | `ImportMasterCopyFromGlobalLibrary` | Lands a ready-made object — far cheaper than rebuilding |
+| Move UDTs / data types between projects | `ExportType` / `ImportType` (`ExportTypes`/`GetTypes`/`GetTypeInfo` for bulk/inspect) | Types are the portable unit; export once, import everywhere |
+
+**Workflow — adopt a company/vendor library into a new project:**
+```
+Bootstrap → AttachToOpenProject → GetProjectTree
+ProbeGlobalLibrary(path=<.al>) → AnalyzeGlobalLibraryPackage   ← see what's inside
+PlanGlobalLibraryTemplateReuse                                  ← review the copy plan
+ImportMasterCopyFromGlobalLibrary(<item>)  / ImportType(<udt>)  ← pull, don't rebuild
+CompileSoftware → SaveProject
+```
+This is the cheapest route to "make a rich project" when a curated library exists —
+prefer it over `ScaffoldProject` regeneration when the user already has standards.
+
+## 16. Offline diff & version control (Git/VCI parity)
+
+Competitors (T-IA Connect VCI, Openness Manager) ship native Git + fingerprint
+diff. This MCP has **no native Git**, but TIA objects can be rendered to **text**
+and diffed under any VCS — that covers most of the real need.
+
+| Need | Tool(s) | Output |
+|---|---|---|
+| Snapshot blocks as diffable text | `ExportBlocksAsDocuments` / `ExportAsDocuments` | SIMATIC SD `.s7dcl`/`.scl` text — line-diffable |
+| Snapshot a whole PLC program | `ExportBlocks` + `ExportPlcTagTable` + `ExportTypes` | Re-importable XML/SD set |
+| Compare project (offline) vs the CPU (online) | `CompareSoftwareToOnline` | Block-level differences |
+| Find who references a tag/block | `GetCrossReferences` | Impact analysis before a change |
+
+**Workflow — version a project in Git (text round-trip):**
+```
+ExportBlocksAsDocuments(softwarePath, outDir)   ← .s7dcl/.scl per block (UTF-8 BOM)
+ExportTypes / ExportPlcTagTable                 ← types + tags alongside
+<commit outDir to git>                          ← real, reviewable diffs over time
+# restore/PR review: ImportBlocksFromDocuments / ImportType to re-materialize
+```
+Keep the export dir stable per project so commits diff cleanly. This gives
+code-review and history without the licensed VCI feature.
+
+## 17. Alarms & multilingual text
+
+| Need | Tool(s) |
+|---|---|
+| Alarm classes (round-trip) | `ExportAlarmClasses` / `ImportAlarmClasses` |
+| Alarm text lists | `ExportAlarmTextLists` / `ImportAlarmTextLists` |
+| Per-instance alarm texts | `ExportAlarmInstanceTexts` |
+| HMI text/graphic lists | `ExportAlarmTextLists` (HMI side) + Unified text-list tools |
+
+Multilingual rule (consistent with §9a): block/network titles and comments live
+as `MLC_*` IDs in the paired `.s7res` (`zh-CN:` + `en-US:`); HMI texts are
+`MultilingualText` parts. For LAD imports, **add `en-US:` beside every `zh-CN:`**
+or the SD import can fail (§9a boundary note). Round-trip alarm/text exports
+through these tools rather than hand-editing project XML.
+
+## 18. Capability boundary vs competitors (对标 — read before promising)
+
+Honest scope so you don't over-promise. Quote this when a user asks "can it do X".
+
+| Capability | This MCP | T-IA Connect | Openness Manager |
+|---|---|---|---|
+| Project/PLC/HMI create, blocks, tags, types | ✅ (`ScaffoldProject` one-shot) | ✅ | ✅ |
+| SCL DSL + external-source generate | ✅ (§10/§14) | ✅ | ✅ |
+| LAD authoring (S7DCL text) | ✅ verified (§9a) | ✅ (text LAD) | ✅ (S7DCL) |
+| Unified HMI design JSON + bindings | ✅ (§12) | ✅ | ✅ (JSON screens) |
+| OPC UA read (live values, monitoring) | ✅ read-only (`ReadPlcLiveValuesOpcUa`) | ✅ | ✅ browser+subscribe+trend |
+| Download to CPU | ❌ known issue, use TIA UI (§13) | ✅ | ✅ |
+| **Safety F-block author / compile / signature** | ❌ **gap** (§4; roadmap) | ✅ full | ✅ full |
+| **PLCSIM simulation / unit testing** | ❌ **gap** (roadmap) | ✅ simulate | ✅ PLCSIM Advanced tests |
+| Native Git / VCI | ❌ (text-export workaround §16) | ✅ Git+CI | ✅ full Git UI |
+| Block protection / encrypted vault | ❌ | partial | ✅ AES vault |
+| UMAC user/rights, SiVArc auto-screens | ❌ | ✅ | partial |
+
+**Where we win:** one-call `ScaffoldProject`, verified S7DCL LAD + mixed LAD/SCL,
+honest verified-vs-not discipline, and being a real MCP (not a paid license).
+**Known gaps → see the roadmap** `docs/server-maturity-roadmap.md` (bundle root):
+safety F-blocks and PLCSIM are the two that matter most for parity.
+
+## 19. Hard rules
 
 1. **Never** call write tools before `Bootstrap` + `GetProjectTree`.
 2. **Never** use a temporary/timestamped path on the user's real working

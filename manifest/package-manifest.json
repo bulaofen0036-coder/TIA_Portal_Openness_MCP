@@ -1,6 +1,6 @@
 ﻿{
   "schemaVersion": "2026-05-25",
-  "bundleVersion": "2.2.4",
+  "bundleVersion": "2.2.5",
   "packageName": "TIA_MCP_交付包_20260525_V20S7DCL_184330",
   "packageType": "tia-portal-mcp-complete-offline-delivery-bundle",
   "generatedAt": "2026-05-31T20:30:00+08:00",
@@ -58,7 +58,7 @@
     "exitCodes": { "0": "success", "1": "completed with failed steps", "2": "error" }
   },
   "capabilities": {
-    "mcpToolCount": 189,
+    "mcpToolCount": 190,
     "mcpToolLayers": {
       "L0": 6,
       "L1": 31,
