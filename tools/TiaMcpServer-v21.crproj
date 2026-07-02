@@ -1,22 +1,10 @@
 <project outputDir="..\..\..\..\..\release\obfuscated-v21" baseDir="." xmlns="http://confuser.codeplex.com">
 
   <module path="TiaMcpServer.exe">
-    <!-- Global: rename types/methods but PRESERVE parameter names (critical for MCP SDK) -->
+    <!-- ctrl flow + anti debug only. No rename — property names must stay for JSON serialization -->
     <rule pattern="true" inherit="false">
-      <protection id="rename" action="add">
-        <argument name="renameArgs" value="false" />
-      </protection>
       <protection id="ctrl flow" action="add" />
       <protection id="anti debug" action="add" />
-    </rule>
-    <rule pattern="full-name('McpServer')" inherit="false">
-      <protection id="rename" action="remove" />
-    </rule>
-    <rule pattern="full-name('Program')" inherit="false">
-      <protection id="rename" action="remove" />
-    </rule>
-    <rule pattern="full-name('CliOptions')" inherit="false">
-      <protection id="rename" action="remove" />
     </rule>
   </module>
 
