@@ -1,8 +1,11 @@
 <project outputDir="..\..\..\..\..\release\obfuscated-v21" baseDir="." xmlns="http://confuser.codeplex.com">
 
   <module path="TiaMcpServer.exe">
+    <!-- Global: rename types/methods but PRESERVE parameter names (critical for MCP SDK) -->
     <rule pattern="true" inherit="false">
-      <protection id="rename" action="add" />
+      <protection id="rename" action="add">
+        <argument name="renameArgs" value="false" />
+      </protection>
       <protection id="ctrl flow" action="add" />
       <protection id="anti debug" action="add" />
       <protection id="anti ildasm" action="add" />
