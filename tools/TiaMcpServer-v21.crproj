@@ -8,8 +8,6 @@
       </protection>
       <protection id="ctrl flow" action="add" />
       <protection id="anti debug" action="add" />
-      <protection id="anti ildasm" action="add" />
-      <protection id="resources" action="add" />
     </rule>
     <rule pattern="full-name('McpServer')" inherit="false">
       <protection id="rename" action="remove" />
