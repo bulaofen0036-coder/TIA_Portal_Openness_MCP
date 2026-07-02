@@ -67,11 +67,14 @@ namespace TiaMcpServer.License
                     "Cannot generate machine fingerprint.");
             }
 
-            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(raw.ToString()));
-            var hex = BitConverter.ToString(hash).Replace("-", "");
-            var id = hex.Substring(0, 16);
+            using (var sha = SHA256.Create())
+            {
+                var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(raw.ToString()));
+                var hex = BitConverter.ToString(hash).Replace("-", "");
+                var id = hex.Substring(0, 16);
 
-            return $"{id.Substring(0, 4)}-{id.Substring(4, 4)}-{id.Substring(8, 4)}-{id.Substring(12, 4)}";
+                return $"{id.Substring(0, 4)}-{id.Substring(4, 4)}-{id.Substring(8, 4)}-{id.Substring(12, 4)}";
+            }
         }
 
         /// <summary>
