@@ -12,3 +12,6 @@ TiaMcp_Output/
 *.suo
 Thumbs.db
 Desktop.ini
+
+*.bak_*
+*.pdb

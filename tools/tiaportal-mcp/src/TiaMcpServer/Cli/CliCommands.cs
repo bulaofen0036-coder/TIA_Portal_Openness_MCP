@@ -81,10 +81,20 @@ namespace TiaMcpServer.Cli
             if (Flag(args, "--json")) { Console.WriteLine(Json(tree)); }
             else
             {
-                Console.WriteLine(tree.Message ?? "(project tree)");
+                // print the actual tree text, not just the "(retrieved)" status line
+                Console.WriteLine(tree.Tree ?? tree.Message ?? "(project tree)");
                 var plc = Opt(args, "--plc");
                 if (!string.IsNullOrWhiteSpace(plc))
-                    Console.WriteLine(McpServer.GetBlocks(plc!, "").Message);
+                {
+                    var blocks = McpServer.GetBlocks(plc!, "");
+                    Console.WriteLine();
+                    Console.WriteLine($"== {plc} · 程序块 ==");
+                    if (blocks.Items != null)
+                        foreach (var b in blocks.Items)
+                            Console.WriteLine($"  {b.TypeName,-12} {b.Name}  [{b.ProgrammingLanguage}]");
+                    else
+                        Console.WriteLine(blocks.Message);
+                }
             }
             return 0;
         }
