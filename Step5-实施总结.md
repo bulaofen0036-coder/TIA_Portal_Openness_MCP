@@ -144,7 +144,10 @@ d663ba6 fix: ConfuserEx renameArgs=false 修复 MCP SDK 参数名丢失
 
 | 任务 | 状态 | 备注 |
 |------|------|------|
-| V21 编译 + 加壳 | ⏳ | 需 V21 Openness 机器，按 `V21_BUILD.md` 操作 |
+| 拉取上游功能性更新 | 📋 | 从朋友仓库（bulaofen0036-coder）拉取最新功能，合并到 v2.3.x |
+| V21 编译 + 加壳 | ⏳ | 另一台有 V21 Openness 的机器，按 `V21_BUILD.md` 操作 |
+| V21 安装测试 | ⏳ | 完整走一遍客户流程：解压 → 激活 → 注册 → 功能验证 |
 | V21 发布包 | ⏳ | 编译后打包 `release/v2.3.0/v21/` |
 | 代码签名证书 | 📋 | 先用自签名，有客户后再投资 |
+| license-server GitHub 仓库 | ✅ 已删 | 保留 GitCode 为唯一源（`gitcode.com/qq_43301551/main.git`） |
 | `hermes mcp add --args` 格式 | 📋 | 当前 `hermes config set` 存为字符串而非列表，需手动 YAML 修复 |
