@@ -1,5 +1,40 @@
 # Change Log
 
+## [2.2.7] - 2026-07-02 - 门槛归零：版本自路由 + 四宿主一键配置 + 模型引导（instructions/GetAuthoringGuide）
+
+本轮全部围绕两个真实用户痛点：①配置要人肉填 MCP 路径/博途路径/版本（issue #9）②非 Claude 的 AI 调用时生成代码质量差、耗时长。
+
+- **版本自路由（修 issue #8 根因）**：exe 启动时若实际 TIA 版本 ≠ 本 exe 编译目标（V20↔V21），自动找到旁边的兄弟 exe（`bin`↔`bin-v20`、`runtime/v20`↔`v21` 两种布局都认）并以相同参数重新执行，stdio 继承——MCP 宿主和 CLI 都无感。V20 机器拿到 V21 exe 不再报「未能加载 Siemens.Engineering.Base 21.0」，而是照常工作。防死循环 env 守卫；找不到兄弟 exe 时给出明确指引。
+- **修复多版本机器上的程序集解析劫持**：`TiaPortalLocation` 环境变量是版本无关的（常指向 V21 安装），旧逻辑让它优先于版本相关注册表，导致 V20 exe 在 V20+V21 双装机器上报「Could not find DLL 'Siemens.Engineering' for version 20」。现在：环境变量路径版本匹配才采用 → 版本专属注册表 → 最后才兜底环境变量。本机双装环境实测修复。
+- **`tia config` 一键配置扩到 4 宿主（修 issue #9）**：Claude Desktop / **Claude Code**（`~/.claude.json`）/ Cursor / **VS Code**（`%APPDATA%\Code\User\mcp.json`，`servers`+`type:stdio` 专属 schema）。自动发现自身路径 + 注册表版本 + **版本匹配的 exe**；默认只写本机检测到的宿主（不给没装的 IDE 凭空造配置）；`--host claude|claude-code|cursor|vscode` 指定单个；`--print` 同时输出两种 schema 片段；JSON 不再把中文路径转成 `\uXXXX` 转义。原配置 `.bak` 备份、其它 server 保留（沿用已真机验证的合并逻辑）。
+- **模型引导（针对“其它 AI 生成质量差”）**：
+  - **MCP initialize 下发 `instructions`**：黄金路径（整工程→ScaffoldProject+dryRun；改块→s7dcl/SCL 文本导入；禁止手写 FlgNet XML）、BOM 编码规则、编译/保存纪律、错误恢复纪律——所有 MCP 客户端（含从不读 SKILL.md 的 VS Code/Cursor/三方 agent）自动注入模型上下文。
+  - **新工具 `GetAuthoringGuide(topic)`**［L0］：workflow / scl / lad / db / hmi / errors 六个主题的已验证语法速查（SCL 骨架与十诫、s7dcl LAD 文本要素、BOM 规则表、常见报错→精确修法），模型写代码前一次调用拿到全部约束。
+  - **Bootstrap OperatingRules 补 2 条**：写代码前先调 GetAuthoringGuide；BOM 编码规则。
+- README 中英：「挂载 MCP」改为一条 `config` 命令的全自动流程。
+- 离线验证：V20/V21 双编译 0 错；V20 exe 真机自路由到 V21 exe 实测通过；`config --print` 双 schema 实测正确；MCP 握手实测 instructions 下发 + 199 工具含 GetAuthoringGuide + 主题内容正确。
+
+## [2.2.6] - 2026-07-02 - 三大 god-file 拆分为领域 partial + CLI describe 增强
+
+维护性重构 + CLI 易用性，工具集与行为不变（重构后 exe 已日常真机使用验证）：
+
+- **god-file 拆分**：`McpServer.cs`(-7000行) / `Program.cs`(-7784行) / `Portal.cs`(-13221行) 按领域拆成 18 个 partial 文件（Blocks/Devices/Documents/Groups/PlcSoftware/ProjectSession/Types、CliProbes/HmiTemplates/PlcHmiSyncXml/ReportBuilders、Alarms/Download/Helpers/OpcUa/Software 等），并发协作不再撞车，行为零变化。
+- **CLI `tia describe` 增强**：输出真实项目树 + 块清单（类型/名称/语言），此前只打印状态串。
+- **Claude Code 插件清单**：新增 `.claude-plugin/` + `.mcp.json` + `runtime/v21` 捆绑运行时，支持 `/plugin marketplace add` 一键安装。
+- 版本对齐：V20/V21 双 exe、manifest、README 统一 2.2.6。
+
+## [2.2.5] - 2026-06-16 - 读组态IP + 块路径修复 + softwarePath 容错 + 文档诚实化
+
+继续降门槛 / 提正确率 / 成熟化，改动均经真机或离线验证：
+
+- **新增只读工具 `ExportDeviceAml`**：导出设备硬件组态为 AutomationML(CAx) `.aml`，内含**组态 IP / 子网 / 网关 / PROFINET 设备名**——补上 `GetDeviceItemNetworkInfo` 读不到已组态 IP 的缺口。真机验证（江夏 安全PLC / S7-1200 station_3）：读出 IP=192.168.0.32 / 网关 .254 / 掩码 255.255.255.0。
+- **修复块路径解析**：`GetBlockInfo` 等对根级块自动跳过开头的 `Program blocks`/`程序块` 根容器段——裸名 `FR12E02v2` 与带前缀 `Program blocks/FR12E02v2` 现在都能命中（此前加前缀报 "Block not found"）。真机验证通过。
+- **`softwarePath` 容错解析**：精确匹配失败时自动兜底——容忍多余空格/大小写、单 PLC 工程任意 token 自动认到唯一 PLC、唯一子串匹配（`"PLC"`→`"PLC_1"`、`"安全"`→`"安全PLC"`）；仍无法解析时列表工具（`GetPlcTagTables`/`GetPlcExternalSources`/`GetPlcWatchTables`）报错附 `Available PLC paths: …`。纯匹配逻辑 `Guard.MatchPlcName` 16 个离线用例全过。
+- **下载 V21 cast bug 修复 + 真机验证**：`DownloadToPlc` 旧版在 V21 报"ConnectionConfiguration 无法转换为 IConfiguration"。修复：导航到 `ConfigurationTargetInterface`（它才是 IConfiguration）并应用路由；修正 StopModules 选择枚举为 `StopAll`（旧值"StopModule"不存在→每次下载"unhandled"中止）；反射异常解包显示真实原因。**真机验证（江夏 安全PLC / S7-1200）：state=Success，0 错**。
+- **文档诚实化**：本轮先发现上一轮未提交文档把"下载已修复"等写在了代码之前，已逐处核对——softwarePath 容错按代码兑现、下载按真机验证转正，措辞与代码/真机一致。
+- 工具数 189 → 190（仅新增 `ExportDeviceAml`）。
+- **文档与既定方向对齐（竞品对标后）**：路线图（`docs/server-maturity-roadmap.md`）与 SKILL §18 中“安全F块 / PLCSIM / 原生Git-VCI”由“P1 待补缺口”改标为**主动放弃（低收益＋高风险）**，避免文档诱导去做已否决的功能；OPC UA 明确保持只读。统一工具数表述为 ~190(full) / ~38(lite)，订正 SKILL.md 中 184 / 196 / 180 等不一致旧值（精确以 `tools/list` 为准）。纯文档，无代码改动。
+
 ## [2.2.4] - 2026-06-15 - 一键配置：把 MCP 注册进 AI 宿主，零手改 JSON
 
 降低上手门槛。新增内置一键配置，**无需第三方软件、无需手改配置文件**：

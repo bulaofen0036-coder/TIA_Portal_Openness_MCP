@@ -1,4 +1,4 @@
-# TIA Portal MCP Server (v2.2.4 · V20 + V21 · S7DCL · CLI · read-only online monitoring · one-click config)
+# TIA Portal MCP Server (v2.2.7 · V20 + V21 · S7DCL · CLI · read-only online monitoring · one-click config)
 
 **English** · [中文](README.md)
 
@@ -85,10 +85,24 @@ to run.
    - set the `TiaPortalLocation` user environment variable;
    - let it auto-read `HKLM\SOFTWARE\Siemens\Automation\_InstalledSW\TIAP{20|21}\TIA_Opns\Path`.
    With multiple versions installed, pass `--tia-major-version 20` (or `21`) explicitly.
-2. **Mount the MCP.** Copy the snippet from `cursor-mcp.example.json` into any
-   MCP-capable client; replace `REPLACE_ME` with this bundle's root; pick the exe
-   path by TIA version (see Highlights). For non-default installs add
-   `"--tia-portal-location","<root>","--tia-major-version","<20|21>"` to `args`.
+2. **Mount the MCP — one command, fully automatic.**
+
+   ```powershell
+   .\tools\tiaportal-mcp\src\TiaMcpServer\bin\Release\net48\TiaMcpServer.exe config
+   ```
+
+   It self-discovers everything: its own absolute path, the installed TIA Portal
+   (registry) and version, and the version-matching exe (V20/V21 picked for you) —
+   then writes the `tia-portal` entry into every AI host detected on this machine:
+   **Claude Desktop / Claude Code / Cursor / VS Code** (existing config backed up
+   as `.bak`, other servers preserved). Restart the AI client to load it.
+   Options: `config --host vscode` (or `claude|claude-code|cursor`), `config --print`
+   to copy a snippet manually. Since v2.2.7 the exe also **self-routes**: if it was
+   built for a different TIA major version than the machine has, it transparently
+   re-execs the matching sibling exe — grabbing the "wrong" exe no longer crashes.
+   Manual fallback: copy the snippet from `cursor-mcp.example.json`, replace
+   `REPLACE_ME` with this bundle's root, pick the exe path by TIA version; for
+   non-default installs add `"--tia-portal-location","<root>","--tia-major-version","<20|21>"` to `args`.
 3. **First call sequence:** `Bootstrap` → `Connect` → `OpenProject` (or
    `CreateProject`) → `GetProjectTree`, then read the real `PLC_*` / `HMI_RT_*`
    paths from the tree before continuing.

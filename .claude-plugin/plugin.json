@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "tia-portal-openness-mcp",
+  "version": "2.2.5",
+  "description": "Siemens TIA Portal (博途) Openness automation via the TiaMcpServer MCP — project/PLC/HMI scaffolding, SCL/LAD authoring, compile, download, online read. Bundles the V21 server for one-command install.",
+  "author": { "name": "bulaofen" },
+  "keywords": ["siemens", "tia-portal", "tia-openness", "plc", "hmi", "scl", "s7", "automation", "mcp"],
+  "skills": "./tools/tiaportal-mcp",
+  "mcpServers": "./.mcp.json"
+}

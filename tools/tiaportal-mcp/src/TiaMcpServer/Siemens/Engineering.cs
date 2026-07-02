@@ -140,20 +140,41 @@ namespace TiaMcpServer.Siemens
                 return TiaPortalLocationOverride;
             }
 
-            // 2. env var (Cursor MCP env or user env): more reliable than registry across versions.
+            // 2. env var (Cursor MCP env or user env) — but it is version-agnostic and on
+            //    multi-version machines it typically points at ONE install (e.g. V21), which
+            //    used to hijack V20 assembly resolution ("Could not find DLL ... for version 20").
+            //    Only trust it when its path names the version we need (or names no version).
             var env = Environment.GetEnvironmentVariable("TiaPortalLocation");
-            if (!string.IsNullOrWhiteSpace(env) && Directory.Exists(env))
+            bool envUsable = !string.IsNullOrWhiteSpace(env) && Directory.Exists(env);
+            if (envUsable && PathMatchesVersion(env!, TiaMajorVersion))
             {
                 return env;
             }
 
+            // 3. Version-specific registry entry — authoritative on multi-version machines.
             var subKeyName = $@"SOFTWARE\Siemens\Automation\_InstalledSW\TIAP{TiaMajorVersion}\TIA_Opns";
 
             using (var regBaseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
             using (var tiaOpnsKey = regBaseKey.OpenSubKey(subKeyName))
             {
-                return tiaOpnsKey?.GetValue("Path")?.ToString();
+                var regPath = tiaOpnsKey?.GetValue("Path")?.ToString();
+                if (!string.IsNullOrWhiteSpace(regPath) && Directory.Exists(regPath))
+                {
+                    return regPath;
+                }
             }
+
+            // 4. Last resort: the env var even when its version looks different — better than nothing.
+            return envUsable ? env : null;
+        }
+
+        /// <summary>True when the path names no version at all, or names exactly V{version}.</summary>
+        private static bool PathMatchesVersion(string path, int version)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(path, @"[Vv](\d{2})",
+                System.Text.RegularExpressions.RegexOptions.RightToLeft);
+            if (!m.Success) return true;
+            return int.TryParse(m.Groups[1].Value, out int pv) && pv == version;
         }
 
         private static string? FindAssemblyRecursive(string directory, string fileName, IEnumerable<string> excludedTiaMajorVersions)

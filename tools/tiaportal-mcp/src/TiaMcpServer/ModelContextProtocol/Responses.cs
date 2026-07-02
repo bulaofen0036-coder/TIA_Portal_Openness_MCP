@@ -503,6 +503,17 @@ namespace TiaMcpServer.ModelContextProtocol
     {
     }
 
+    public class ResponseExportDeviceAml : ResponseMessage
+    {
+        public string? DeviceName { get; set; }
+        public string? FilePath { get; set; }
+        public bool Success { get; set; }
+        public string? State { get; set; }
+        public int ErrorCount { get; set; }
+        public int WarningCount { get; set; }
+        public IEnumerable<string>? Messages { get; set; }
+    }
+
     public class ResponseImportBlock : ResponseMessage
     {
     }

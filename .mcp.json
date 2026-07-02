@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "tia-portal": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/runtime/v21/TiaMcpServer.exe",
+      "args": ["--tia-major-version", "21"]
+    }
+  }
+}

@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json.Nodes;
 using TiaMcpServer.ModelContextProtocol;
 
 namespace TiaMcpServer.Siemens
@@ -134,6 +135,48 @@ namespace TiaMcpServer.Siemens
                 _logger?.LogError(ex, "GoOffline failed for {SoftwarePath}", softwarePath);
                 return new ResponseMessage { Message = $"GoOffline error: {ex.Message}" };
             }
+        }
+
+        // Take EVERY PLC in the project offline, not just one. A UI-initiated online session,
+        // or a project with more than one online PLC, will NOT release the compile/export/import
+        // lock when GoOffline is called for a single softwarePath. This iterates all PLCs using
+        // the same provider resolution as GoOffline, so the agent never has to ask the user to
+        // toggle online/offline in the TIA UI. Returns per-PLC before/after state.
+        public JsonObject GoOfflineAll()
+        {
+            var plcs = new JsonArray();
+            if (IsProjectNull())
+                return new JsonObject { ["message"] = "No project open.", ["allOffline"] = true, ["plcs"] = plcs };
+
+            bool allOffline = true;
+            foreach (var plc in GetAllPlcSoftware())
+            {
+                var entry = new JsonObject { ["name"] = plc.Name };
+                try
+                {
+                    var provider = ResolvePlcService<OnlineProvider>(plc.Name, plc);
+                    entry["before"] = provider?.State.ToString() ?? "Unknown";
+                    provider?.GoOffline();
+                    var after = provider?.State.ToString() ?? "Unknown";
+                    entry["after"] = after;
+                    entry["ok"] = after != "Online";
+                    if (after == "Online") allOffline = false;
+                }
+                catch (Exception ex)
+                {
+                    entry["ok"] = false;
+                    entry["error"] = ex.Message;
+                    allOffline = false;
+                }
+                plcs.Add(entry);
+            }
+
+            return new JsonObject
+            {
+                ["message"] = $"GoOfflineAll: {plcs.Count} PLC(s) processed; allOffline={allOffline}.",
+                ["allOffline"] = allOffline,
+                ["plcs"] = plcs
+            };
         }
 
         public ResponseCompare CompareSoftwareToOnline(string softwarePath, int maxDepth = 4, int maxEntries = 200)

@@ -94,13 +94,36 @@ namespace TiaMcpServer.ModelContextProtocol
             [Description("itemsJson: JSON array or comma-separated list of absolute S7 addresses, e.g. [\"DB10.DBD0:REAL\",\"DB10.DBD4:REAL\",\"M0.0\"].")] string itemsJson,
             [Description("rack: hardware rack. S7-1200/1500 = 0.")] int rack = 0,
             [Description("slot: hardware slot. S7-1200/1500 = 1.")] int slot = 1,
-            [Description("expectModuleContains: optional identity guard. If set (e.g. '1211C'), the read aborts unless the CPU module type contains this substring.")] string expectModuleContains = "")
+            [Description("expectModuleContains: optional identity guard. If set (e.g. '1211C'), the read aborts unless the CPU module type contains this substring.")] string expectModuleContains = "",
+            [Description("devicePath: optional device name (e.g. 'PLC_1') for a PUT/GET precheck. When set, the read is skipped with a clear, actionable message if the CPU has remote PUT/GET access disabled, instead of failing with a TCP timeout.")] string devicePath = "")
         {
             try
             {
                 var specs = ParseItemSpecs(itemsJson);
                 if (specs.Count == 0)
                     return new ResponseJsonReport { Ok = false, Message = "No addresses supplied in itemsJson." };
+
+                // Dependency check: an S7 DB read is impossible if the CPU forbids remote PUT/GET.
+                // Surface that as an actionable result rather than a bare TCP timeout.
+                if (!string.IsNullOrWhiteSpace(devicePath))
+                {
+                    try
+                    {
+                        var pg = Portal.GetPutGetAccess(devicePath);
+                        if ((pg["found"]?.GetValue<bool>() ?? false) && !(pg["enabled"]?.GetValue<bool>() ?? false))
+                        {
+                            return new ResponseJsonReport
+                            {
+                                Ok = false,
+                                Message = $"PUT/GET access is DISABLED on '{devicePath}' (attribute '{pg["attributeName"]}'). S7 absolute DB reads will fail. " +
+                                          $"Enable it: SetPutGetAccess(devicePath:'{devicePath}', enable:true) then DownloadToPlc — or read M/I/Q which are unrestricted.",
+                                Data = new JsonObject { ["putGetAccess"] = pg, ["precheck"] = "putget-disabled" },
+                                Meta = new JsonObject { ["timestamp"] = DateTime.Now, ["success"] = false }
+                            };
+                        }
+                    }
+                    catch { /* precheck is best-effort; fall through to the read */ }
+                }
 
                 var r = S7LiveReader.ReadItems(ip, rack, slot, specs, string.IsNullOrWhiteSpace(expectModuleContains) ? null : expectModuleContains);
 
@@ -146,9 +169,13 @@ namespace TiaMcpServer.ModelContextProtocol
                 return new ResponseJsonReport
                 {
                     Ok = ok,
-                    Message = r.Error ?? (ok
-                        ? $"Read {r.Items.Count} live value(s) from {ip} in {r.ElapsedMs} ms."
-                        : $"Connected to {ip}, but one or more items failed (see items[].error)."),
+                    Message = r.Error != null
+                        ? r.Error + "  HINT: if the CPU IS reachable, this is commonly because remote PUT/GET access is disabled " +
+                          "(TIA: CPU > Protection & Security > Connection mechanisms > 'Permit access with PUT/GET communication'), or a wrong rack/slot."
+                        : (ok
+                            ? $"Read {r.Items.Count} live value(s) from {ip} in {r.ElapsedMs} ms."
+                            : $"Connected to {ip}, but one or more items failed — a DB read failing here usually means the DB is OPTIMIZED " +
+                              "(no absolute access) or PUT/GET is disabled; M/I/Q are unrestricted. See items[].error."),
                     Data = data,
                     Meta = new JsonObject { ["timestamp"] = DateTime.Now, ["success"] = ok }
                 };

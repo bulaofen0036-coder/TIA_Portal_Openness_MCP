@@ -14,3 +14,11 @@ obj-v20/
 
 # Logs
 *.log
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Artifacts
+*.bak_*
+*.pdb

@@ -1,4 +1,4 @@
-# TIA Portal MCP 完整交付包（**v2.2.4** / V20+V21 + S7DCL + CLI + 在线只读监控 + 一键配置）
+# TIA Portal MCP 完整交付包（**v2.2.7** / V20+V21 + S7DCL + CLI + 在线只读监控 + 一键配置）
 
 [English](README.en.md) · **中文**
 
@@ -98,13 +98,18 @@
    - 当机器装了多个版本时显式传 `--tia-major-version 20`（或 21）以免自动选最高版；  
    - 首次连接时在 TIA 弹窗中授权 **Openness**。
 
-2. **挂载 MCP**  
-   - 复制 `cursor-mcp.example.json` 片段到任意支持 MCP 的客户端（Cursor / VS Code / Claude Desktop / 自研 HTTP 客户端均可）；  
-   - 将路径中的 **`REPLACE_ME`** 替换为 **本包根目录**；
-   - **按 TIA 版本选 exe 路径**：  
-     - V21 → `…\tools\tiaportal-mcp\src\TiaMcpServer\bin\Release\net48\TiaMcpServer.exe`  
-     - V20 → `…\tools\tiaportal-mcp\src\TiaMcpServer\bin-v20\Release\net48\TiaMcpServer.exe`  
-   - 非标准安装位置必须在客户端 `args` 里加 `--tia-portal-location "<安装根>" --tia-major-version <20|21>`，例如 `"--tia-portal-location","D:\\app\\TIA20\\Portal V20","--tia-major-version","20"`。
+2. **挂载 MCP（一条命令，全自动）**  
+   在交付包里任选一个 exe 运行：
+
+   ```powershell
+   .\tools\tiaportal-mcp\src\TiaMcpServer\bin\Release\net48\TiaMcpServer.exe config
+   ```
+
+   它会**自动发现一切**：自己的绝对路径、注册表里的博途安装与版本、与版本匹配的 exe（V20/V21 自动选对），然后把 `tia-portal` 条目一次性写进本机检测到的所有 AI 客户端配置——**Claude Desktop / Claude Code / Cursor / VS Code**（原配置自动备份 `.bak`，其它 server 原样保留）。重启 AI 客户端即生效。  
+   - 只配某一个宿主：`config --host vscode`（可选 `claude|claude-code|cursor|vscode`）；  
+   - 只看不写（手动粘贴其它宿主）：`config --print`；  
+   - **拿错 exe 也没关系**：v2.2.7 起 exe 会按实际 TIA 版本**自动转投**正确的兄弟 exe（V21 exe 在纯 V20 机器上照常可用）。  
+   - 手动配置兜底：复制 `cursor-mcp.example.json` 片段，把 `REPLACE_ME` 换成本包根目录，V21 用 `bin\Release\net48\TiaMcpServer.exe`、V20 用 `bin-v20\Release\net48\TiaMcpServer.exe`；非标准安装位置在 `args` 加 `--tia-portal-location "<安装根>" --tia-major-version <20|21>`。
 
 3. **首次调用顺序**  
    - `Bootstrap` → `Connect` → `OpenProject`（或 `CreateProject`）→ `GetProjectTree`，从树中读取真实的 `PLC_xxx` / `HMI_RT_xxx` 路径再继续。

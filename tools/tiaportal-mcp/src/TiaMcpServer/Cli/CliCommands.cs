@@ -81,10 +81,20 @@ namespace TiaMcpServer.Cli
             if (Flag(args, "--json")) { Console.WriteLine(Json(tree)); }
             else
             {
-                Console.WriteLine(tree.Message ?? "(project tree)");
+                // print the actual tree text, not just the "(retrieved)" status line
+                Console.WriteLine(tree.Tree ?? tree.Message ?? "(project tree)");
                 var plc = Opt(args, "--plc");
                 if (!string.IsNullOrWhiteSpace(plc))
-                    Console.WriteLine(McpServer.GetBlocks(plc!, "").Message);
+                {
+                    var blocks = McpServer.GetBlocks(plc!, "");
+                    Console.WriteLine();
+                    Console.WriteLine($"== {plc} · 程序块 ==");
+                    if (blocks.Items != null)
+                        foreach (var b in blocks.Items)
+                            Console.WriteLine($"  {b.TypeName,-12} {b.Name}  [{b.ProgrammingLanguage}]");
+                    else
+                        Console.WriteLine(blocks.Message);
+                }
             }
             return 0;
         }
@@ -155,36 +165,58 @@ namespace TiaMcpServer.Cli
             return 0;
         }
 
-        // One-click MCP registration into AI hosts (Claude Desktop / Cursor), no manual JSON editing.
+        // One-click MCP registration into AI hosts (Claude Desktop / Claude Code / Cursor /
+        // VS Code), no manual JSON editing. Self-discovers everything: own exe path, TIA
+        // version from the registry, and the version-matching sibling exe.
         private static int Config(string[] args)
         {
-            string exe = McpConfigInstaller.OwnExePath();
             int ver = int.TryParse(Opt(args, "--tia-major-version"), out var v) && v > 0
                 ? v
                 : (TiaMcpServer.Siemens.Engineering.DetectTiaMajorVersion() ?? 21);
+            string exe = McpConfigInstaller.ExeForVersion(ver);
 
             if (Flag(args, "--print"))
             {
-                Console.WriteLine("Paste this into your MCP host config (mcpServers):");
-                Console.WriteLine(McpConfigInstaller.Snippet(exe, ver));
+                Console.WriteLine("Claude Desktop / Claude Code / Cursor (mcpServers):");
+                Console.WriteLine(McpConfigInstaller.Snippet(exe, ver, McpConfigInstaller.HostStyle.McpServers));
+                Console.WriteLine();
+                Console.WriteLine("VS Code — %APPDATA%\\Code\\User\\mcp.json (servers):");
+                Console.WriteLine(McpConfigInstaller.Snippet(exe, ver, McpConfigInstaller.HostStyle.VsCode));
                 return 0;
             }
 
-            string only = Opt(args, "--host"); // claude | cursor | (default: all)
+            string? only = Opt(args, "--host"); // claude|claude-code|cursor|vscode (default: all installed)
             int done = 0, failed = 0;
             foreach (var h in McpConfigInstaller.KnownHosts())
             {
-                if (!string.IsNullOrEmpty(only) &&
-                    h.Name.IndexOf(only, StringComparison.OrdinalIgnoreCase) < 0) continue;
-                try { Console.WriteLine("  [ok]     " + McpConfigInstaller.Apply(h.ConfigPath, exe, ver)); done++; }
+                bool targeted = !string.IsNullOrEmpty(only) && MatchesHost(h.Name, only!);
+                if (!string.IsNullOrEmpty(only) && !targeted) continue;
+
+                // Without an explicit --host, only touch hosts that look installed —
+                // don't fabricate config files for IDEs the user doesn't have.
+                bool installed = System.IO.File.Exists(h.ConfigPath) ||
+                                 System.IO.Directory.Exists(System.IO.Path.GetDirectoryName(h.ConfigPath));
+                if (!targeted && !installed)
+                {
+                    Console.WriteLine("  [skip]   " + h.Name + " (not detected on this machine)");
+                    continue;
+                }
+
+                try { Console.WriteLine("  [ok]     " + h.Name + ": " + McpConfigInstaller.Apply(h.ConfigPath, exe, ver, h.Style)); done++; }
                 catch (Exception ex) { Console.Error.WriteLine("  [failed] " + h.Name + ": " + ex.Message); failed++; }
             }
 
             Console.WriteLine(done > 0
-                ? $"Configured {done} host(s) for TIA V{ver}. Restart the AI client to load it. (original config backed up as *.bak)"
+                ? $"Configured {done} host(s) for TIA V{ver} -> {exe}. Restart the AI client to load it. (original config backed up as *.bak)"
                 : "No host config written. Targeted host not found, or use `config --print` to copy the snippet manually.");
-            Console.WriteLine("For other hosts (e.g. Claude Code), run `config --print` and paste the snippet.");
+            Console.WriteLine("For other hosts, run `config --print` and paste the matching snippet.");
             return failed > 0 && done == 0 ? 1 : 0;
+        }
+
+        private static bool MatchesHost(string hostName, string query)
+        {
+            string norm(string s) => s.Replace(" ", "").Replace("-", "").ToLowerInvariant();
+            return norm(hostName).Contains(norm(query));
         }
 
         // ---- helpers ----
@@ -244,7 +276,10 @@ USAGE
   tia export   <project.apXX> --plc NAME --out DIR --block PATH [--scl]
   tia import   <project.apXX> --plc NAME --from DIR [--no-overwrite]
   tia prewarm  [--stop]                                   Hold a headless instance open (~1s attach after)
-  tia config   [--host claude|cursor] [--print]           One-click: register this MCP into Claude Desktop / Cursor
+  tia config   [--host claude|claude-code|cursor|vscode] [--print]
+                                                          One-click: register this MCP into all detected AI hosts
+                                                          (Claude Desktop / Claude Code / Cursor / VS Code); auto-picks
+                                                          the exe matching your installed TIA version
   tia schema                                              Print the spec field reference
   tia version
 
