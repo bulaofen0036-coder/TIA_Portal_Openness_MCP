@@ -1,4 +1,4 @@
-# TIA Portal MCP 完整交付包（**v2.2.7** / V20+V21 + S7DCL + CLI + 在线只读监控 + 一键配置）
+# TIA Portal MCP 完整交付包（**v2.2.8** / V20+V21 + S7DCL + CLI + 在线只读监控 + 一键配置 + Doctor 体检）
 
 [English](README.en.md) · **中文**
 
@@ -108,6 +108,8 @@
    它会**自动发现一切**：自己的绝对路径、注册表里的博途安装与版本、与版本匹配的 exe（V20/V21 自动选对），然后把 `tia-portal` 条目一次性写进本机检测到的所有 AI 客户端配置——**Claude Desktop / Claude Code / Cursor / VS Code**（原配置自动备份 `.bak`，其它 server 原样保留）。重启 AI 客户端即生效。  
    - 只配某一个宿主：`config --host vscode`（可选 `claude|claude-code|cursor|vscode`）；  
    - 只看不写（手动粘贴其它宿主）：`config --print`；  
+   - **模型较弱 / 客户端限工具数（如 VS Code 上限 128）**：`config --lite` —— 配置里自动带 `TIA_MCP_PROFILE=lite`，只暴露约 42 个核心工具（v2.2.8）；  
+   - **连不上 / 报错**：`tia.cmd doctor` 一键体检（TIA 安装 / exe 版本匹配 / Openness 用户组 / 宿主注册状态，每项给修法；`--fix` 自动补用户组，v2.2.8）；  
    - **拿错 exe 也没关系**：v2.2.7 起 exe 会按实际 TIA 版本**自动转投**正确的兄弟 exe（V21 exe 在纯 V20 机器上照常可用）。  
    - 手动配置兜底：复制 `cursor-mcp.example.json` 片段，把 `REPLACE_ME` 换成本包根目录，V21 用 `bin\Release\net48\TiaMcpServer.exe`、V20 用 `bin-v20\Release\net48\TiaMcpServer.exe`；非标准安装位置在 `args` 加 `--tia-portal-location "<安装根>" --tia-major-version <20|21>`。
 
