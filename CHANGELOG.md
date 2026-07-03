@@ -1,5 +1,33 @@
 # Change Log
 
+## [2.3.0] - 2026-07-03 — 商业授权版正式发布 (AhYesZ fork)
+
+本版本在 upstream v2.2.7 基础上加入闭源授权层，产出 V20/V21 双版本发布包。
+
+### 新增: 授权系统
+- **机器指纹** (`License/MachineId.cs`): WMI 采集 CPU + 主板 + MAC → SHA256 哈希, `--show-machine-id` CLI
+- **离线授权** (`License/LicenseCache.cs` + `LicenseValidator.cs`): JWT RS256 验签, machineId 绑定, 30 天缓存
+- **在线授权服务器**: Flask + SQLite, 部署阿里云 ECS, `/api/activate` + `/api/validate` + admin 面板
+- **Key 管理** (`keygen.py`): CLI 创建/吊销/列表
+- **Program.cs 入口拦截**: 24 行, `--license-key` + `--license-server-url` 参数
+- 零外部 NuGet 依赖, 不改 McpServer.cs (零上游冲突)
+
+### 保护
+- ConfuserEx 加壳: **ctrl flow + anti debug**
+- RSA-2048 私钥仅在服务器, 公钥硬编码客户端
+
+### 发布
+- `TIA_MCP_v2.3.0_V20.zip` (65 文件, 5.4 MB)
+- `TIA_MCP_v2.3.0_V21.zip` (65 文件, 5.4 MB)
+- 一键注册脚本支持 Claude Desktop / Claude Code / Cursor / VS Code
+- 标签: `v2.3.0`
+
+### 仓库
+- GitHub: `AhYesZ/TIA_Portal_Openness_MCP`
+- 授权服务器: `gitcode.com/qq_43301551/main`
+
+---
+
 ## [2.2.7] - 2026-07-02 - 门槛归零：版本自路由 + 四宿主一键配置 + 模型引导（instructions/GetAuthoringGuide）
 
 本轮全部围绕两个真实用户痛点：①配置要人肉填 MCP 路径/博途路径/版本（issue #9）②非 Claude 的 AI 调用时生成代码质量差、耗时长。
