@@ -22,11 +22,16 @@ Desktop.ini
 # Artifacts (do NOT commit — too large or regenerable)
 *.bak_*
 *.pdb
-release/
+release/*/
+release/obfuscated/
+release/*.exe
+release/*.dll
+release/*.config
 test_install/
 TmpExport/
 tools/ConfuserEx/
 tools/ConfuserEx*.zip
 license-server/
 *.zip
+!release/*.zip
 !.github/**
