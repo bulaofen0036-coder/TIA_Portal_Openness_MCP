@@ -1,10 +1,12 @@
-# TIA Portal MCP 完整交付包（**v2.2.7** / V20+V21 + S7DCL + CLI + 在线只读监控 + 一键配置）
+# TIA Portal MCP 完整交付包（**v2.3.0** / V20+V21 + 商业授权）
 
 [English](README.en.md) · **中文**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Release](https://img.shields.io/github/v/release/bulaofen0036-coder/TIA_Portal_Openness_MCP)](https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP/releases) [![validate-bundle](https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP/actions/workflows/validate.yml/badge.svg)](https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP/actions/workflows/validate.yml)
+> **本仓库为商业 Fork** — 在 MIT 开源上游 [bulaofen0036-coder/TIA_Portal_Openness_MCP](https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP) 基础上，新增 RSA-JWT 闭源授权层。上游负责 MCP 功能开发，本 fork 负责授权 + 发布。详见 [项目总览](docs/项目总览.md)。
 
-> **免费开源（MIT）**：服务器**无需任何 license key** 即可运行，**不含任何授权校验代码**。
+[![License](https://img.shields.io/badge/License-Commercial-red.svg)]() [![Fork](https://img.shields.io/badge/Fork-AhYesZ%2FTIA__Portal__Openness__MCP-blue)](https://github.com/AhYesZ/TIA_Portal_Openness_MCP) [![Upstream](https://img.shields.io/badge/Upstream-bulaofen0036--coder%2FTIA__Portal__Openness__MCP-green)](https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP)
+
+> **商业授权**：运行需要 License Key，激活步骤见 [快速开始](release/v2.3.0/v20/快速开始.md) 或 [项目总览](docs/项目总览.md)。
 
 ![架构图](docs/assets/architecture.svg)
 

@@ -1,8 +1,10 @@
-# TIA Portal MCP Server (v2.2.7 · V20 + V21 · S7DCL · CLI · read-only online monitoring · one-click config)
+# TIA Portal MCP Server (v2.3.0 · V20 + V21 · Commercial Fork)
 
 **English** · [中文](README.md)
 
-> **v2.0 — the same exe is also a declarative CLI (`tia`).** Any AI emits a
+> **This is a commercial fork** of the MIT-licensed upstream [bulaofen0036-coder/TIA_Portal_Openness_MCP](https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP). A License Key is required to run. See [项目总览](docs/项目总览.md) for details.
+
+> **v2.0 — the same exe is also a declarative CLI (`tia`).**
 > YAML/JSON spec, any engineer runs one command (`tia gen spec.yaml`) — no MCP
 > client required. Verbs: `gen` / `patch` / `compile` / `describe` / `export` /
 > `import` / `prewarm` / `schema` / `version`. Exit code 0/1/2. See
