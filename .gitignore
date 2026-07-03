@@ -32,6 +32,7 @@ TmpExport/
 tools/ConfuserEx/
 tools/ConfuserEx*.zip
 license-server/
+bin-build/
 *.zip
 !release/*.zip
 !.github/**

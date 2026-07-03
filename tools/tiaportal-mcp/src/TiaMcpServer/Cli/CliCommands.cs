@@ -16,7 +16,7 @@ namespace TiaMcpServer.Cli
     public static class CliCommands
     {
         private static readonly string[] Verbs =
-            { "gen", "patch", "compile", "export", "import", "describe", "prewarm", "config", "schema", "version", "help", "--help", "-h" };
+            { "gen", "patch", "compile", "export", "import", "describe", "prewarm", "config", "doctor", "schema", "version", "help", "--help", "-h" };
 
         public static bool IsVerb(string s) => Array.IndexOf(Verbs, s.ToLowerInvariant()) >= 0;
 
@@ -35,6 +35,7 @@ namespace TiaMcpServer.Cli
                     case "describe": return Describe(args);
                     case "prewarm": return Prewarm(args);
                     case "config": return Config(args);
+                    case "doctor": return DoctorCli(args);
                     case "schema": Console.WriteLine(SchemaText); return 0;
                     case "version": Console.WriteLine("tia " + AssemblyVersion()); return 0;
                     default: PrintUsage(); return 0;
@@ -176,14 +177,15 @@ namespace TiaMcpServer.Cli
             string exe = McpConfigInstaller.ExeForVersion(ver);
             string? licenseKey = Opt(args, "--license-key");
             string? licenseServerUrl = Opt(args, "--license-server-url");
+            bool lite = Flag(args, "--lite"); // ~40 essential tools; best for weaker models / VS Code's 128-tool cap
 
             if (Flag(args, "--print"))
             {
                 Console.WriteLine("Claude Desktop / Claude Code / Cursor (mcpServers):");
-                Console.WriteLine(McpConfigInstaller.Snippet(exe, ver, McpConfigInstaller.HostStyle.McpServers, licenseKey, licenseServerUrl));
+                Console.WriteLine(McpConfigInstaller.Snippet(exe, ver, McpConfigInstaller.HostStyle.McpServers, licenseKey, licenseServerUrl, lite));
                 Console.WriteLine();
                 Console.WriteLine("VS Code — %APPDATA%\\Code\\User\\mcp.json (servers):");
-                Console.WriteLine(McpConfigInstaller.Snippet(exe, ver, McpConfigInstaller.HostStyle.VsCode, licenseKey, licenseServerUrl));
+                Console.WriteLine(McpConfigInstaller.Snippet(exe, ver, McpConfigInstaller.HostStyle.VsCode, licenseKey, licenseServerUrl, lite));
                 return 0;
             }
 
@@ -204,15 +206,80 @@ namespace TiaMcpServer.Cli
                     continue;
                 }
 
-                try { Console.WriteLine("  [ok]     " + h.Name + ": " + McpConfigInstaller.Apply(h.ConfigPath, exe, ver, h.Style, licenseKey, licenseServerUrl)); done++; }
+                try { Console.WriteLine("  [ok]     " + h.Name + ": " + McpConfigInstaller.Apply(h.ConfigPath, exe, ver, h.Style, licenseKey, licenseServerUrl, lite)); done++; }
                 catch (Exception ex) { Console.Error.WriteLine("  [failed] " + h.Name + ": " + ex.Message); failed++; }
             }
 
             Console.WriteLine(done > 0
-                ? $"Configured {done} host(s) for TIA V{ver} -> {exe}. Restart the AI client to load it. (original config backed up as *.bak)"
+                ? $"Configured {done} host(s) for TIA V{ver} -> {exe}{(lite ? " [lite profile: ~40 essential tools]" : "")}. Restart the AI client to load it. (original config backed up as *.bak)"
                 : "No host config written. Targeted host not found, or use `config --print` to copy the snippet manually.");
             Console.WriteLine("For other hosts, run `config --print` and paste the matching snippet.");
             return failed > 0 && done == 0 ? 1 : 0;
+        }
+
+        // `tia doctor` — standalone environment check that works even when the MCP host can't
+        // start the server (the exact situation where an in-server Doctor tool is unreachable).
+        // Read-only by default; --fix adds the current user to the Openness group (may UAC).
+        private static int DoctorCli(string[] args)
+        {
+            bool fix = Flag(args, "--fix");
+            Console.WriteLine("tia doctor — environment check" + (fix ? " (fix mode)" : " (read-only; pass --fix to auto-add the Openness group)"));
+            bool ready = true;
+
+            void Line(bool ok, string name, string detail, string? fixHint)
+            {
+                Console.WriteLine($"  [{(ok ? " ok " : "FAIL")}] {name}: {detail}");
+                if (!ok && !string.IsNullOrEmpty(fixHint)) Console.WriteLine($"         fix: {fixHint}");
+            }
+
+            // 1) TIA installation
+            var detected = TiaMcpServer.Siemens.Engineering.DetectTiaMajorVersion();
+            Line(detected != null, "TIA Portal installation",
+                detected != null ? $"detected V{detected}" : "no TIA Portal detected (registry / TiaPortalLocation)",
+                "Install TIA Portal V18+ with the Openness option, or set the TiaPortalLocation environment variable to the install folder (e.g. C:\\Program Files\\Siemens\\Automation\\Portal V21).");
+            ready &= detected != null;
+
+            // 2) engine exe matches the installed version (or a sibling exe can take over)
+            int compiled = TiaMcpServer.Siemens.EngineRouter.CompiledTiaMajorVersion;
+            bool verOk = detected == null || detected.Value == compiled
+                || TiaMcpServer.Siemens.EngineRouter.FindSiblingExe(detected.Value) != null;
+            Line(verOk, "Engine exe / TIA version",
+                $"exe built for V{compiled}" + (detected != null ? $", machine has V{detected}" : ", machine version unknown"),
+                detected != null ? $"use the V{detected} exe from the bundle (it ships both), or keep this one and pass --tia-major-version {compiled}." : null);
+            ready &= verOk;
+
+            // 3) Openness user group
+            bool groupOk; string groupDetail;
+            try
+            {
+                groupOk = fix
+                    ? TiaMcpServer.Siemens.Openness.IsUserInGroup().GetAwaiter().GetResult()
+                    : TiaMcpServer.Siemens.Openness.IsUserInGroupNoFix();
+                groupDetail = groupOk ? "current user is in 'Siemens TIA Openness'" : "current user NOT in 'Siemens TIA Openness'";
+            }
+            catch (Exception ex)
+            {
+                groupOk = false;
+                groupDetail = "check failed: " + ex.Message;
+            }
+            Line(groupOk, "Openness user group", groupDetail,
+                "run `tia doctor --fix` (prompts UAC), or add your Windows user to the local group 'Siemens TIA Openness' (lusrmgr.msc) and sign out/in.");
+            ready &= groupOk;
+
+            // 4) AI host configs (informational — does not gate readiness)
+            foreach (var h in McpConfigInstaller.KnownHosts())
+            {
+                bool present = false;
+                try { present = File.Exists(h.ConfigPath) && File.ReadAllText(h.ConfigPath).Contains("\"" + McpConfigInstaller.ServerKey + "\""); }
+                catch { }
+                Console.WriteLine($"  [{(present ? " ok " : " -- ")}] AI host config — {h.Name}: {(present ? "tia-portal registered" : "not registered")}");
+            }
+            Console.WriteLine("         (register into all detected hosts with: tia config)");
+
+            Console.WriteLine(ready
+                ? "READY — environment OK. Next: restart your AI client and ask it to call Bootstrap."
+                : "NOT READY — fix the FAIL items above, then run `tia doctor` again.");
+            return ready ? 0 : 1;
         }
 
         private static bool MatchesHost(string hostName, string query)
@@ -278,10 +345,14 @@ USAGE
   tia export   <project.apXX> --plc NAME --out DIR --block PATH [--scl]
   tia import   <project.apXX> --plc NAME --from DIR [--no-overwrite]
   tia prewarm  [--stop]                                   Hold a headless instance open (~1s attach after)
-  tia config   [--host claude|claude-code|cursor|vscode] [--print]
+  tia config   [--host claude|claude-code|cursor|vscode] [--print] [--lite]
                                                           One-click: register this MCP into all detected AI hosts
                                                           (Claude Desktop / Claude Code / Cursor / VS Code); auto-picks
-                                                          the exe matching your installed TIA version
+                                                          the exe matching your installed TIA version.
+                                                          --lite = expose only ~40 essential tools (best for weaker
+                                                          models and VS Code's 128-tool cap)
+  tia doctor   [--fix]                                    Environment check: TIA install, exe/version match, Openness
+                                                          group, AI host configs. --fix auto-adds the Openness group
   tia schema                                              Print the spec field reference
   tia version
 

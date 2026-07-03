@@ -155,6 +155,22 @@ namespace TiaMcpServer.ModelContextProtocol
         public int? L2Count { get; set; }
     }
 
+    public class ResponseDoctor : ResponseMessage
+    {
+        public bool? Ready { get; set; }
+        public IEnumerable<DoctorCheck>? Checks { get; set; }
+        public string? RecommendedNextTool { get; set; }
+        public string? Summary { get; set; }
+    }
+
+    public class DoctorCheck
+    {
+        public string? Name { get; set; }
+        public bool Ok { get; set; }
+        public string? Detail { get; set; }
+        public string? Fix { get; set; }
+    }
+
     public class ResponseSafetySelfTest : ResponseMessage
     {
         public bool? Ok { get; set; }

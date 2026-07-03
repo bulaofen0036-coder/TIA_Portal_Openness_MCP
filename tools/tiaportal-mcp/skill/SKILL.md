@@ -7,7 +7,7 @@ description: Drive Siemens TIA Portal (博途) end-to-end through the TiaMcpServ
 
 This is the operating skill for TIA Portal MCP automation. The
 companion plugin lives at `tools/tiaportal-mcp/`. It exposes on the order of
-**~190** MCP tools (lite profile ~38; exact runtime set: call `tools/list` on the running server) covering
+**~200** MCP tools (lite profile ~42; exact runtime set: call `tools/list` on the running server) covering
 project, hardware, PLC, HMI, and online operations.
 
 ## 0. Always start here
@@ -51,8 +51,9 @@ else unless one of these tools' output explicitly tells you to call another:
 
 **降门槛三件套(已内置，弱模型友好):**
 - **Lite 工具档位** — 启动 server 时设环境变量 `TIA_MCP_PROFILE=lite`，`tools/list`
-  只暴露 ~38 个 L0/L1 核心工具(而非全部 ~190)，弱模型不会在工具海里选错。默认仍是
-  full；要全量工具就别设这个变量。(已实测：full=190 工具含 L2，lite=38 工具无 L2。)
+  只暴露 ~42 个 L0/L1 核心工具(而非全部 ~200)，弱模型不会在工具海里选错，VS Code 的
+  128 工具上限也不再爆。默认仍是 full；要全量工具就别设这个变量。一键写入宿主配置：
+  `tia config --lite`。(v2.2.8 实测：full=200 工具含 L2，lite=42 工具无 L2。)
 - **参数容错** — `softwarePath` 现在容忍多余空格/大小写，单 PLC 工程或唯一匹配时
   传"PLC"也能自动认到 `PLC_1`；找不到时报错会**列出可用 PLC 路径**。少数易错工具
   接受别名(`tableJson`↔`tagTableJson`、`screenJson`↔`designJson`、

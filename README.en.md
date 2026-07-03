@@ -1,4 +1,4 @@
-# TIA Portal MCP Server (v2.3.0 · V20 + V21 · Commercial Fork)
+# TIA Portal MCP Server (v2.4.0 · V20 + V21 · Commercial Fork + Doctor + Lite)
 
 **English** · [中文](README.md)
 
@@ -99,7 +99,11 @@ to run.
    **Claude Desktop / Claude Code / Cursor / VS Code** (existing config backed up
    as `.bak`, other servers preserved). Restart the AI client to load it.
    Options: `config --host vscode` (or `claude|claude-code|cursor`), `config --print`
-   to copy a snippet manually. Since v2.2.7 the exe also **self-routes**: if it was
+   to copy a snippet manually, `config --lite` (v2.2.8) to expose only ~42 essential
+   tools via `TIA_MCP_PROFILE=lite` — best for weaker models and VS Code's 128-tool cap.
+   If anything fails to connect, run `tia.cmd doctor` (v2.2.8): a one-shot environment
+   check (TIA install, exe/version match, Openness group, host registration) with the
+   exact fix per problem; `--fix` auto-adds the Openness group. Since v2.2.7 the exe also **self-routes**: if it was
    built for a different TIA major version than the machine has, it transparently
    re-execs the matching sibling exe — grabbing the "wrong" exe no longer crashes.
    Manual fallback: copy the snippet from `cursor-mcp.example.json`, replace

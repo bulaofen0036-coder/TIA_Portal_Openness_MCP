@@ -1,16 +1,22 @@
 ﻿{
   "schemaVersion": "2026-05-25",
-  "bundleVersion": "2.2.7",
-  "packageName": "TIA_MCP_交付包_20260525_V20S7DCL_184330",
+  "bundleVersion": "2.2.8",
+  "packageName": "TIA_MCP_Delivery_v2.2.8_20260703",
   "packageType": "tia-portal-mcp-complete-offline-delivery-bundle",
   "generatedAt": "2026-05-31T20:30:00+08:00",
-  "refreshedAt": "2026-05-31T20:30:00+08:00",
+  "refreshedAt": "2026-07-03T19:00:00+08:00",
   "target": {
-    "tiaPortalMajorVersion": [20, 21],
+    "tiaPortalMajorVersion": [
+      20,
+      21
+    ],
     "publicApiPathExample": "D:\\app\\TIA21\\Portal V21\\PublicAPI or D:\\app\\TIA20\\Portal V20\\PublicAPI",
     "runtimeRequirement": ".NET Framework 4.8",
     "windowsGroupRequirement": "Siemens TIA Openness",
-    "newCliFlags": ["--tia-portal-location <path>", "--tia-major-version {20|21}"]
+    "newCliFlags": [
+      "--tia-portal-location <path>",
+      "--tia-major-version {20|21}"
+    ]
   },
   "selfContainedScope": {
     "description": "The bundle contains runtime, skill, manuals, templates and blueprints required for PLC + WinCC Unified project generation.",
@@ -53,21 +59,40 @@
   "cli": {
     "description": "Same exe also runs as a declarative CLI: `tia <verb>`. Any AI can emit a YAML/JSON spec; any engineer runs one command. No MCP client required.",
     "exe": "tools/tiaportal-mcp/src/TiaMcpServer/bin/Release/net48/TiaMcpServer.exe",
-    "verbs": ["gen", "patch", "compile", "export", "import", "describe", "prewarm", "config", "schema", "version", "help"],
-    "specFormats": ["json", "yaml"],
-    "exitCodes": { "0": "success", "1": "completed with failed steps", "2": "error" }
+    "verbs": [
+      "gen",
+      "patch",
+      "compile",
+      "export",
+      "import",
+      "describe",
+      "prewarm",
+      "config",
+      "doctor",
+      "schema",
+      "version",
+      "help"
+    ],
+    "specFormats": [
+      "json",
+      "yaml"
+    ],
+    "exitCodes": {
+      "0": "success",
+      "1": "completed with failed steps",
+      "2": "error"
+    }
   },
   "capabilities": {
-    "mcpToolCount": 190,
+    "mcpToolCount": 200,
     "mcpToolLayers": {
-      "L0": 6,
-      "L1": 31,
-      "L2": 152
+      "L0": 8,
+      "L1": 34,
+      "L2": 158
     },
     "newToolsThisRelease": [
-      "SamplePlcLiveValuesS7",
-      "TraceTagCauseLive",
-      "GetPlcRunStateS7"
+      "Doctor (v2.2.8)",
+      "GetAuthoringGuide (v2.2.7)"
     ],
     "removedToolsThisRelease": [],
     "hmiTemplateJsonCount": 8,
@@ -86,7 +111,12 @@
       "button Down/Up actions and tag dynamization",
       "read-only online live-value monitoring over S7 (port 102) and OPC UA (port 4840): single read, trend sampling (PID step-response capture), watch-table live read, CPU RUN/STOP state, and offline+live tag causal trace",
       "reflection-based API discovery for uncovered Openness shapes"
-    ]
+    ],
+    "liteProfile": {
+      "env": "TIA_MCP_PROFILE=lite",
+      "toolCount": 42,
+      "scope": "L0+L1 essentials; one-click via `tia config --lite`"
+    }
   },
   "validationSnapshot": {
     "performedAt": "2026-05-26T19:10:00+08:00",

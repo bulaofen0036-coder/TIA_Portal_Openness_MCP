@@ -34,6 +34,8 @@ tia patch 改动.yaml             # 把 spec 增量合并进已有工程（spec 
 tia compile  D:\proj\X.ap21 --plc PLC_1
 tia describe D:\proj\X.ap21 --plc PLC_1
 tia prewarm                     # 常驻 headless 实例，后续命令 ~1s 连上
+tia doctor                      # 一键体检：TIA 安装/exe 版本匹配/Openness 组/宿主注册（--fix 自动修用户组）
+tia config                      # 一键把 MCP 注册进 Claude Desktop/Claude Code/Cursor/VS Code（--lite=精简 42 工具档）
 tia schema                      # 打印 spec 所有字段说明
 ```
 退出码：**0=成功，1=有失败步骤，2=错误**（方便脚本/CI 判读）。

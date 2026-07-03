@@ -184,10 +184,10 @@ namespace TiaMcpServer.ModelContextProtocol
         // NOTE: Deprecated demo tool removed.
         // In V21, prefer importing block XML via ImportBlock/ImportBlocksFromDirectory, then CompileSoftware.
 
-        [McpServerTool(Name = "ScaffoldProject"), Description("[L1][Project] One-shot project generator: from a single JSON spec it creates the project, adds PLC (and optional Unified HMI) hardware, builds UDTs/global DBs/PLC tag tables, imports SCL external sources and LAD S7DCL documents, compiles, sets up the HMI connection/screens/tags, and saves — collapsing the ~20-step runbook into one call. Auto-connects if needed. Critical-step failures (connect/createProject/PLC device) abort; per-element failures are collected and reported. Spec keys: projectName(required); directoryPath?(default %TEMP%); plcName?(PLC_1); plcFamily?(S7-1500); plcMlfb?; hmiName?(omit to skip all HMI); hmiFamily?(WinCCUnifiedPC); hmiSoftwarePath?(HMI_RT_1); connectionName?(HMI_Connection_1); udt?/globalDb?/tagTable? = arrays of the same json objects PlcBuildAndImport accepts; sclSourceFiles? = array of .scl file paths; ladDocs? = array of {importPath,name}; hmiScreens? = array of {screenName,width,height,designJson(object)}; hmiTags? = array of {tagTableName?,tagName,hmiDataType?,plcTag?,address?}; compile?(true); save?(true). Returns a per-step report with compile error/warning counts. Pass dryRun=true to validate the spec offline (PLC block JSON shapes, SCL/LAD file paths, designJson) WITHOUT connecting to TIA or creating anything.")]
+        [McpServerTool(Name = "ScaffoldProject"), Description("[L1][Project] One-shot project generator: from a single JSON spec it creates the project, adds PLC (and optional Unified HMI) hardware, builds UDTs/global DBs/PLC tag tables, imports SCL external sources and LAD S7DCL documents, compiles, sets up the HMI connection/screens/tags, and saves — collapsing the ~20-step runbook into one call. Auto-connects if needed. Critical-step failures (connect/createProject/PLC device) abort; per-element failures are collected and reported. Spec keys: projectName(required); directoryPath?(default %TEMP%); plcName?(PLC_1); plcFamily?(S7-1500); plcMlfb?; hmiName?(omit to skip all HMI); hmiFamily?(WinCCUnifiedPC); hmiSoftwarePath?(HMI_RT_1); connectionName?(HMI_Connection_1); udt?/globalDb?/tagTable? = arrays of the same json objects PlcBuildAndImport accepts; sclSourceFiles? = array of .scl file paths; ladDocs? = array of {importPath,name}; hmiScreens? = array of {screenName,width,height,designJson(object)}; hmiTags? = array of {tagTableName?,tagName,hmiDataType?,plcTag?,address?}; compile?(true); save?(true). Returns a per-step report with compile error/warning counts. dryRun DEFAULTS TO TRUE (safety): the default call only validates the spec offline (PLC block JSON shapes, SCL/LAD file paths, designJson) WITHOUT connecting to TIA or creating anything; after a clean dry run, call again with dryRun=false to actually create the project.")]
         public static ResponseScaffold ScaffoldProject(
             [Description("spec: JSON object describing the project to generate. See tool description for keys.")] string spec,
-            [Description("dryRun: true validates the spec offline (no TIA connection, nothing created). Use to pre-flight a spec before the real run.")] bool dryRun = false)
+            [Description("dryRun: DEFAULT true — validates the spec offline (no TIA connection, nothing created). Pass dryRun=false explicitly to actually create the project (after a clean dry run).")] bool dryRun = true)
         {
             var resp = new ResponseScaffold { Ok = true };
             void Step(string name, string status, string? detail = null)
@@ -249,7 +249,8 @@ namespace TiaMcpServer.ModelContextProtocol
                 }
                 var okN = resp.Steps.Count(s => s.Status == "ok");
                 var failN = resp.Steps.Count(s => s.Status == "failed");
-                resp.Message = $"ScaffoldProject dryRun '{projectName}': {okN} ok, {failN} failed (offline validation, nothing created).";
+                resp.Message = $"ScaffoldProject dryRun '{projectName}': {okN} ok, {failN} failed (offline validation, nothing created)." +
+                    (failN == 0 ? " Spec is valid — call ScaffoldProject again with dryRun=false to actually create the project." : " Fix the failed steps, then re-run.");
                 resp.Meta = new JsonObject { ["timestamp"] = DateTime.Now, ["success"] = resp.Ok, ["dryRun"] = true };
                 return resp;
             }

@@ -77,7 +77,7 @@ namespace TiaMcpServer.Cli
         }
 
         public static JsonObject BuildServerEntry(string exePath, int tiaMajorVersion, HostStyle style,
-            string? licenseKey = null, string? licenseServerUrl = null)
+            string? licenseKey = null, string? licenseServerUrl = null, bool lite = false)
         {
             var entry = new JsonObject();
             if (style == HostStyle.VsCode) entry["type"] = "stdio";
@@ -94,17 +94,20 @@ namespace TiaMcpServer.Cli
                 args.Add(licenseServerUrl);
             }
             entry["args"] = args;
+            // lite profile: server exposes only the ~40 [L0]/[L1] essentials — the right
+            // default for weaker models and tool-capped hosts (VS Code caps at 128 tools).
+            if (lite) entry["env"] = new JsonObject { ["TIA_MCP_PROFILE"] = "lite" };
             return entry;
         }
 
         /// <summary>Pretty single-server snippet for hosts we don't write automatically.</summary>
         public static string Snippet(string exePath, int tiaMajorVersion, HostStyle style = HostStyle.McpServers,
-            string? licenseKey = null, string? licenseServerUrl = null)
+            string? licenseKey = null, string? licenseServerUrl = null, bool lite = false)
         {
             string rootKey = style == HostStyle.VsCode ? "servers" : "mcpServers";
             var root = new JsonObject
             {
-                [rootKey] = new JsonObject { [ServerKey] = BuildServerEntry(exePath, tiaMajorVersion, style, licenseKey, licenseServerUrl) }
+                [rootKey] = new JsonObject { [ServerKey] = BuildServerEntry(exePath, tiaMajorVersion, style, licenseKey, licenseServerUrl, lite) }
             };
             return root.ToJsonString(JsonOpts);
         }
@@ -114,7 +117,7 @@ namespace TiaMcpServer.Cli
         /// Throws on hard I/O / parse failure so the caller can report it.
         /// </summary>
         public static string Apply(string configPath, string exePath, int tiaMajorVersion, HostStyle style = HostStyle.McpServers,
-            string? licenseKey = null, string? licenseServerUrl = null)
+            string? licenseKey = null, string? licenseServerUrl = null, bool lite = false)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(configPath));
 
@@ -140,7 +143,7 @@ namespace TiaMcpServer.Cli
             }
 
             bool existed = servers.ContainsKey(ServerKey);
-            servers[ServerKey] = BuildServerEntry(exePath, tiaMajorVersion, style, licenseKey, licenseServerUrl);
+            servers[ServerKey] = BuildServerEntry(exePath, tiaMajorVersion, style, licenseKey, licenseServerUrl, lite);
 
             File.WriteAllText(configPath, root.ToJsonString(JsonOpts));
             return (existed ? "updated" : "wrote") + " " + ServerKey + " -> " + configPath;

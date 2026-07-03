@@ -18,10 +18,10 @@ namespace TiaMcpServer.ModelContextProtocol
         public const string ServerInstructions =
 @"TIA Portal MCP server (Siemens PLC/HMI engineering via Openness). How to work well:
 
-FIRST CALL: Bootstrap — returns environment status, connection state, the recommended next tool, and operating rules. Do this before anything else.
+FIRST CALL: Bootstrap — returns environment status, connection state, the recommended next tool, and operating rules. Do this before anything else. If the environment itself seems broken (TIA missing, group membership, nothing connects), call Doctor for a plain-language diagnosis with exact fixes.
 
 GOLDEN PATHS (pick one, do not improvise):
-- Whole new project → ScaffoldProject with ONE JSON spec (PLC + blocks + HMI + compile + save in a single call). Always run it with dryRun=true first to validate the spec offline, then dryRun=false.
+- Whole new project → ScaffoldProject with ONE JSON spec (PLC + blocks + HMI + compile + save in a single call). The DEFAULT call is a dry run (offline spec validation, nothing created); when it reports clean, call again with dryRun=false to actually create.
 - Add/modify code in an existing project → write SCL or S7DCL text files, then ImportFromDocuments (PREFERRED, .s7dcl) or GenerateBlocksFromExternalSource (.scl). NEVER hand-write SimaticML FlgNet XML for ladder logic — it is fragile (UId bookkeeping, XML entities) and the #1 cause of failed imports. Use S7DCL ladder text instead (GetAuthoringGuide topic 'lad').
 - Read/understand a project → GetProjectTree, GetBlocksWithHierarchy, ExportBlocksAsScl.
 

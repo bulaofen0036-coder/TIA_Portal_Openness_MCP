@@ -1,5 +1,22 @@
 # Change Log
 
+## [2.4.0] - 2026-07-03 — 合并上游 v2.2.8 (AhYesZ fork)
+
+本版本合并上游 v2.2.8 功能更新，保留全部授权层。
+
+### 合并上游 v2.2.8 新功能
+- **Lite 工具档位**: `TIA_MCP_PROFILE=lite` 环境变量 → 只暴露 L0/L1 核心工具 (~42/200)，适配弱模型和 VS Code 128 工具上限。`tia config --lite` 一键写入。
+- **Doctor 体检**: MCP 工具 `Doctor` + CLI `tia doctor [--fix]`，检查 TIA 安装/Openness 组/exe版本匹配/AI宿主配置。
+- **启动失败中英文指引**: TIA 未装或 Openness 组缺失时给出清晰修复指引，退出码正确。
+- **ScaffoldProject 默认干跑**: `dryRun` 默认值 false→true，防止弱模型一把梭建废工程。
+- **工具清单更新**: 185→200 工具。
+
+### 本 fork 变更
+- 版本号: 2.3.0 → 2.4.0
+- 合并策略: 保留全部 License/ 授权代码、crproj 加壳配置、fork 文档，冲突文件手动合并（CliCommands.cs / McpConfigInstaller.cs 签名同时支持 license 参数 + lite 参数）
+
+---
+
 ## [2.3.0] - 2026-07-03 — 商业授权版正式发布 (AhYesZ fork)
 
 本版本在 upstream v2.2.7 基础上加入闭源授权层，产出 V20/V21 双版本发布包。
@@ -25,8 +42,6 @@
 ### 仓库
 - GitHub: `AhYesZ/TIA_Portal_Openness_MCP`
 - 授权服务器: `gitcode.com/qq_43301551/main`
-
----
 
 ## [2.2.7] - 2026-07-02 - 门槛归零：版本自路由 + 四宿主一键配置 + 模型引导（instructions/GetAuthoringGuide）
 
