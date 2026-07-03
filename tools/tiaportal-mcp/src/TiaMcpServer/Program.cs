@@ -529,7 +529,7 @@ namespace TiaMcpServer
                     {
                         var (licenseOk, licenseMsg) = await LicenseValidator.Validate(
                             options.LicenseKey,
-                            options.LicenseServerUrl ?? "http://localhost:5000");
+                            options.LicenseServerUrl ?? "http://47.96.87.46");
                         LogDiag(licenseMsg);
                         if (!licenseOk)
                         {

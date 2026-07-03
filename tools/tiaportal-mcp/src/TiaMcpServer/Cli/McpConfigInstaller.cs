@@ -76,22 +76,35 @@ namespace TiaMcpServer.Cli
             return Siemens.EngineRouter.FindSiblingExe(tiaMajorVersion) ?? OwnExePath();
         }
 
-        public static JsonObject BuildServerEntry(string exePath, int tiaMajorVersion, HostStyle style)
+        public static JsonObject BuildServerEntry(string exePath, int tiaMajorVersion, HostStyle style,
+            string? licenseKey = null, string? licenseServerUrl = null)
         {
             var entry = new JsonObject();
             if (style == HostStyle.VsCode) entry["type"] = "stdio";
             entry["command"] = exePath;
-            entry["args"] = new JsonArray("--tia-major-version", tiaMajorVersion.ToString());
+            var args = new JsonArray("--tia-major-version", tiaMajorVersion.ToString());
+            if (!string.IsNullOrWhiteSpace(licenseKey))
+            {
+                args.Add("--license-key");
+                args.Add(licenseKey);
+            }
+            if (!string.IsNullOrWhiteSpace(licenseServerUrl))
+            {
+                args.Add("--license-server-url");
+                args.Add(licenseServerUrl);
+            }
+            entry["args"] = args;
             return entry;
         }
 
         /// <summary>Pretty single-server snippet for hosts we don't write automatically.</summary>
-        public static string Snippet(string exePath, int tiaMajorVersion, HostStyle style = HostStyle.McpServers)
+        public static string Snippet(string exePath, int tiaMajorVersion, HostStyle style = HostStyle.McpServers,
+            string? licenseKey = null, string? licenseServerUrl = null)
         {
             string rootKey = style == HostStyle.VsCode ? "servers" : "mcpServers";
             var root = new JsonObject
             {
-                [rootKey] = new JsonObject { [ServerKey] = BuildServerEntry(exePath, tiaMajorVersion, style) }
+                [rootKey] = new JsonObject { [ServerKey] = BuildServerEntry(exePath, tiaMajorVersion, style, licenseKey, licenseServerUrl) }
             };
             return root.ToJsonString(JsonOpts);
         }
@@ -100,7 +113,8 @@ namespace TiaMcpServer.Cli
         /// Upserts the tia-portal server into one host config. Returns a human-readable status line.
         /// Throws on hard I/O / parse failure so the caller can report it.
         /// </summary>
-        public static string Apply(string configPath, string exePath, int tiaMajorVersion, HostStyle style = HostStyle.McpServers)
+        public static string Apply(string configPath, string exePath, int tiaMajorVersion, HostStyle style = HostStyle.McpServers,
+            string? licenseKey = null, string? licenseServerUrl = null)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(configPath));
 
@@ -126,7 +140,7 @@ namespace TiaMcpServer.Cli
             }
 
             bool existed = servers.ContainsKey(ServerKey);
-            servers[ServerKey] = BuildServerEntry(exePath, tiaMajorVersion, style);
+            servers[ServerKey] = BuildServerEntry(exePath, tiaMajorVersion, style, licenseKey, licenseServerUrl);
 
             File.WriteAllText(configPath, root.ToJsonString(JsonOpts));
             return (existed ? "updated" : "wrote") + " " + ServerKey + " -> " + configPath;
