@@ -1,6 +1,6 @@
 # Change Log
 
-## [2.2.8] - 未发布 - 弱模型档位回归 + Doctor 体检 + 写操作默认干跑 + VS Code schema 修复
+## [2.2.8] - 2026-07-03 - 弱模型档位回归 + Doctor 体检 + 写操作默认干跑 + VS Code schema 修复
 
 围绕「外部环境部署 + 弱 AI + 出错率」（lite 档位与 Doctor 此前只存在于 SKILL 文档、代码在迁仓时丢失，本版补齐并超越原实现）：
 
