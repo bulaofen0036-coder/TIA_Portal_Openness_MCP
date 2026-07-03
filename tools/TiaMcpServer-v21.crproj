@@ -1,4 +1,4 @@
-<project outputDir="..\..\..\..\..\release\obfuscated-v21" baseDir="." xmlns="http://confuser.codeplex.com">
+<project outputDir="C:\TIA-MCP项目\release\obfuscated-v21" baseDir="C:\TIA-MCP项目\tools\tiaportal-mcp\src\TiaMcpServer\bin\Release\net48" xmlns="http://confuser.codeplex.com">
 
   <module path="TiaMcpServer.exe">
     <!-- ctrl flow + anti debug only. No rename — property names must stay for JSON serialization -->
