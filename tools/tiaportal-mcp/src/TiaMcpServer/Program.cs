@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 using System.Xml;
 using TiaMcpServer.ModelContextProtocol;
 using TiaMcpServer.Siemens;
+using TiaMcpServer.License;
 
 namespace TiaMcpServer
 {
@@ -58,6 +59,16 @@ namespace TiaMcpServer
                 {
                     options.Logging = 1;
                     LogDiag("Logging defaulted to stderr (--logging 1). Pass --logging 0 to silence, 2 for Debug output, 3 for EventLog.");
+                }
+
+                // --show-machine-id: print hardware fingerprint and exit.
+                // Must happen BEFORE any TIA-specific initialization.
+                if (options.ShowMachineId)
+                {
+                    var machineId = MachineId.Get();
+                    Console.WriteLine(machineId);
+                    LogDiag($"MachineId: {machineId}");
+                    return;
                 }
 
                 // Wire CLI --tia-portal-location into the assembly resolver. Must happen BEFORE
@@ -514,6 +525,19 @@ namespace TiaMcpServer
                     {
                         RunSearchHardwareCatalog(options);
                         return;
+                    }
+
+                    // ── License validation ────────────────────────────
+                    {
+                        var (licenseOk, licenseMsg) = await LicenseValidator.Validate(
+                            options.LicenseKey,
+                            options.LicenseServerUrl ?? "http://47.96.87.46");
+                        LogDiag(licenseMsg);
+                        if (!licenseOk)
+                        {
+                            LogDiag("LICENSE DENIED — exiting (code 7)");
+                            Environment.Exit(7);
+                        }
                     }
 
                     if (string.Equals(options.Transport, "http", StringComparison.OrdinalIgnoreCase))

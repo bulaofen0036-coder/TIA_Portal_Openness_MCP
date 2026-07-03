@@ -1,16 +1,47 @@
 # Change Log
 
-## [2.2.8] - 2026-07-03 - 弱模型档位回归 + Doctor 体检 + 写操作默认干跑 + VS Code schema 修复
+## [2.4.0] - 2026-07-03 — 合并上游 v2.2.8 (AhYesZ fork)
 
-围绕「外部环境部署 + 弱 AI + 出错率」（lite 档位与 Doctor 此前只存在于 SKILL 文档、代码在迁仓时丢失，本版补齐并超越原实现）：
+本版本合并上游 v2.2.8 功能更新，保留全部授权层。
 
-- **lite 工具档位（弱模型/受限宿主）**：`TIA_MCP_PROFILE=lite` 环境变量生效——`tools/list` 只暴露 [L0]/[L1] 共 42 个核心工具（full=200），弱模型不再被 200 个工具淹没，VS Code 的 128 工具上限也不再爆。一键写入：`tia config --lite`（宿主配置里自动带 `env`），GUI 配置向导同步提供勾选。stdio 实测 full=200 / lite=42、核心工具（Bootstrap/Connect/GetProjectTree/ScaffoldProject/CompileSoftware/SaveProject/Doctor）全在。
-- **`Doctor` 工具回归 + 新 CLI `tia doctor`**：MCP 工具版一次体检 TIA 安装/Openness 用户组/连接与项目状态，逐项给出精确修法，`fix=true` 自动补 Openness 组；**CLI 版 `tia doctor [--fix]` 在 MCP 宿主根本起不来 server 的时候也能用**（正是最需要体检的场景），额外检查 exe 编译版本与本机 TIA 版本匹配、四宿主配置是否已注册。stdio 调用与 CLI 实测输出正确。
-- **启动失败不再无声**：TIA 未装（Openness 初始化 FileNotFound）与用户不在 Openness 组两条失败路径，stderr/日志给出中英文修复指引（指向 `tia doctor`），后者退出码从 0 改为 2，MCP 宿主能感知失败。
-- **写操作默认干跑（约束加强）**：`ScaffoldProject` 的 `dryRun` 默认值 false→**true**——默认调用只做离线校验、不连 TIA 不建工程，干跑干净后需显式 `dryRun=false` 才真跑；干跑结果消息里明确指引下一步。与 ServerInstructions「永远先 dryRun」铁律一致，弱模型一把梭建废工程的路径被堵死。（行为变更：依赖旧默认值的调用方需显式传 `dryRun=false`。）
-- **VS Code 工具校验修复随本版 exe 发布**（源码 38043e9 已在 master）：`InvokeObject`/`InvokeService` 数组入参 schema 补 `items`，VS Code 不再拒收。
-- **配置脚本加固**：`配置MCP.bat`/`配置MCP-v20.bat` 先检查引擎 exe 存在（防"只拷了 bat"），完成后提示 `--lite`/`doctor`/`--print` 三条路。
-- 验证：V20/V21 双编译 0 错；stdio 握手实测（full/lite 工具数、Doctor 诊断内容、instructions 下发）；`tia doctor`/`tia config --print --lite` CLI 实测。
+### 合并上游 v2.2.8 新功能
+- **Lite 工具档位**: `TIA_MCP_PROFILE=lite` 环境变量 → 只暴露 L0/L1 核心工具 (~42/200)，适配弱模型和 VS Code 128 工具上限。`tia config --lite` 一键写入。
+- **Doctor 体检**: MCP 工具 `Doctor` + CLI `tia doctor [--fix]`，检查 TIA 安装/Openness 组/exe版本匹配/AI宿主配置。
+- **启动失败中英文指引**: TIA 未装或 Openness 组缺失时给出清晰修复指引，退出码正确。
+- **ScaffoldProject 默认干跑**: `dryRun` 默认值 false→true，防止弱模型一把梭建废工程。
+- **工具清单更新**: 185→200 工具。
+
+### 本 fork 变更
+- 版本号: 2.3.0 → 2.4.0
+- 合并策略: 保留全部 License/ 授权代码、crproj 加壳配置、fork 文档，冲突文件手动合并（CliCommands.cs / McpConfigInstaller.cs 签名同时支持 license 参数 + lite 参数）
+
+---
+
+## [2.3.0] - 2026-07-03 — 商业授权版正式发布 (AhYesZ fork)
+
+本版本在 upstream v2.2.7 基础上加入闭源授权层，产出 V20/V21 双版本发布包。
+
+### 新增: 授权系统
+- **机器指纹** (`License/MachineId.cs`): WMI 采集 CPU + 主板 + MAC → SHA256 哈希, `--show-machine-id` CLI
+- **离线授权** (`License/LicenseCache.cs` + `LicenseValidator.cs`): JWT RS256 验签, machineId 绑定, 30 天缓存
+- **在线授权服务器**: Flask + SQLite, 部署阿里云 ECS, `/api/activate` + `/api/validate` + admin 面板
+- **Key 管理** (`keygen.py`): CLI 创建/吊销/列表
+- **Program.cs 入口拦截**: 24 行, `--license-key` + `--license-server-url` 参数
+- 零外部 NuGet 依赖, 不改 McpServer.cs (零上游冲突)
+
+### 保护
+- ConfuserEx 加壳: **ctrl flow + anti debug**
+- RSA-2048 私钥仅在服务器, 公钥硬编码客户端
+
+### 发布
+- `TIA_MCP_v2.3.0_V20.zip` (65 文件, 5.4 MB)
+- `TIA_MCP_v2.3.0_V21.zip` (65 文件, 5.4 MB)
+- 一键注册脚本支持 Claude Desktop / Claude Code / Cursor / VS Code
+- 标签: `v2.3.0`
+
+### 仓库
+- GitHub: `AhYesZ/TIA_Portal_Openness_MCP`
+- 授权服务器: `gitcode.com/qq_43301551/main`
 
 ## [2.2.7] - 2026-07-02 - 门槛归零：版本自路由 + 四宿主一键配置 + 模型引导（instructions/GetAuthoringGuide）
 

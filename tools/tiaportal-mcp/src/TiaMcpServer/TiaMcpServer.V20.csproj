@@ -4,14 +4,14 @@
     <Nullable>enable</Nullable>
     <LangVersion>Latest</LangVersion>
     <OutputType>Exe</OutputType>
-    <AssemblyVersion>2.2.8</AssemblyVersion>
+    <AssemblyVersion>2.4.0</AssemblyVersion>
     <AssemblyName>TiaMcpServer</AssemblyName>
     <BaseOutputPath>.\bin-v20</BaseOutputPath>
     <BaseIntermediateOutputPath>.\obj-v20\</BaseIntermediateOutputPath>
     <PlatformTarget>x64</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
     <DefineConstants>$(DefineConstants);TIA_V20</DefineConstants>
-    <TiaPortalLocation>D:\app\TIA20\Portal V20</TiaPortalLocation>
+    <TiaPortalLocation>D:\Program Files\Siemens\Automation\Portal V20</TiaPortalLocation>
     <DefaultItemExcludes>$(DefaultItemExcludes);obj\**;obj-v20\**;bin\**;bin-v20\**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>

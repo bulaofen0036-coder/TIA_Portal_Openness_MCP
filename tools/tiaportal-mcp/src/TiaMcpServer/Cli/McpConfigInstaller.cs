@@ -76,12 +76,24 @@ namespace TiaMcpServer.Cli
             return Siemens.EngineRouter.FindSiblingExe(tiaMajorVersion) ?? OwnExePath();
         }
 
-        public static JsonObject BuildServerEntry(string exePath, int tiaMajorVersion, HostStyle style, bool lite = false)
+        public static JsonObject BuildServerEntry(string exePath, int tiaMajorVersion, HostStyle style,
+            string? licenseKey = null, string? licenseServerUrl = null, bool lite = false)
         {
             var entry = new JsonObject();
             if (style == HostStyle.VsCode) entry["type"] = "stdio";
             entry["command"] = exePath;
-            entry["args"] = new JsonArray("--tia-major-version", tiaMajorVersion.ToString());
+            var args = new JsonArray("--tia-major-version", tiaMajorVersion.ToString());
+            if (!string.IsNullOrWhiteSpace(licenseKey))
+            {
+                args.Add("--license-key");
+                args.Add(licenseKey);
+            }
+            if (!string.IsNullOrWhiteSpace(licenseServerUrl))
+            {
+                args.Add("--license-server-url");
+                args.Add(licenseServerUrl);
+            }
+            entry["args"] = args;
             // lite profile: server exposes only the ~40 [L0]/[L1] essentials — the right
             // default for weaker models and tool-capped hosts (VS Code caps at 128 tools).
             if (lite) entry["env"] = new JsonObject { ["TIA_MCP_PROFILE"] = "lite" };
@@ -89,12 +101,13 @@ namespace TiaMcpServer.Cli
         }
 
         /// <summary>Pretty single-server snippet for hosts we don't write automatically.</summary>
-        public static string Snippet(string exePath, int tiaMajorVersion, HostStyle style = HostStyle.McpServers, bool lite = false)
+        public static string Snippet(string exePath, int tiaMajorVersion, HostStyle style = HostStyle.McpServers,
+            string? licenseKey = null, string? licenseServerUrl = null, bool lite = false)
         {
             string rootKey = style == HostStyle.VsCode ? "servers" : "mcpServers";
             var root = new JsonObject
             {
-                [rootKey] = new JsonObject { [ServerKey] = BuildServerEntry(exePath, tiaMajorVersion, style, lite) }
+                [rootKey] = new JsonObject { [ServerKey] = BuildServerEntry(exePath, tiaMajorVersion, style, licenseKey, licenseServerUrl, lite) }
             };
             return root.ToJsonString(JsonOpts);
         }
@@ -103,7 +116,8 @@ namespace TiaMcpServer.Cli
         /// Upserts the tia-portal server into one host config. Returns a human-readable status line.
         /// Throws on hard I/O / parse failure so the caller can report it.
         /// </summary>
-        public static string Apply(string configPath, string exePath, int tiaMajorVersion, HostStyle style = HostStyle.McpServers, bool lite = false)
+        public static string Apply(string configPath, string exePath, int tiaMajorVersion, HostStyle style = HostStyle.McpServers,
+            string? licenseKey = null, string? licenseServerUrl = null, bool lite = false)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(configPath));
 
@@ -129,7 +143,7 @@ namespace TiaMcpServer.Cli
             }
 
             bool existed = servers.ContainsKey(ServerKey);
-            servers[ServerKey] = BuildServerEntry(exePath, tiaMajorVersion, style, lite);
+            servers[ServerKey] = BuildServerEntry(exePath, tiaMajorVersion, style, licenseKey, licenseServerUrl, lite);
 
             File.WriteAllText(configPath, root.ToJsonString(JsonOpts));
             return (existed ? "updated" : "wrote") + " " + ServerKey + " -> " + configPath;

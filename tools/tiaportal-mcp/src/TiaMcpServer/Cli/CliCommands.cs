@@ -175,15 +175,17 @@ namespace TiaMcpServer.Cli
                 ? v
                 : (TiaMcpServer.Siemens.Engineering.DetectTiaMajorVersion() ?? 21);
             string exe = McpConfigInstaller.ExeForVersion(ver);
+            string? licenseKey = Opt(args, "--license-key");
+            string? licenseServerUrl = Opt(args, "--license-server-url");
             bool lite = Flag(args, "--lite"); // ~40 essential tools; best for weaker models / VS Code's 128-tool cap
 
             if (Flag(args, "--print"))
             {
                 Console.WriteLine("Claude Desktop / Claude Code / Cursor (mcpServers):");
-                Console.WriteLine(McpConfigInstaller.Snippet(exe, ver, McpConfigInstaller.HostStyle.McpServers, lite));
+                Console.WriteLine(McpConfigInstaller.Snippet(exe, ver, McpConfigInstaller.HostStyle.McpServers, licenseKey, licenseServerUrl, lite));
                 Console.WriteLine();
                 Console.WriteLine("VS Code — %APPDATA%\\Code\\User\\mcp.json (servers):");
-                Console.WriteLine(McpConfigInstaller.Snippet(exe, ver, McpConfigInstaller.HostStyle.VsCode, lite));
+                Console.WriteLine(McpConfigInstaller.Snippet(exe, ver, McpConfigInstaller.HostStyle.VsCode, licenseKey, licenseServerUrl, lite));
                 return 0;
             }
 
@@ -204,7 +206,7 @@ namespace TiaMcpServer.Cli
                     continue;
                 }
 
-                try { Console.WriteLine("  [ok]     " + h.Name + ": " + McpConfigInstaller.Apply(h.ConfigPath, exe, ver, h.Style, lite)); done++; }
+                try { Console.WriteLine("  [ok]     " + h.Name + ": " + McpConfigInstaller.Apply(h.ConfigPath, exe, ver, h.Style, licenseKey, licenseServerUrl, lite)); done++; }
                 catch (Exception ex) { Console.Error.WriteLine("  [failed] " + h.Name + ": " + ex.Message); failed++; }
             }
 

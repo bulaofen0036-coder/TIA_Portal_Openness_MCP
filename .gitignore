@@ -1,18 +1,38 @@
-*.log
-*.startup.log
+# License keys (private key must never be committed)
+keys/
+
+# Build output
+bin/
+bin-v20/
+obj/
+obj-v20/
+
+# IDE
 .vs/
-**/obj/
-**/obj-v20/
-**/bin/Debug/
-**/bin-v20/Debug/
-**/bin/Release/
-**/bin-v20/Release/
-TiaMcp_Output/
 *.user
 *.suo
+
+# Logs
+*.log
+
+# OS
 Thumbs.db
 Desktop.ini
 
+# Artifacts (do NOT commit — too large or regenerable)
 *.bak_*
 *.pdb
+release/*/
+release/obfuscated/
+release/*.exe
+release/*.dll
+release/*.config
+test_install/
+TmpExport/
+tools/ConfuserEx/
+tools/ConfuserEx*.zip
+license-server/
 bin-build/
+*.zip
+!release/*.zip
+!.github/**
