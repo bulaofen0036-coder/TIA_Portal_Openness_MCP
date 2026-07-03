@@ -1,0 +1,11 @@
+<project outputDir="D:\Z_Work\AI\Program\TIA_MCP\release\obfuscated" baseDir="D:\Z_Work\AI\Program\TIA_MCP\Local_repository\tools\tiaportal-mcp\src\TiaMcpServer\bin-v20\Release\net48" xmlns="http://confuser.codeplex.com">
+
+  <module path="TiaMcpServer.exe">
+    <!-- ctrl flow + anti debug only. No rename — property names must stay for JSON serialization -->
+    <rule pattern="true" inherit="false">
+      <protection id="ctrl flow" action="add" />
+      <protection id="anti debug" action="add" />
+    </rule>
+  </module>
+
+</project>

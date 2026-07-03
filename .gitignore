@@ -19,6 +19,14 @@ obj-v20/
 Thumbs.db
 Desktop.ini
 
-# Artifacts
+# Artifacts (do NOT commit — too large or regenerable)
 *.bak_*
 *.pdb
+release/
+test_install/
+TmpExport/
+tools/ConfuserEx/
+tools/ConfuserEx*.zip
+license-server/
+*.zip
+!.github/**
