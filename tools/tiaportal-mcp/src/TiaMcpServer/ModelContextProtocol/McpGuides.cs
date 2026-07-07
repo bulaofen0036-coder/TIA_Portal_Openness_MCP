@@ -82,17 +82,46 @@ Rules that prevent 90% of compile errors:
 - S7-1200 TIME from an Int number of seconds: '#n * T#1S' fails ('Operator * not compatible with Int and Time'). Use PT := DINT_TO_TIME(INT_TO_DINT(#sec) * 1000).
 - Do NOT put OB1 in a .scl external source (ORGANIZATION_BLOCK ""Main""): it collides with the CPU's auto-generated OB1 and the WHOLE source rolls back atomically — even FBs that report 'compiled' do not land. Author OB1 calls separately.
 - A comment placed BEFORE the FUNCTION_BLOCK / FUNCTION header is discarded (treated as a file-level comment). Put block comments you need to keep AFTER BEGIN, inside the block body.
-- After import always CompileSoftware and read the diagnostics; fix and re-import the SAME block name (it overwrites).",
+INSTRUCTION GOTCHAS (compile-verified on S7-1500/V21 — these are the ones weak models get wrong):
+- Power/exponent: use the '**' operator (#x ** 2.0). EXPT(IN1:=,IN2:=) is NOT an SCL function ('Tag EXPT not defined').
+- Range check: IN_RANGE / OUT_RANGE are LAD/FBD box instructions, NOT SCL functions. In SCL write the comparison: #ok := (#v >= 0) AND (#v <= 100);
+- String<->number: STRG_VAL and VAL_STRG return their result via an OUT=> parameter (the function return is a status). STRG_VAL(IN:=#s, FORMAT:=0, P:=#p, OUT=>#num);  VAL_STRG(IN:=#n, SIZE:=8, PREC:=2, FORMAT:=0, P:=#p, OUT=>#str);  — do NOT write '#num := STRG_VAL(...)'. S_CONV is not a usable function name.
+- MOVE_BLK / FILL_BLK: IN and OUT take an ARRAY ELEMENT reference (#arr[0]), not the whole array. MOVE_BLK(IN:=#src[0], COUNT:=5, OUT=>#dst[0]);
+- Error handling: GET_ERR_ID() takes NO parameters and returns the id (#id := GET_ERR_ID();). GET_ERROR(#errStruct) uses a positional arg.
+- IEC timer/counter/edge: declare the instance type directly and call it — VAR tmr:TON_TIME; ctr:CTU_INT; edge:R_TRIG; END_VAR then #tmr(IN:=#x, PT:=T#5s); #ctr(CU:=,R:=,PV:=10); #edge(CLK:=#x); read #tmr.Q / #ctr.CV / #edge.Q. No separate instance DB needed.
+- UNION is NOT supported in S7-1500 SCL ('data type UNION unknown'). For byte/word overlays use AT in a NON-optimized block: { S7_Optimized_Access := 'FALSE' } ... asBytes AT dw : Array[0..3] of Byte;
+- After import always CompileSoftware and read the diagnostics; fix and re-import the SAME block name (it overwrites).
+- One bad function call cascades bogus errors onto neighbouring valid statements — if a rung of errors looks wrong, isolate the suspect statement in a tiny test block to find the real culprit.",
 
             ["lad"] =
 @"LADDER (LAD) — READING & AUTHORING (verified):
 READING/ANALYZING existing LAD: call DescribeBlockLogic(softwarePath, blockPath). It reconstructs each rung as a readable expression (series contacts = ' · ', parallel = ' + ', NC shown as '/operand'), lists coils ( )/(S)/(R) and MOVE/compare/timer boxes with operands, and FLAGS a contact wired to a literal constant ('⟨恒断·禁用本行⟩' = a NO contact on FALSE that silently disables its rung). Use it instead of exporting XML and tracing wires by hand — it is the accurate, fast path.
 AUTHORING: DO NOT hand-write SimaticML FlgNet XML — UId bookkeeping and entity escaping make it fail constantly. The reliable path is S7DCL ladder TEXT imported with ImportBlocksFromScl(importPath=directory) / ImportFromDocuments. Files: Block.s7dcl (+ optional Block.s7res for Chinese texts), both UTF-8 WITH BOM.
-S7DCL ladder essentials (from real V20/V21 exports):
-- A network is a RUNG; series contacts chain, parallel branches use shared wire labels (wire#w1, wire#w2) to fork and rejoin.
-- Elements: Contact (NO), negated contact (NC), Coil, S_Coil (set), R_Coil (reset), timer/counter/compare boxes via templates (e.g. GT_Contact + {S7_Templates}), Move/Add boxes with EN/ENO.
-- Operands: #local for interface vars, ""Tag_Name"" for global tags, ""DB"".member for DB access.
-- Easiest way to learn the exact dialect: ExportBlocksAsScl on ANY existing LAD block and copy its .s7dcl structure.
+S7DCL LADDER DIALECT (compile-verified on S7-1500/V21):
+Block skeleton — LAD FCs return Void:
+  { S7_Optimized := ""TRUE""; S7_PreferredLanguage := ""LAD""; S7_Version := ""0.1"" }
+  FUNCTION ""Name"" : Void
+      VAR_INPUT Start : Bool; END_VAR
+      VAR_OUTPUT Run : Bool; END_VAR
+      { S7_Language := ""LAD"" }
+      NETWORK
+          RUNG wire#powerrail
+              Contact( #Start )
+              Coil( #Run )
+          END_RUNG
+      END_NETWORK
+  END_FUNCTION
+- Contacts: Contact( op ) = NO; I_Contact( op ) = NC (inverted); Not() = invert power flow. Edge: P_Trig( ""edgeMem"" ) / N_Trig( ... ).
+- Coils: Coil( op ); S_Coil( op ) set; R_Coil( op ) reset.
+- Compare box: prefix { S7_Templates := ""SrcType := Int"" } then GT_Contact( in1 := , in2 := )  (also LT_/EQ_/NE_/LE_Contact).
+- Math/move box (with SrcType template): Move( in := , out1 => );  Sub( in1 := , in2 := , out => )  (Add/Mul/Div/Neg alike).
+- Range box (LAD-only, SCL has none): OutRange( min := , in := , max := ) / InRange( ... ).
+- IEC timer box: static VAR tmr : TON_TIME; then { S7_Templates := ""time_type := Time"" } #tmr.TON( pt := T#5s, et => ); read the output with Contact( #tmr.Q ). (block must be a FUNCTION_BLOCK for the static instance.)
+- Call an FC in a rung: ""FC_Name""()  (bare name in quotes + empty parens).
+- Operands: #local for interface/temp vars, ""Tag"" for globals, ""DB"".member for DB access.
+- Branching: fork by placing wire#w1 inline in a rung; a following rung that ends with 'END_RUNG wire#w1' rejoins that node (this is how parallel OR / multi-output is expressed).
+MIXED LAD + SCL in ONE block: the block header keeps S7_PreferredLanguage := ""LAD"", but each NETWORK carries its own { S7_Language := ""LAD"" } or { S7_Language := ""SCL"" }. An SCL network holds plain SCL statements (no RUNG). This is the verified way to do arithmetic inside a mostly-ladder block.
+- To learn any element you have not seen: ExportAsDocuments on a real LAD block and copy its .s7dcl structure (SD is ~9x smaller and readable vs XML).
 When only a plain FC/FB CALL network is needed, BuildFlgNetCallXml / ComposePlcLadFcBlockXml are safe (they generate the XML for you).
 Mixed LAD+SCL blocks are supported by .s7dcl. After import: CompileSoftware, then SaveProject.",
 
