@@ -4,6 +4,14 @@
 
 ### 修复
 
+- **HMI 画面查找只检查根目录，遗漏子文件夹中的画面。** `GetHmiScreens`、
+  HMI 程序信息及按名称定位画面的操作现在共用递归遍历，覆盖 Classic 的
+  `ScreenFolder/Folders` 和 Unified 的 `ScreenGroups/Groups`。
+  描述、导出、控件操作和 `EnsureUnifiedHmiScreen` 均可定位子组中的现有画面，
+  避免误报不存在或在根目录重复创建。返回值仍为画面名称，保留大小写不敏感及根层优先匹配。
+  读取子组失败时明确报错，不再返回看似完整的根层结果。新增离线回归用例覆盖两种结构、
+  多层嵌套、空根目录、兄弟组及重复引用。
+
 - **写完 Unified HMI 的 JS 事件脚本就强制跑 `SyntaxCheck()`，在 TIA V21 上会偶发
   把博途进程整个带走**（issue #36，由 Moy-GH 报告）。抛的是 `NonRecoverableException`，
   不是「这一步失败了」而是「进程没了」：句柄全部作废，刚写进去、还没保存的脚本

@@ -322,6 +322,12 @@ Pass `json` as a **string** (escape quotes in MCP args). Replace
 
 ### 6.3 Unified HMI — minimal `designJson` for `ApplyUnifiedHmiScreenDesignJson`
 
+`GetHmiScreens` lists screen names recursively across all screen folders/groups
+(Classic and Unified). Pass the returned name as `screenName` to describe, export,
+or edit that screen; nested screens do not require a folder path.
+`EnsureUnifiedHmiScreen` also searches subgroups before creating a new root screen.
+Name matching remains case-insensitive, with root-level matches taking precedence.
+
 Keys are **lowercase**. Colors: ARGB hex strings like `0xAARRGGBB`. Call
 `EnsureUnifiedHmiScreen` before apply. Button bit actions:
 `EnsureUnifiedHmiButtonAction` with `eventType` **`Down` / `Up` / `Tapped`**

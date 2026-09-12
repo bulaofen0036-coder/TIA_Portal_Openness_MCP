@@ -1391,13 +1391,13 @@ namespace TiaMcpServer.Siemens
             // Classic WinCC (HmiTarget)
             if (sw is HmiTarget classic)
             {
-                return (classic.Name, "Classic", TryListScreens(classic));
+                return (classic.Name, "Classic", HmiScreenTraversal.ListNames(classic));
             }
 
             // Unified (HmiSoftware)
             if (sw is HmiSoftware unified)
             {
-                return (unified.Name, "Unified", TryListScreens(unified));
+                return (unified.Name, "Unified", HmiScreenTraversal.ListNames(unified));
             }
 
             return (sw.ToString(), "Unknown", new List<string>());
@@ -1465,7 +1465,7 @@ namespace TiaMcpServer.Siemens
             }
 
             var sw = softwareContainer.Software;
-            var screen = TryFindByNameInCollection(sw, new[] { "Screens", "ScreenFolder" }, screenName);
+            var screen = HmiScreenTraversal.FindByName(sw, screenName);
             if (screen == null)
             {
                 // 「找不到」返回一条正常响应 + 空成员表，调用方看到的是 isError=false，
@@ -1648,7 +1648,7 @@ namespace TiaMcpServer.Siemens
             }
 
             var sw = sc.Software;
-            var screen = TryFindByNameInCollection(sw, new[] { "Screens", "ScreenFolder" }, screenName);
+            var screen = HmiScreenTraversal.FindByName(sw, screenName);
             if (screen == null)
             {
                 // 「找不到」返回一条正常响应 + 空成员表，调用方看到的是 isError=false，
@@ -1778,7 +1778,7 @@ namespace TiaMcpServer.Siemens
                 Step("resolveSoftware", true, sw.GetType().FullName);
 
                 // Resolve screen + tag table
-                var screen = TryFindByNameInCollection(sw, new[] { "Screens", "ScreenFolder" }, screenName);
+                var screen = HmiScreenTraversal.FindByName(sw, screenName);
                 if (screen == null)
                 {
                     Step("findScreen", false, $"Screen '{screenName}' not found");
@@ -2321,7 +2321,7 @@ namespace TiaMcpServer.Siemens
                 var screens = TryGetPropertyValue(sw, "Screens");
                 if (screens == null) throw new InvalidOperationException("HMI Screens collection not found.");
 
-                var screen = TryFindByNameInCollection(sw, new[] { "Screens", "ScreenFolder" }, screenName);
+                var screen = HmiScreenTraversal.FindByName(sw, screenName);
                 var action = "exists";
                 if (screen == null)
                 {
@@ -3410,7 +3410,7 @@ namespace TiaMcpServer.Siemens
         private object ResolveHmiScreenOrThrow(string hmiSoftwarePath, string screenName)
         {
             var sw = ResolveHmiSoftwareOrThrow(hmiSoftwarePath);
-            var screen = TryFindByNameInCollection(sw, new[] { "Screens", "ScreenFolder" }, screenName);
+            var screen = HmiScreenTraversal.FindByName(sw, screenName);
             if (screen == null)
             {
                 throw new InvalidOperationException($"HMI screen '{screenName}' not found.");
@@ -4679,7 +4679,7 @@ namespace TiaMcpServer.Siemens
             if (IsProjectNull()) return null;
             var softwareContainer = GetSoftwareContainer(softwarePath);
             if (softwareContainer?.Software == null) return null;
-            return TryListScreens(softwareContainer.Software);
+            return HmiScreenTraversal.ListNames(softwareContainer.Software);
         }
 
         public List<string>? GetHmiTagTables(string softwarePath)
@@ -4726,7 +4726,7 @@ namespace TiaMcpServer.Siemens
             var softwareContainer = GetSoftwareContainer(softwarePath);
             if (softwareContainer?.Software == null) throw new PortalException(PortalErrorCode.NotFound, $"HMI software not found: {softwarePath}");
 
-            var screen = TryFindByNameInCollection(softwareContainer.Software, new[] { "Screens", "ScreenFolder" }, screenName);
+            var screen = HmiScreenTraversal.FindByName(softwareContainer.Software, screenName);
             if (screen == null) throw new PortalException(PortalErrorCode.NotFound, $"HMI screen not found: {screenName}");
 
             if (!TryExportEngineeringObject(screen, exportPath, out var err))
@@ -5910,45 +5910,6 @@ namespace TiaMcpServer.Siemens
                 if (obj is IDisposable d) d.Dispose();
             }
             catch { }
-        }
-
-        private static List<string> TryListScreens(object hmiRoot)
-        {
-            var result = new List<string>();
-
-            try
-            {
-                // Try common shapes: root.Screens OR root.ScreenFolder.Screens
-                var rootType = hmiRoot.GetType();
-                var screens = rootType.GetProperty("Screens")?.GetValue(hmiRoot);
-                if (screens == null)
-                {
-                    var folder = rootType.GetProperty("ScreenFolder")?.GetValue(hmiRoot);
-                    if (folder != null)
-                    {
-                        screens = folder.GetType().GetProperty("Screens")?.GetValue(folder);
-                    }
-                }
-
-                if (screens is System.Collections.IEnumerable enumerable)
-                {
-                    foreach (var item in enumerable)
-                    {
-                        if (item == null) continue;
-                        var name = item.GetType().GetProperty("Name")?.GetValue(item)?.ToString();
-                        if (!string.IsNullOrWhiteSpace(name))
-                        {
-                            result.Add(name!);
-                        }
-                    }
-                }
-            }
-            catch
-            {
-                // best-effort only
-            }
-
-            return result;
         }
 
         private static List<string> TryListNamesFromCollection(object root, string[] propertyHints, string finalCollectionNameHint)

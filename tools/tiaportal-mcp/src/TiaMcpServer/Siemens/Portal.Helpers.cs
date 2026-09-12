@@ -1617,7 +1617,7 @@ namespace TiaMcpServer.Siemens
                     var screenName = parts[1];
                     var sc = GetSoftwareContainer(swPath);
                     if (sc?.Software == null) return null;
-                    return TryFindByNameInCollection(sc.Software, new[] { "Screens", "ScreenFolder" }, screenName);
+                    return HmiScreenTraversal.FindByName(sc.Software, screenName);
                 }
 
                 case "hmitagtable":
@@ -1703,7 +1703,7 @@ namespace TiaMcpServer.Siemens
                     var itemName = parts[2];
                     var sc = GetSoftwareContainer(swPath);
                     if (sc?.Software == null) return null;
-                    var screen = TryFindByNameInCollection(sc.Software, new[] { "Screens", "ScreenFolder" }, screenName);
+                    var screen = HmiScreenTraversal.FindByName(sc.Software, screenName);
                     if (screen == null) return null;
                     var itemsComp = screen.GetType().GetProperty("ScreenItems")?.GetValue(screen);
                     if (itemsComp == null) return null;

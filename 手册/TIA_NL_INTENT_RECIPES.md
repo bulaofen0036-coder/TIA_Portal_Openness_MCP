@@ -247,6 +247,11 @@ Every recipe ends with a readback step and a clear success criterion.
 
 **成功判断**: GetHmiScreens 包含 "MotorCtrl"，ApplyUnifiedHmiLayout success=true
 
+`GetHmiScreens` 会递归列出根目录及所有子文件夹/子组中的画面（Classic、Unified 均支持）。
+返回值仍为画面名称；描述、导出、编辑时直接传入该名称即可。
+`EnsureUnifiedHmiScreen` 会先查找子组中的现有画面，找不到才在根目录创建。
+名称匹配不区分大小写；如有同名画面，根目录匹配优先。
+
 **Status**: `manual-derived`
 
 ---

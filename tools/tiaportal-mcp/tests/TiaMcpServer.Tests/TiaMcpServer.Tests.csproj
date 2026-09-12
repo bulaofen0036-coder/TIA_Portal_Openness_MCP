@@ -17,6 +17,8 @@
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Shared Classic / Unified screen traversal, with no Siemens runtime dependency. -->
+    <Compile Include="..\..\src\TiaMcpServer\Siemens\HmiScreenTraversal.cs" Link="HmiScreenTraversal.cs" />
     <!-- HMI 模板布局体检 + 执行 JSON 构建器：两个都零依赖。
          盯的是「执行 JSON 检查」那条 —— 它曾经在委托缺省时退化成
          `items.Length > 0 && errors.Count == 0`，判据里含着 errors.Count == 0，

@@ -57,6 +57,9 @@ namespace TiaMcpServer.Tests
             Console.WriteLine("== Unified JS 脚本的 SyntaxCheck 默认关闭 + 进程级致命错不许被吞（issue #36）==");
             UnifiedScriptSyntaxCheckTests.Run(Check, Skip);
 
+            Console.WriteLine("== HMI 画面列表和按名称查找必须覆盖所有子文件夹 ==");
+            HmiScreenTraversalTests.Run(Check);
+
             Console.WriteLine(_fail == 0
                 ? $"{_pass} passed, {_fail} failed, {_skip} skipped."
                 : $"{_pass} passed, {_fail} failed, {_skip} skipped.  <<< 有失败");

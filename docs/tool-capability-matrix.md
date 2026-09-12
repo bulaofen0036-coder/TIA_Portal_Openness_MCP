@@ -185,7 +185,7 @@
 | DescribeHmiTagTable | [L2][HMI]Describe one HMI tag table object (members/methods) by name under an HMI software. |
 | DescribeHmiTag | [L2][HMI]Describe one HMI tag object (members/methods) by name under an HMI tag table. |
 | DescribeHmiScreenItem | [L2][HMI]Describe one HMI screen item (widget) by name under an HMI screen. |
-| GetHmiScreens | [L2][HMI] List all screen names in an HMI (Classic or Unified). Requires: Connect + OpenProject. softwarePath from GetProjectTree. Use before EnsureUnifiedHmiScreen/ExportHmiScreen to confirm which screens exist. |
+| GetHmiScreens | [L2][HMI] List all screen names in an HMI (Classic or Unified), including all nested screen folders/groups. Returns screen names, not folder paths; screen operations resolve these names recursively. Requires: Connect + OpenProject. softwarePath from GetProjectTree. Use before EnsureUnifiedHmiScreen/ExportHmiScreen to confirm which screens exist. |
 | GetHmiTagTables | [L2][HMI]List HMI tag table names (Classic/Unified, best-effort) |
 | GetHmiTags | [L2][HMI]List HMI tag names (best-effort). If tagTableName empty, returns tags found at root collection if available. |
 | GetHmiConnections | [L2][HMI]List HMI connection names (Classic/Unified, best-effort) |
