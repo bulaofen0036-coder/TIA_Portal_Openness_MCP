@@ -41,6 +41,12 @@
     <!-- 画面分组递归（PR #41）：分组里的画面曾对所有画面工具隐形，只报一句「找不到」。 -->
     <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\HmiScreenWalk.cs" Link="HmiScreenWalk.cs" />
     <!-- DescribeBlockLogic 的回读（issue #42）：错了不报错、不崩，只会让人看到不存在的逻辑。 -->
+    <!-- HMI 属性读取（GetHmiTagDetails / GetHmiScreenItemDetails）：读错了不崩、不报错，
+         只会让评审拿到一份缺列或缺项的清单 —— 只有会失败的用例盯得住。 -->
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\HmiDetailRead.cs" Link="HmiDetailRead.cs" />
+    <!-- 反射桥的只读闸门与参数整形（GetAttributes 批量读）：闸门放错了是安全问题，
+         参数整形错了是「方法签名不匹配」，两者都不会崩。 -->
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ReflectionInvokeSafety.cs" Link="ReflectionInvokeSafety.cs" />
     <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\SimaticMlText.cs" Link="SimaticMlText.cs" />
     <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\LadTextRenderer.cs" Link="LadTextRenderer.cs" />
   </ItemGroup>

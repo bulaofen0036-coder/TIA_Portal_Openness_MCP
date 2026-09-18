@@ -1960,14 +1960,11 @@ namespace TiaMcpServer.Siemens
                 };
             }
 
-            var safe = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "ToString",
-                "GetAttribute",
-                "GetAttributeInfos"
-            };
-
-            if (!allowWrite && !safe.Contains(methodName))
+            // The read-only allowlist lives in ModelContextProtocol/ReflectionInvokeSafety.cs so it
+            // can be tested offline. GetAttributes belongs on it: it reads several attributes in one
+            // round trip and writes nothing, and refusing it left one call per attribute as the only
+            // route — thousands of calls to read one HMI.
+            if (!allowWrite && !ModelContextProtocol.ReflectionInvokeSafety.IsReadOnlyMethod(methodName))
             {
                 return new ModelContextProtocol.ResponseObjectValue
                 {
@@ -1977,25 +1974,9 @@ namespace TiaMcpServer.Siemens
                 };
             }
 
-            var argValues = new List<object?>();
-            if (args != null)
-            {
-                foreach (var a in args)
-                {
-                    if (a == null) { argValues.Add(null); continue; }
-                    if (a is JsonValue jv)
-                    {
-                        if (jv.TryGetValue<string>(out var s)) { argValues.Add(s); continue; }
-                        if (jv.TryGetValue<int>(out var i)) { argValues.Add(i); continue; }
-                        if (jv.TryGetValue<long>(out var l)) { argValues.Add(l); continue; }
-                        if (jv.TryGetValue<double>(out var d)) { argValues.Add(d); continue; }
-                        if (jv.TryGetValue<bool>(out var b)) { argValues.Add(b); continue; }
-                        argValues.Add(jv.ToString());
-                        continue;
-                    }
-                    argValues.Add(a.ToString());
-                }
-            }
+            // A nested array is ONE argument and becomes a string list (GetAttributes(names) is
+            // unusable otherwise); scalars keep their JSON type, as before.
+            var argValues = ModelContextProtocol.ReflectionInvokeSafety.ToArgValues(args);
 
             try
             {
@@ -2004,7 +1985,9 @@ namespace TiaMcpServer.Siemens
                     .Where(m => !m.IsSpecialName && m.Name.Equals(methodName, StringComparison.OrdinalIgnoreCase))
                     .ToList();
 
-                MethodInfo? mi = methods.FirstOrDefault(m => m.GetParameters().Length == argValues.Count);
+                // By parameter TYPE, not just count: GetAttributes has two overloads that both take
+                // exactly one parameter, so counting alone lands on whichever is declared first.
+                MethodInfo? mi = ModelContextProtocol.ReflectionInvokeSafety.SelectOverload(methods, argValues);
                 if (mi == null)
                 {
                     return new ModelContextProtocol.ResponseObjectValue
@@ -2022,11 +2005,6 @@ namespace TiaMcpServer.Siemens
                     var av = argValues[i];
                     if (av == null) { converted[i] = null; continue; }
                     var pt = ps[i].ParameterType;
-                    if (pt == typeof(string)) { converted[i] = av.ToString(); continue; }
-                    if (pt == typeof(int)) { converted[i] = Convert.ToInt32(av); continue; }
-                    if (pt == typeof(long)) { converted[i] = Convert.ToInt64(av); continue; }
-                    if (pt == typeof(double)) { converted[i] = Convert.ToDouble(av); continue; }
-                    if (pt == typeof(bool)) { converted[i] = Convert.ToBoolean(av); continue; }
                     if (pt == typeof(object)
                         && methodName.Equals("SetAttribute", StringComparison.OrdinalIgnoreCase)
                         && i == 1
@@ -2039,7 +2017,7 @@ namespace TiaMcpServer.Siemens
                         converted[i] = oldValue == null ? av : CoerceReflectionValue(av, oldValue.GetType());
                         continue;
                     }
-                    converted[i] = av;
+                    converted[i] = ModelContextProtocol.ReflectionInvokeSafety.ConvertArgument(pt, av);
                 }
 
                 var result = mi.Invoke(instance, converted);

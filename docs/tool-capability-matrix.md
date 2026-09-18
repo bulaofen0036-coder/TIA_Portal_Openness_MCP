@@ -2,8 +2,8 @@
 
 本文件由源码中的 `[McpServerTool]` 静态抽取生成，运行时仍以 `tools/list` 为准。
 
-- 生成时间：2026-09-16 18:25:03
-- 工具数量：222
+- 生成时间：2026-09-18 08:40:00
+- 工具数量：224
 
 ## L0
 
@@ -188,6 +188,8 @@
 | GetHmiScreens | [L2][HMI] List all screen names in an HMI (Classic or Unified). Requires: Connect + OpenProject. softwarePath from GetProjectTree. Use before EnsureUnifiedHmiScreen/ExportHmiScreen to confirm which screens exist. |
 | GetHmiTagTables | [L2][HMI]List HMI tag table names (Classic/Unified, best-effort) |
 | GetHmiTags | [L2][HMI]List HMI tag names (best-effort). If tagTableName empty, returns tags found at root collection if available. |
+| GetHmiTagDetails | [L2][HMI] Read the PROPERTIES of HMI tags in one call: datatype, connection, address, PLC binding, acquisition cycle. Read-only. GetHmiTags gives names only; this gives values, for one tag table or (tagTableName empty) every tag table including the ones filed in a tag table group. attributes: comma-separated list to override the default set (Name,DataType,HmiDataType,Connection,Address,PlcTag,PlcName,AcquisitionCycle); an attribute this tag type does not have comes back null instead of failing the call. Requires: Connect + OpenProject. softwarePath from GetProjectTree, e.g. 'HMI_RT_1'. |
+| GetHmiScreenItemDetails | [L2][HMI] Read the PROPERTIES of every item on one HMI screen in one call: type (HmiButton/HmiIOField/HmiText/...), position, size, visibility, plus the screen's own size. Read-only. Screens inside a screen group are found. attributes: comma-separated list to override the default set (Name,Left,Top,Width,Height,Visible,Enabled); an attribute this item type does not have comes back null instead of failing the call. Requires: Connect + OpenProject. softwarePath from GetProjectTree, screenName from GetHmiScreens. |
 | GetHmiConnections | [L2][HMI]List HMI connection names (Classic/Unified, best-effort) |
 | ExportHmiScreen | [L2][HMI]Export one HMI screen to a file (best-effort; requires Openness export support) |
 | ExportHmiTagTable | [L2][HMI]Export one HMI tag table to a file (best-effort; requires Openness export support) |

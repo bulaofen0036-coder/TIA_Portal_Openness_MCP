@@ -2031,6 +2031,48 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
+        [McpServerTool(Name = "GetHmiTagDetails"), Description("[L2][HMI] Read the PROPERTIES of HMI tags in one call: datatype, connection, address, PLC binding, acquisition cycle. Read-only. GetHmiTags gives names only; this gives values, for one tag table or (tagTableName empty) every tag table including the ones filed in a tag table group. attributes: comma-separated list to override the default set (Name,DataType,HmiDataType,Connection,Address,PlcTag,PlcName,AcquisitionCycle); an attribute this tag type does not have comes back null instead of failing the call. Requires: Connect + OpenProject. softwarePath from GetProjectTree, e.g. 'HMI_RT_1'.")]
+        public static ResponseHmiTagDetails GetHmiTagDetails(
+            [Description("softwarePath: HMI software path, e.g. 'HMI_RT_1'")] string softwarePath,
+            [Description("tagTableName: one tag table, or empty for every tag table of this HMI")] string tagTableName = "",
+            [Description("attributes: comma-separated attribute names; empty = the default set")] string attributes = "")
+        {
+            try
+            {
+                return Portal.GetHmiTagDetails(softwarePath, tagTableName, attributes);
+            }
+            catch (PortalException pex)
+            {
+                throw new McpException(pex.Message, pex,
+                    pex.Code == PortalErrorCode.NotFound ? McpErrorCode.InvalidParams : McpErrorCode.InternalError);
+            }
+            catch (Exception ex) when (ex is not McpException)
+            {
+                throw new McpException($"Unexpected error reading HMI tag details for '{softwarePath}': {ex.Message}{McpHints.Recovery(ex)}", ex, McpErrorCode.InternalError);
+            }
+        }
+
+        [McpServerTool(Name = "GetHmiScreenItemDetails"), Description("[L2][HMI] Read the PROPERTIES of every item on one HMI screen in one call: type (HmiButton/HmiIOField/HmiText/...), position, size, visibility, plus the screen's own size. Read-only. Screens inside a screen group are found. attributes: comma-separated list to override the default set (Name,Left,Top,Width,Height,Visible,Enabled); an attribute this item type does not have comes back null instead of failing the call. Requires: Connect + OpenProject. softwarePath from GetProjectTree, screenName from GetHmiScreens.")]
+        public static ResponseHmiScreenItemDetails GetHmiScreenItemDetails(
+            [Description("softwarePath: HMI software path, e.g. 'HMI_RT_1'")] string softwarePath,
+            [Description("screenName: screen name, e.g. 'MainScreen'")] string screenName,
+            [Description("attributes: comma-separated attribute names; empty = the default set")] string attributes = "")
+        {
+            try
+            {
+                return Portal.GetHmiScreenItemDetails(softwarePath, screenName, attributes);
+            }
+            catch (PortalException pex)
+            {
+                throw new McpException(pex.Message, pex,
+                    pex.Code == PortalErrorCode.NotFound ? McpErrorCode.InvalidParams : McpErrorCode.InternalError);
+            }
+            catch (Exception ex) when (ex is not McpException)
+            {
+                throw new McpException($"Unexpected error reading HMI screen item details for '{softwarePath}:{screenName}': {ex.Message}{McpHints.Recovery(ex)}", ex, McpErrorCode.InternalError);
+            }
+        }
+
         [McpServerTool(Name = "GetHmiConnections"), Description("[L2][HMI]List HMI connection names (Classic/Unified, best-effort)")]
         public static ResponseStringList GetHmiConnections(
             [Description("softwarePath: path in the project structure to the HMI software")] string softwarePath)

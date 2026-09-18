@@ -1,5 +1,65 @@
 ﻿# Change Log
 
+## [Unreleased] - HMI tag and screen-item PROPERTIES are readable in one call
+
+### 新增
+
+- **`GetHmiTagDetails` / `GetHmiScreenItemDetails`: read the attribute VALUES of HMI tags and
+  screen items, per tag table respectively per screen, in ONE call.** The server could already
+  list their names (`GetHmiTags`, `ListObjectChildren`) and describe their API shape
+  (`DescribeHmiTag`, `DescribeHmiScreenItem`), but a value — datatype, connection, address, PLC
+  binding, position, size — could only be fetched one attribute per object per call through the
+  `InvokeObject` reflection bridge. For a project with 223 tags and 26 screens that is thousands
+  of round trips, over a tool that can also write and therefore cannot be handed to a read-only
+  review agent. Both new tools are read-only by construction: no `allowWrite`, no write path.
+
+  - `GetHmiTagDetails(softwarePath, tagTableName?, attributes?)` — one tag table, or every tag
+    table of the HMI when `tagTableName` is empty, **including tables filed in a
+    `TagTableGroup`** (the tag counterpart of the screen-group walk from PR #41). Default
+    attributes: `Name, DataType, HmiDataType, Connection, Address, PlcTag, PlcName,
+    AcquisitionCycle`.
+  - `GetHmiScreenItemDetails(softwarePath, screenName, attributes?)` — every item on one screen
+    with its CLR type (`HmiButton` / `HmiIOField` / `HmiText` / …) plus **the screen's own size**,
+    without which an item's position cannot be judged. Default attributes:
+    `Name, Left, Top, Width, Height, Visible, Enabled`.
+
+  Three properties they are built to keep, each one a failure that would otherwise stay silent:
+
+  - **An attribute this object type does not have blanks that one value, not the call.** Openness
+    throws for an unsupported attribute name; swallowing that per attribute is what lets one
+    exotic column coexist with seven good ones.
+  - **Every value that is not a JSON primitive is flattened to a string.** A `MultilingualText`
+    (`Text`, `ToolTipText`, `DisplayName`) carries `Items[].Language.Culture.Parent.Parent…`;
+    serializing it raises "a possible object cycle was detected" at depth 64 and takes the whole
+    response with it. One exotic attribute must not be able to sink a 200-item inventory.
+  - **`success` follows the failure count, and nothing is dropped.** An object that cannot be read
+    is listed in `Failed[]` with a reason; `Meta.success` is false as soon as anything failed. The
+    pattern this avoids is already in this server twice (`ExportHmiProgram` reports
+    "HMI program exported" with all 41 objects in `Failed[]` and `success: true`;
+    `ExportAlarmClasses` reports "not available for this PLC" the same way) — a caller that
+    trusts `success` files an empty inventory as a complete one.
+
+### 修复
+
+- **`InvokeObject` / `InvokeService` refused `GetAttributes`, the one call that reads several
+  attributes at once.** It was answered with "Method not allowed (read-only mode)" although it
+  provably only reads, which left one call per attribute as the only route. It is now on the
+  read-only allowlist — and, because letting it through alone would not have made it work:
+
+  - a nested JSON array is now ONE argument and becomes a string list (it used to arrive as the
+    literal text `["Address","PlcTag"]`, which no `IEnumerable<string>` parameter accepts), while
+    an array handed to a `string` parameter still arrives as that same JSON text as before;
+  - overloads are selected by parameter TYPE, not by parameter count alone — `GetAttributes` has
+    two overloads that each take exactly one parameter, so counting picked whichever the runtime
+    happened to return first;
+  - an `enum` parameter is parsed from its name instead of being passed as a string.
+
+  `SetAttribute`/`SetAttributes` stay refused; the allowlist moved into the zero-dependency
+  `ReflectionInvokeSafety.cs` so the offline suite can hold that line.
+
+  This is a cheaper route for every caller, but it does **not** replace the two tools above:
+  `InvokeObject` can still write, so a read-only agent must not be given it.
+
 ## [2.7.3] - 2026-09-16 - 写 Unified JS 脚本不再赌上整个博途进程；画面分组里的画面不再隐形
 
 ### 修复

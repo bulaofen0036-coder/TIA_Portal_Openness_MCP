@@ -250,6 +250,30 @@ namespace TiaMcpServer.ModelContextProtocol
         public IEnumerable<string>? Items { get; set; }
     }
 
+    /// <summary>Size of the screen an item sits on; a position means nothing without it.</summary>
+    public class HmiScreenGeometry
+    {
+        public string? Name { get; set; }
+        public object? Width { get; set; }
+        public object? Height { get; set; }
+    }
+
+    // GetHmiTagDetails / GetHmiScreenItemDetails. Failed is never null and never silently empty:
+    // an object that could not be read is listed there with a reason, and Meta.success follows the
+    // failure count — a caller that trusts success must not file a partial inventory as complete.
+    public class ResponseHmiTagDetails : ResponseMessage
+    {
+        public IEnumerable<HmiDetailItem>? Items { get; set; }
+        public IEnumerable<HmiDetailFailure>? Failed { get; set; }
+    }
+
+    public class ResponseHmiScreenItemDetails : ResponseMessage
+    {
+        public HmiScreenGeometry? Screen { get; set; }
+        public IEnumerable<HmiDetailItem>? Items { get; set; }
+        public IEnumerable<HmiDetailFailure>? Failed { get; set; }
+    }
+
     public class ResponseExportFile : ResponseMessage
     {
         public string? ExportPath { get; set; }
