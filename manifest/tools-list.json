@@ -1,6 +1,6 @@
 {
   "package": "TIA_MCP_Delivery_v2.7.3",
-  "generatedAt": "2026-09-27T11:20:51.178124+08:00",
+  "generatedAt": "2026-09-27T16:34:55.980067+08:00",
   "source": "live MCP tools/list of TiaMcpServer.exe",
   "toolCount": 222,
   "note": "Full roster (--profile full). The default lite profile lists only the core tools; the rest stay reachable via FindTools + CallTool. Runtime tools/list remains authoritative.",
@@ -252,7 +252,7 @@
       "parameters": [
         "globalDbJson"
       ],
-      "description": "[L2][PLC-Builders][Offline] Build a TIA V21 PLC GlobalDB XML document from structured JSON. Input: {dbName,dbNumber,staticMembers:[{name,datatype,externalWritable?,commentZhCn?,startValue?}]}. It only returns XML; it does not connect to TIA Portal, import blocks, write files, or modify projects."
+      "description": "[L2][PLC-Builders][Offline] Build a TIA V21 PLC GlobalDB XML document from structured JSON. Input: {dbName,dbNumber,optimized?,staticMembers:[{name,datatype,externalWritable?,commentZhCn?,startValue?}]}. optimized defaults to false = Standard (non-optimized) memory layout, which PUT/GET and absolute S7 reads require; optimized=true gives an Optimized DB (memoryLayout:'Standard'|'Optimized' is accepted as an alias). Unknown JSON keys are rejected. It only returns XML; it does not connect to TIA Portal, import blocks, write files, or modify projects."
     },
     {
       "name": "BuildPlcSymbolManifestFromXmlPath",
@@ -2276,7 +2276,7 @@
         "compileAfter",
         "dryRun"
       ],
-      "description": "[L1][PLC-Software] MAIN tool for creating new PLC blocks from natural language. Build one PLC artifact (UDT/tag table/GlobalDB/FC/FB) from structured JSON, then optionally import and compile. Use dryRun=true first to validate. Workflow: describe block in JSON → dryRun → review → dryRun=false to import. Replaces the multi-step Build*Xml + ImportBlock sequence."
+      "description": "[L1][PLC-Software] MAIN tool for creating new PLC blocks from natural language. Build one PLC artifact (UDT/tag table/GlobalDB/FC/FB) from structured JSON, then optionally import and compile. Use dryRun=true first to validate. Workflow: describe block in JSON → dryRun → review → dryRun=false to import. Replaces the multi-step Build*Xml + ImportBlock sequence. After a block import it reads the block back (name, number, OB type, memory layout) and returns Meta.verified + Meta.readback; any import failure or read-back mismatch is an error."
     },
     {
       "name": "PlugDeviceItem",
