@@ -7,7 +7,7 @@ description: Drive Siemens TIA Portal (博途) end-to-end through the TiaMcpServ
 
 This is the operating skill for TIA Portal MCP automation. The
 companion plugin lives at `tools/tiaportal-mcp/`. It exposes on the order of
-**223** MCP tools (default lite profile lists 62; exact runtime set: call `tools/list` on the running server) covering
+**225** MCP tools (default lite profile lists 62; exact runtime set: call `tools/list` on the running server) covering
 project, hardware, PLC, HMI, and online operations.
 
 ## 0. Always start here
@@ -28,7 +28,7 @@ it; otherwise inspect with `DescribeObject`/`DescribeService` first, then call
 
 ## 0.1 弱模型 / 新手：你一辈子只需要这 15 个工具（其余的先忽略）
 
-This server exposes ~190 tools. **You do NOT need most of them.** A small or
+This server exposes 225 tools (62 listed by default). **You do NOT need most of them.** A small or
 non-expert model should pick **only** from this whitelist and ignore everything
 else unless one of these tools' output explicitly tells you to call another:
 
@@ -50,7 +50,7 @@ else unless one of these tools' output explicitly tells you to call another:
 参数名时，照本表/§8 的"精确参数名"抄，不要猜。HMI 美化看 §12，库复用看 §15。
 
 **降门槛三件套(已内置，弱模型友好):**
-- **Lite 工具档位（默认）** — `tools/list` 默认只暴露 62 个核心工具(全部 223 个)，其余用
+- **Lite 工具档位（默认）** — `tools/list` 默认只暴露 62 个核心工具(全部 225 个)，其余用
   `FindTools` + `CallTool` 随用随取；弱模型不会在工具海里选错，VS Code 的 128 工具上限也不再爆。
   会动 CPU 或删工程数据的 7 个工具(DownloadToPlc / GoOnline / SetWatchTableModifyValue / Delete*)
   始终以本名列出，`CallTool` 拒绝转发它们。要全量：`--profile full` 或 `TIA_MCP_PROFILE=full`，
@@ -936,7 +936,10 @@ deep inside `SetUnifiedHmiButtonEventScriptCode`.
 `set-bit`, `reset-bit`, `toggle-bit` (other recipes are rejected by the safety
 gate). The tool builds and applies the script via
 `SetUnifiedHmiButtonEventScriptCode` — i.e. it actually writes JS to the event
-handler, then runs SyntaxCheck.
+handler and reads it back. SyntaxCheck is NOT run unless `syntaxCheck=true` (on V21 it can crash the
+Portal process, issue #36). Screen-level events (`Loaded` / `Unloaded`) use
+`SetUnifiedHmiScreenEventScriptCode`; shared functions go in a script module imported with
+`ImportUnifiedHmiScriptModule`.
 
 ### Unified HMI pitfalls
 

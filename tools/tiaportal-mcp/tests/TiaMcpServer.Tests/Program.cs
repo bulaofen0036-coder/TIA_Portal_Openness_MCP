@@ -84,6 +84,9 @@ namespace TiaMcpServer.Tests
             Console.WriteLine("== .s7dcl 声明的块名：读回不再按文件名（issue #30）==");
             S7DclHeaderTests.Run(Check);
 
+            Console.WriteLine("== Unified 画面事件名 + 脚本模块目录预检（issue #38）==");
+            UnifiedHmiScriptArgsTests.Run(Check);
+
             Console.WriteLine(_fail == 0
                 ? $"{_pass} passed, {_fail} failed, {_skip} skipped."
                 : $"{_pass} passed, {_fail} failed, {_skip} skipped.  <<< 有失败");

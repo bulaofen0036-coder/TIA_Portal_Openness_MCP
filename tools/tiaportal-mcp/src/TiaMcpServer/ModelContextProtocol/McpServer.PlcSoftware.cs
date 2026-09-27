@@ -1878,6 +1878,65 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
+        [McpServerTool(Name = "SetUnifiedHmiScreenEventScriptCode"), Description("[L2][HMI-Unified] Set the JavaScript of a Unified HMI SCREEN event (Loaded / Unloaded; also Tapped / ContextTapped), creating the event handler if missing. The standard Unified pattern for periodic refresh is Loaded: TimerId = SetInterval(UpdateValues, 1000); and Unloaded: ClearInterval(TimerId); - without the Unloaded half the timer leaks. Finds screens inside screen groups too. Reads the script back after writing (Meta.readback) and fails if it does not match. SyntaxCheck is OFF by default because on TIA V21 it can crash the Portal process and lose the script (issue #36). Returns Meta.handlerAction (exists|created) and the event enum type.")]
+        public static ResponseMessage SetUnifiedHmiScreenEventScriptCode(
+            [Description("hmiSoftwarePath: path or name of the Unified HMI software (e.g. 'HMI_RT_1')")] string hmiSoftwarePath,
+            [Description("screenName: target screen name")] string screenName,
+            [Description("eventType: screen event, e.g. Loaded or Unloaded ('Cleared', 'OnLoaded' and 'OnUnloaded' are accepted as aliases)")] string eventType,
+            [Description("scriptCode: JavaScript body of the event")] string scriptCode,
+            [Description("globalDefinitionAreaScriptCode: optional global definition area code")] string globalDefinitionAreaScriptCode = "",
+            [Description("async: whether the script runs asynchronously")] bool async = false,
+            [Description("syntaxCheck: run TIA SyntaxCheck after writing. Default false - on TIA V21 this call can crash the Portal process (NonRecoverableException) and lose the just-written script. When false, no syntaxErrorCount is reported: absence means NOT CHECKED, never zero errors.")] bool syntaxCheck = false)
+        {
+            try
+            {
+                return FailUnlessHmiStepSucceeded(
+                    Portal.SetUnifiedHmiScreenEventScriptCode(hmiSoftwarePath, screenName, eventType, scriptCode, globalDefinitionAreaScriptCode, async, syntaxCheck),
+                    $"SetUnifiedHmiScreenEventScriptCode '{screenName}.{eventType}'");
+            }
+            catch (Exception ex) when (ex is not McpException)
+            {
+                throw new McpException($"Unexpected error setting screen event script '{screenName}.{eventType}': {ex.Message}{McpHints.Recovery(ex)}", ex, McpErrorCode.InternalError);
+            }
+        }
+
+        [McpServerTool(Name = "ImportUnifiedHmiScriptModule"), Description("[L2][HMI-Unified] Import a WinCC Unified script module (shared JavaScript functions used by several screens) into the HMI software's Scripts collection, from a folder holding the module in TIA's export layout: <Name>.hmi.yml ('#Version: 2.0' / 'ScriptModules:' / '  <Name>:' / '    ScriptFile: <Name>.hmi.js') plus <Name>.hmi.js with the JavaScript; the folder is checked before TIA is called. moduleName empty = import every module in the folder (Scripts.Import(DirectoryInfo)); otherwise the module's base name, e.g. MyModule for MyModule.hmi.yml (a .hmi.yml suffix is stripped). Lists the modules before and after: Meta.scripts, Meta.scriptCount, Meta.newModules, Meta.importResult. Fails when TIA returns false, when moduleName is not present afterwards, or when no module exists at all; warns when no new name appeared (an existing module was overwritten).")]
+        public static ResponseMessage ImportUnifiedHmiScriptModule(
+            [Description("hmiSoftwarePath: path or name of the Unified HMI software (e.g. 'HMI_RT_1')")] string hmiSoftwarePath,
+            [Description("importDirectory: folder holding <Name>.hmi.yml + <Name>.hmi.js")] string importDirectory,
+            [Description("moduleName: optional module base name to import from the folder (e.g. 'MyModule'); empty imports every module in the folder")] string moduleName = "")
+        {
+            try
+            {
+                return FailUnlessHmiStepSucceeded(
+                    Portal.ImportUnifiedHmiScriptModule(hmiSoftwarePath, importDirectory, moduleName),
+                    $"ImportUnifiedHmiScriptModule from '{importDirectory}'");
+            }
+            catch (Exception ex) when (ex is not McpException)
+            {
+                throw new McpException($"Unexpected error importing script module from '{importDirectory}': {ex.Message}{McpHints.Recovery(ex)}", ex, McpErrorCode.InternalError);
+            }
+        }
+
+        /// <summary>
+        /// HMI 步骤工具（RunHmiStepTool）失败时只在 Meta 里写 success=false，宿主看到的是一条正常响应。
+        /// 新工具不再沿用这一点：失败就是 isError。错误文本保留完整的异常消息、只去掉堆栈 ——
+        /// Openness 把真正的原因写在消息的第二段（"Error when calling method ..." 之后空一行）。
+        /// </summary>
+        private static ResponseMessage FailUnlessHmiStepSucceeded(ResponseMessage result, string what)
+        {
+            if (result.Meta?["success"]?.GetValue<bool>() == true)
+                return result;
+            var error = result.Meta?["error"]?.ToString() ?? result.Message ?? "unknown error";
+            var inner = error.IndexOf(" ---> ", StringComparison.Ordinal);   // 内层异常的 ToString 只是把同一句话再说一遍
+            if (inner > 0) error = error.Substring(0, inner);
+            var lines = error.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(l => l.Trim())
+                .TakeWhile(l => !l.StartsWith("at ", StringComparison.Ordinal) && !l.StartsWith("--- End of", StringComparison.Ordinal))
+                .Where(l => l.Length > 0);
+            throw new McpException($"{what} failed: {string.Join(" ", lines)}", McpErrorCode.InternalError);
+        }
+
         [McpServerTool(Name = "BuildUnifiedHmiButtonActionScript"), Description("[L2][HMI-Unified]Build a safe Unified HMI button action script from a high-level action recipe without connecting to TIA.")]
         public static ResponseMessage BuildUnifiedHmiButtonActionScript(
             [Description("actionKind: set-bit, reset-bit, toggle-bit, open-popup, goto-screen, confirm-write")] string actionKind,

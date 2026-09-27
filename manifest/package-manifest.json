@@ -84,11 +84,11 @@
     }
   },
   "capabilities": {
-    "mcpToolCount": 223,
+    "mcpToolCount": 225,
     "mcpToolLayers": {
       "L0": 10,
       "L1": 45,
-      "L2": 168
+      "L2": 170
     },
     "newToolsThisRelease": [
       "HealthCheck (v2.4.0)",
@@ -117,7 +117,7 @@
       "isDefault": true,
       "scope": "core golden-path tools (plus the CPU-changing and delete tools, listed by name) + FindTools/CallTool",
       "optOut": "--profile full  (or TIA_MCP_PROFILE=full, or `tia config --full`)",
-      "note": "The other 161 tools stay reachable on demand via FindTools + CallTool; nothing is removed."
+      "note": "The other 163 tools stay reachable on demand via FindTools + CallTool; nothing is removed."
     }
   },
   "validationSnapshot": {

@@ -49,6 +49,8 @@
 - **`ImportFromDocuments` 按文件名读回（#30 的用户报告）。** `OB100.s7dcl` 里声明的是 `"Startup"`，
   导入成功却报 `verified=false`（V21 实测复现）；导入前后保持块号也按文件名找块，同样落空。现在按
   `.s7dcl` 里声明的块名；导入的是 OB 时额外警告它已丢失块号与事件类别。
+- **新 HMI 步骤工具失败即 `isError`**：沿用的 `RunHmiStepTool` 只在 Meta 里写 `success=false`；
+  两个新工具不再如此，错误保留 Openness 消息的第二段（真正的原因），只去掉堆栈。
 - **导入读回按编号兜底时不看块种类**：DB100 / FC100 / OB100 编号相同，可能认错块；模糊名匹配也可能让
   `Startup_1` 顶替 `Startup`。现在按编号兜底要求种类一致，模糊匹配只在恰好命中一个时才算。
 
@@ -68,6 +70,16 @@
   （TIA 导入期同一规则，实测 OB101 配循环中断被拒）。导入后读回块名、块号、事件类别、循环周期。
   **OB 不要走 `.s7dcl`**：SD 文本头不带块号与事件类别，V21 实测 Startup/OB100 的内容导进去一律变成
   「程序循环」OB 且不报错 —— 编写指南与 `ImportFromDocuments` 的警告都已写明。
+- **Unified 画面级事件脚本 `SetUnifiedHmiScreenEventScriptCode`（#38）。** `Loaded` / `Unloaded`
+  （以及 `Tapped` / `ContextTapped`；认 `Cleared`、`OnLoaded`、`OnUnloaded` 别名），处理器不存在就创建。
+  周期刷新的官方写法（Loaded 里 SetInterval、Unloaded 里 ClearInterval）以前整个做不了。
+  SyntaxCheck 与按钮脚本同一规则：默认不跑（#36）。
+- **导入 Unified 脚本模块 `ImportUnifiedHmiScriptModule`（#38）。** `HmiSoftware.Scripts` 只有
+  `Import(DirectoryInfo[, name])`，目录须是 TIA 导出全局脚本的写法：`<名>.hmi.yml`（`ScriptModules` →
+  `<名>` → `ScriptFile`）+ `<名>.hmi.js`（V21 实测）。调用 TIA 之前先查目录并讲明写法；
+  导入前后各列一次模块名，`name` 参数按 TIA 实际接受的基本名传（带 `.hmi.yml` 后缀会返回 false，这里自动剥掉）。
+- **按钮/画面事件脚本写完即读回**（`Meta.readback`）：以前 `setScriptCode=true` 只说明 setter 没抛。
+  读回与写入不符即报错。两条路径共用一个写脚本流程。
 
 ### 安全
 

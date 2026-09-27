@@ -32,6 +32,10 @@ namespace TiaMcpServer.Tests
             Pin("CallTool", s => s.Destructive && s.TouchesPortal && !s.DirectOnly, "inherits the worst case but stays callable");
             Pin("InvokeObject", s => s.Destructive, "generic reflection bridge is destructive");
             Pin("ImportBlock", s => s.Destructive, "imports use Override semantics");
+            Pin("SetUnifiedHmiScreenEventScriptCode", s => s.Destructive && s.Idempotent && s.TouchesPortal && !s.DirectOnly,
+                "writes a screen script; same input, same result (issue #38)");
+            Pin("ImportUnifiedHmiScriptModule", s => s.Destructive && !s.Idempotent && s.TouchesPortal && !s.DirectOnly,
+                "imports can overwrite an existing module (issue #38)");
             Pin("CloseProject", s => s.Destructive, "closing loses unsaved edits");
             Pin("GoOfflineAll", s => s.Destructive && s.OpenWorld, "drops live sessions, including the user's");
             Pin("GetBlocks", s => s.ReadOnly && !s.Destructive && s.Idempotent && s.TouchesPortal && !s.OpenWorld,

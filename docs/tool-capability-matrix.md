@@ -2,8 +2,8 @@
 
 本文件由源码中的 `[McpServerTool]` 静态抽取生成，运行时仍以 `tools/list` 为准。
 
-- 生成时间：2026-09-27 16:35:22
-- 工具数量：223
+- 生成时间：2026-09-27 17:03:20
+- 工具数量：225
 
 ## L0
 
@@ -245,6 +245,8 @@
 | EnsureUnifiedHmiButtonEventHandler | [L2][HMI-Unified]Ensure a Unified HMI button event handler exists and return its API shape. eventType must match HmiButtonEventType. |
 | DescribeUnifiedHmiButtonEventScript | [L2][HMI-Unified]Describe a Unified HMI button event handler Script property and its current object members/attributes. |
 | SetUnifiedHmiButtonEventScriptCode | [L2][HMI-Unified]Set ScriptCode on a Unified HMI button event ScriptDynamization. SyntaxCheck is OFF by default because on TIA V21 it can crash the Portal process and lose the script (issue #36); pass syntaxCheck=true only when you need that evidence. |
+| SetUnifiedHmiScreenEventScriptCode | [L2][HMI-Unified] Set the JavaScript of a Unified HMI SCREEN event (Loaded / Unloaded; also Tapped / ContextTapped), creating the event handler if missing. The standard Unified pattern for periodic refresh is Loaded: TimerId = SetInterval(UpdateValues, 1000); and Unloaded: ClearInterval(TimerId); - without the Unloaded half the timer leaks. Finds screens inside screen groups too. Reads the script back after writing (Meta.readback) and fails if it does not match. SyntaxCheck is OFF by default because on TIA V21 it can crash the Portal process and lose the script (issue #36). Returns Meta.handlerAction (exists\|created) and the event enum type. |
+| ImportUnifiedHmiScriptModule | [L2][HMI-Unified] Import a WinCC Unified script module (shared JavaScript functions used by several screens) into the HMI software's Scripts collection, from a folder holding the module in TIA's export layout: <Name>.hmi.yml ('#Version: 2.0' / 'ScriptModules:' / '  <Name>:' / '    ScriptFile: <Name>.hmi.js') plus <Name>.hmi.js with the JavaScript; the folder is checked before TIA is called. moduleName empty = import every module in the folder (Scripts.Import(DirectoryInfo)); otherwise the module's base name, e.g. MyModule for MyModule.hmi.yml (a .hmi.yml suffix is stripped). Lists the modules before and after: Meta.scripts, Meta.scriptCount, Meta.newModules, Meta.importResult. Fails when TIA returns false, when moduleName is not present afterwards, or when no module exists at all; warns when no new name appeared (an existing module was overwritten). |
 | BuildUnifiedHmiButtonActionScript | [L2][HMI-Unified]Build a safe Unified HMI button action script from a high-level action recipe without connecting to TIA. |
 | EnsureUnifiedHmiButtonAction | [L2][HMI-Unified]Generate and apply a deterministic Unified HMI button action. Only set-bit/reset-bit/toggle-bit are applied; high-risk or TODO recipes are rejected. SyntaxCheck is OFF by default (issue #36: it can crash TIA V21). |
 | EnsureUnifiedHmiDynamization | [L2][HMI-Unified]Ensure a Unified HMI item property dynamization exists using a concrete dynamization type and return its API shape. |

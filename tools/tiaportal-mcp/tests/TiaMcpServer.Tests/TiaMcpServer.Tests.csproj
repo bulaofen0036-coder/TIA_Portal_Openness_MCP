@@ -70,5 +70,8 @@
          ImportFromDocuments 的读回按声明的块名，而不是文件名。 -->
     <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\PlcObXmlBuilder.cs" Link="PlcObXmlBuilder.cs" />
     <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\S7DclHeader.cs" Link="S7DclHeader.cs" />
+    <!-- Unified 画面事件脚本与脚本模块导入（issue #38）：事件名规范化（Enum.Parse 吃数字和逗号列表）
+         与模块目录预检（TIA 只回 false 或一句 "no YAML files"）。 -->
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\UnifiedHmiScriptArgs.cs" Link="UnifiedHmiScriptArgs.cs" />
   </ItemGroup>
 </Project>

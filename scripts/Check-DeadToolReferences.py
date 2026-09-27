@@ -50,6 +50,7 @@ ALLOWED = {
     'ReadLineAsync': '.NET StreamReader 方法（SKILL.md 讲 HTTP 桥的实现）',
     'CompileUnit': 'SimaticML 元素名',
     'SetPoint': 'SKILL.md 示例里的 PLC 变量名',
+    'SetInterval': 'WinCC Unified 运行系统的 JS 函数（HMIRuntime.Timers.SetInterval），画面事件脚本的描述在讲它的用法',
     'ApplyConfiguration': 'Openness ConnectionConfiguration.ApplyConfiguration()',
     'GenerateBlocks': 'Openness PlcExternalSource.GenerateBlocks()',
     'GenerateBlocksFromSource': 'Openness PlcExternalSource.GenerateBlocksFromSource()',

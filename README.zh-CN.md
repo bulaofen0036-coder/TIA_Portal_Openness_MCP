@@ -147,7 +147,7 @@ GetVersionControlStatus(changedOnly=true)
    它会**自动发现一切**：自己的绝对路径、注册表里的博途安装与版本、与版本匹配的 exe（V20/V21 自动选对），然后把 `tia-portal` 条目一次性写进本机检测到的所有 AI 客户端配置——**Claude Desktop / Claude Code / Cursor / VS Code**（原配置自动备份 `.bak`，其它 server 原样保留）。重启 AI 客户端即生效。  
    - 只配某一个宿主：`config --host vscode`（可选 `claude|claude-code|cursor|vscode`）；  
    - 只看不写（手动粘贴其它宿主）：`config --print`；  
-   - **工具档位**：默认就是精简档（62 个核心工具），无需任何参数，见下文《工具档位》；想一次列全 223 个用 `config --full`；  
+   - **工具档位**：默认就是精简档（62 个核心工具），无需任何参数，见下文《工具档位》；想一次列全 225 个用 `config --full`；  
    - **连不上 / 报错**：`tia.cmd doctor` 一键体检（TIA 安装 / exe 版本匹配 / Openness 用户组 / 宿主注册状态，每项给修法；`--fix` 自动补用户组，v2.2.8）；  
    - **拿错 exe 也没关系**：v2.2.7 起 exe 会按实际 TIA 版本**自动转投**正确的兄弟 exe（前提是兄弟 exe 就在包里：Release zip 同时带 V20 与 V21；git 克隆和插件只带 `runtime\v21`，纯 V20 机器请用 Release zip）。  
    - 手动配置兜底：复制 `cursor-mcp.example.json` 片段，把 `REPLACE_ME` 换成本包根目录；exe 路径按上文「两种获取方式」表选（zip 用 `tools\...\bin[-v20]\Release\net48`，git clone 用 `runtime\v21`）；非标准安装位置在 `args` 加 `--tia-portal-location "<安装根>" --tia-major-version <20|21>`。
@@ -159,12 +159,12 @@ GetVersionControlStatus(changedOnly=true)
 
 ## 工具档位：精简（默认）与完整
 
-服务端共 **223** 个工具，但默认**只在 `tools/list` 里列出 62 个**。这不是裁能力，是裁上下文——两个原因都是硬的：
+服务端共 **225** 个工具，但默认**只在 `tools/list` 里列出 62 个**。这不是裁能力，是裁上下文——两个原因都是硬的：
 
-- **成本**：223 个工具的 `tools/list` 约 **196 KB（按 4 字符/token 估约 49,000 tokens）**，宿主每一轮对话都要把它重发给模型。精简档约 **57 KB（约 14,000 tokens）**，每轮省掉约七成，模型也不必在 200 多个名字里挑。
+- **成本**：225 个工具的 `tools/list` 约 **196 KB（按 4 字符/token 估约 49,000 tokens）**，宿主每一轮对话都要把它重发给模型。精简档约 **57 KB（约 14,000 tokens）**，每轮省掉约七成，模型也不必在 200 多个名字里挑。
 - **兼容**：VS Code / GitHub Copilot 的 agent 模式**超过 128 个工具直接报错不干活**，Windsurf 上限 100。全量档在这两个宿主上根本加载不起来。
 
-**能力一个不少。** 没列出来的 161 个工具随用随取：
+**能力一个不少。** 没列出来的 163 个工具随用随取：
 
 ```
 FindTools("watch table")                     → 列出匹配的工具名、参数签名、完整说明
@@ -176,7 +176,7 @@ CallTool("ExportPlcWatchTable", "{...}")     → 照常执行，跟直接调用�
 | 档位 | 怎么开 | 列出工具 | 每轮 schema 开销 |
 |---|---|---|---|
 | 精简（默认） | 什么都不用做 | 62 | ~14,000 tokens |
-| 完整 | `config --full`，或 `TiaMcpServer.exe --profile full`，或环境变量 `TIA_MCP_PROFILE=full` | 223 | ~49,000 tokens |
+| 完整 | `config --full`，或 `TiaMcpServer.exe --profile full`，或环境变量 `TIA_MCP_PROFILE=full` | 225 | ~49,000 tokens |
 
 完整档只在「宿主不限工具数、且你就是想让模型直接看到全部」时才有意义；VS Code/Copilot、Windsurf 上不要用。
 

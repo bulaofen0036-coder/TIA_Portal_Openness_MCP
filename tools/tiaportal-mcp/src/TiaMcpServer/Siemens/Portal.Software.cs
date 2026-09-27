@@ -3170,93 +3170,266 @@ namespace TiaMcpServer.Siemens
             return RunHmiStepTool("SetUnifiedHmiButtonEventScriptCode", meta =>
             {
                 var handler = ResolveHmiButtonEventHandlerOrThrow(hmiSoftwarePath, screenName, buttonName, eventType);
-                var script = TryGetPropertyValue(handler, "Script");
-                if (script == null)
-                {
-                    throw new InvalidOperationException($"Script object is null on '{buttonName}.{eventType}'. Ensure the event handler exists first.");
-                }
-
-                var setScriptCode = TrySetProperty(script, "ScriptCode", scriptCode ?? string.Empty);
-                var setGlobalCode = TrySetProperty(script, "GlobalDefinitionAreaScriptCode", globalDefinitionAreaScriptCode ?? string.Empty);
-                var setAsync = TrySetProperty(script, "Async", async);
-
-                meta["scriptType"] = script.GetType().FullName;
-                meta["setScriptCode"] = setScriptCode;
-                meta["setGlobalDefinitionAreaScriptCode"] = setGlobalCode;
-                meta["setAsync"] = setAsync;
-
-                // 写不进去就到此为止：ScriptCode 都没落下，再去跑 SyntaxCheck 只是拿一个
-                // 已知会弄崩 V21 的调用，去检查一份根本不存在的脚本。这个判断以前排在
-                // SyntaxCheck 之后，等于先冒一次崩溃风险，才发现这一步本来就该失败。
-                if (!setScriptCode)
-                {
-                    throw new InvalidOperationException($"ScriptCode property could not be written on {script.GetType().FullName}.");
-                }
-
-                // SyntaxCheck 默认不跑（issue #36）：TIA V21 上对 Unified 的 Script 对象调
-                // SyntaxCheck() 会偶发抛 NonRecoverableException 并带走整个 Portal 进程，
-                // 脚本已写进内存却随进程一起丢掉。检查是可选的增值动作，不该让「写脚本」
-                // 这件必须成功的事去赌它。需要证据的调用方显式传 syntaxCheck: true。
-                meta["syntaxCheckRequested"] = syntaxCheck;
-                if (!syntaxCheck)
-                {
-                    // 不发 syntaxErrorCount：缺席必须读成「没查」，而不是「查了 0 个错」。
-                    meta["syntaxCheckStatus"] = "skipped";
-                    meta["syntaxCheckSkippedReason"] =
-                        "SyntaxCheck was not run (default). On TIA V21 it can crash the Portal process " +
-                        "(NonRecoverableException) and take the just-written ScriptCode with it. " +
-                        "Pass syntaxCheck=true only when you need the evidence and can afford the risk.";
-                }
-                else
-                {
-                    object? syntaxResult = null;
-                    try
-                    {
-                        syntaxResult = script.GetType().GetMethod("SyntaxCheck", Type.EmptyTypes)?.Invoke(script, Array.Empty<object>());
-                        if (syntaxResult != null)
-                        {
-                            var syntaxErrors = TryGetEnumerableStrings(syntaxResult, "Errors").ToList();
-                            var syntaxWarnings = TryGetEnumerableStrings(syntaxResult, "Warnings").ToList();
-                            meta["syntaxCheckStatus"] = "ran";
-                            meta["syntaxResultType"] = syntaxResult.GetType().FullName;
-                            meta["syntaxResult"] = syntaxResult.ToString();
-                            meta["syntaxErrors"] = ToJsonArray(syntaxErrors);
-                            meta["syntaxWarnings"] = ToJsonArray(syntaxWarnings);
-                            meta["syntaxErrorCount"] = syntaxErrors.Count;
-                            meta["syntaxWarningCount"] = syntaxWarnings.Count;
-                            meta["syntaxPropertyName"] = TryGetPropertyValue(syntaxResult, "PropertyName")?.ToString() ?? string.Empty;
-                            meta["syntaxMembers"] = string.Join(" | ", DescribeMembers(syntaxResult, 80).Select(m => $"{m.Kind}:{m.Name}:{m.Type}"));
-                        }
-                        else
-                        {
-                            // 这个 Script 类型上根本没有 SyntaxCheck 方法，同样不是「0 个错」。
-                            meta["syntaxCheckStatus"] = "unavailable";
-                            meta["syntaxCheckSkippedReason"] = $"No SyntaxCheck() method on {script.GetType().FullName}.";
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        var real = ex is TargetInvocationException tie && tie.InnerException != null ? tie.InnerException : ex;
-                        meta["syntaxCheckStatus"] = "faulted";
-                        meta["syntaxError"] = $"{real.GetType().FullName}: {real.Message}";
-
-                        // NonRecoverableException 不是「这一步没做成」，是 Portal 进程已经没了。
-                        // 刚写进去的 ScriptCode 没保存就随进程消失，这时候再返回 Success 是在撒谎。
-                        if (ModelContextProtocol.PortalFailureClassifier.IsPortalProcessLost(real))
-                        {
-                            throw new InvalidOperationException(
-                                "SyntaxCheck killed the TIA Portal process (" + real.GetType().Name + "). " +
-                                "The ScriptCode was written in memory but is NOT saved - the whole session is gone. " +
-                                "Reconnect, re-apply the script with syntaxCheck=false, and save. This is issue #36.", real);
-                        }
-                    }
-                }
+                ApplyEventScript(handler, $"{buttonName}.{eventType}", scriptCode, globalDefinitionAreaScriptCode, async, syntaxCheck, meta);
 
                 return syntaxCheck
                     ? $"ScriptCode set for '{buttonName}.{eventType}'."
                     : $"ScriptCode set for '{buttonName}.{eventType}' (SyntaxCheck skipped by default; see syntaxCheckSkippedReason).";
             });
         }
+
+        /// <summary>
+        /// 画面级事件脚本（issue #38）：HmiScreen.EventHandlers.Find/Create(HmiScreenEventType) → Script。
+        /// WinCC Unified 周期刷新的官方写法就是 Loaded 里 SetInterval、Unloaded 里 ClearInterval；
+        /// 以前只有按钮级事件够得着，这一类需求整个做不了。写法与按钮事件共用 ApplyEventScript。
+        /// </summary>
+        public ResponseMessage SetUnifiedHmiScreenEventScriptCode(string hmiSoftwarePath, string screenName, string eventType, string scriptCode, string globalDefinitionAreaScriptCode = "", bool async = false, bool syntaxCheck = false)
+        {
+            return RunHmiStepTool("SetUnifiedHmiScreenEventScriptCode", meta =>
+            {
+                var screen = ResolveHmiScreenOrThrow(hmiSoftwarePath, screenName);
+                var handler = ResolveScreenEventHandler(screen, screenName, eventType, out var action, out var enumType, out var eventName);
+                meta["handlerAction"] = action;
+                meta["eventEnumType"] = enumType.FullName;
+                meta["eventType"] = eventName;
+
+                ApplyEventScript(handler, $"{screenName}.{eventName}", scriptCode, globalDefinitionAreaScriptCode, async, syntaxCheck, meta);
+
+                return $"ScriptCode set for screen event '{screenName}.{eventName}' (handler {action})"
+                    + (syntaxCheck ? "." : "; SyntaxCheck skipped by default, see syntaxCheckSkippedReason.");
+            });
+        }
+
+        /// <summary>
+        /// 导入 Unified 脚本模块（issue #38）：HmiSoftware.Scripts 是 HmiScriptModuleComposition，
+        /// 只有 Import(DirectoryInfo) / Import(DirectoryInfo, string) 两个入口（返回 bool），没有 Create。
+        /// 导入前后各取一次模块名做对比 —— Import 返回 true 不等于模块真的出现了。
+        /// </summary>
+        public ResponseMessage ImportUnifiedHmiScriptModule(string hmiSoftwarePath, string importDirectory, string moduleName = "")
+        {
+            return RunHmiStepTool("ImportUnifiedHmiScriptModule", meta =>
+            {
+                var files = ModelContextProtocol.UnifiedHmiScriptArgs.ValidateModuleFolder(importDirectory, moduleName);
+                var wanted = ModelContextProtocol.UnifiedHmiScriptArgs.NormalizeModuleName(moduleName);
+                var named = wanted.Length > 0;
+                meta["hmiSoftwarePath"] = hmiSoftwarePath;
+                meta["importDirectory"] = importDirectory;
+                meta["moduleName"] = wanted;
+                meta["files"] = ToJsonArray(files);
+
+                var sw = ResolveHmiSoftwareOrThrow(hmiSoftwarePath);
+                var scripts = TryGetPropertyValue(sw, "Scripts")
+                    ?? throw new InvalidOperationException($"'{hmiSoftwarePath}' has no Scripts collection: script modules exist only on WinCC Unified HMI software.");
+
+                var before = ScriptModuleNames(scripts);
+                var import = named
+                    ? scripts.GetType().GetMethod("Import", new[] { typeof(DirectoryInfo), typeof(string) })
+                    : scripts.GetType().GetMethod("Import", new[] { typeof(DirectoryInfo) });
+                if (import == null)
+                    throw new InvalidOperationException($"{scripts.GetType().FullName} has no Import({(named ? "DirectoryInfo, string" : "DirectoryInfo")}) on this TIA version.");
+
+                object? result;
+                try
+                {
+                    result = import.Invoke(scripts, named
+                        ? new object[] { new DirectoryInfo(importDirectory), wanted }
+                        : new object[] { new DirectoryInfo(importDirectory) });
+                }
+                catch (TargetInvocationException tie) when (tie.InnerException != null)
+                {
+                    throw new InvalidOperationException($"Scripts.Import failed: {tie.InnerException.Message}", tie.InnerException);
+                }
+
+                // 读回要重新取 HmiSoftware.Scripts：导入前拿到的那个集合对象看不见新导入的模块
+                // （V21 实测：Import 返回 true，同一对象枚举仍为空；覆盖导入时还会枚举到已释放的旧模块）。
+                var after = ScriptModuleNames(TryGetPropertyValue(sw, "Scripts") ?? scripts);
+                var added = ModelContextProtocol.UnifiedHmiScriptArgs.NewNames(before, after);
+                meta["importResult"] = result is bool r ? JsonValue.Create(r) : null;
+                meta["scripts"] = ToJsonArray(after);
+                meta["scriptCount"] = after.Count;
+                meta["newModules"] = ToJsonArray(added);
+
+                if (result is bool ok && !ok)
+                    throw new InvalidOperationException(
+                        $"Scripts.Import returned false: TIA imported nothing from '{importDirectory}' (files: {string.Join(", ", files)}). "
+                        + ModelContextProtocol.UnifiedHmiScriptArgs.LayoutHint);
+                if (named && !after.Contains(wanted, StringComparer.OrdinalIgnoreCase))
+                    throw new InvalidOperationException(
+                        $"Scripts.Import returned {result ?? "null"}, but no module named '{wanted}' exists afterwards. Modules now: {string.Join(", ", after)}.");
+                if (after.Count == 0)
+                    throw new InvalidOperationException($"Scripts.Import returned {result ?? "null"}, but the HMI still has no script modules.");
+                if (added.Length == 0)
+                    meta["warning"] = "No new module name appeared: an existing module with the same name was probably overwritten.";
+
+                return added.Length > 0
+                    ? $"Imported script module(s) {string.Join(", ", added)} into '{hmiSoftwarePath}'."
+                    : $"Script module import into '{hmiSoftwarePath}' finished; no new module name (existing module overwritten?).";
+            });
+        }
+
+        private static List<string> ScriptModuleNames(object scripts)
+        {
+            var names = new List<string>();
+            if (scripts is IEnumerable enumerable)
+            {
+                foreach (var entry in enumerable)
+                {
+                    string? name = null;
+                    try { name = entry == null ? null : TryGetPropertyValue(entry, "Name")?.ToString(); }
+                    catch { /* 覆盖导入后旧模块对象已释放：跳过，不让读回本身失败 */ }
+                    if (!string.IsNullOrWhiteSpace(name)) names.Add(name!);
+                }
+            }
+            return names;
+        }
+
+        /// <summary>
+        /// 画面事件处理器：枚举类型取自 EventHandlers.Create(enum) 的参数（V21 为 HmiScreenEventType：
+        /// None/Tapped/ContextTapped/Loaded/Unloaded），事件名先经 NormalizeEventName 规范化。
+        /// </summary>
+        private static object ResolveScreenEventHandler(object screen, string screenName, string eventType, out string action, out Type enumType, out string eventName)
+        {
+            var eventHandlers = TryGetPropertyValue(screen, "EventHandlers")
+                ?? throw new InvalidOperationException($"EventHandlers not found on screen '{screenName}'.");
+
+            var create = eventHandlers.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                .FirstOrDefault(m => m.Name == "Create" && m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType.IsEnum)
+                ?? throw new InvalidOperationException($"Create(enum) not found on {eventHandlers.GetType().FullName}.");
+
+            enumType = create.GetParameters()[0].ParameterType;
+            eventName = ModelContextProtocol.UnifiedHmiScriptArgs.NormalizeEventName(eventType, Enum.GetNames(enumType));
+            var enumValue = Enum.Parse(enumType, eventName);
+            var eventEnumType = enumType;
+
+            var find = eventHandlers.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                .FirstOrDefault(m => m.Name == "Find" && m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == eventEnumType);
+            var handler = find?.Invoke(eventHandlers, new[] { enumValue });
+            if (handler != null)
+            {
+                action = "exists";
+                return handler;
+            }
+
+            handler = InvokeCreate(create, eventHandlers, new[] { enumValue })
+                ?? throw new InvalidOperationException($"Screen event handler '{eventName}' create returned null.");
+            action = "created";
+            return handler;
+        }
+
+        /// <summary>
+        /// 按钮事件与画面事件共用的写脚本流程：写 ScriptCode / 全局定义区 / Async → 读回核对 →
+        /// 按需 SyntaxCheck（默认不跑，issue #36）。读回是新增的：以前 setScriptCode=true 只说明
+        /// setter 没抛，不说明读回来是同一段代码。
+        /// </summary>
+        private static void ApplyEventScript(object handler, string target, string scriptCode, string globalDefinitionAreaScriptCode, bool async, bool syntaxCheck, JsonObject meta)
+        {
+            var script = TryGetPropertyValue(handler, "Script");
+            if (script == null)
+            {
+                throw new InvalidOperationException($"Script object is null on '{target}'. Ensure the event handler exists first.");
+            }
+
+            var wantCode = scriptCode ?? string.Empty;
+            var wantGlobal = globalDefinitionAreaScriptCode ?? string.Empty;
+            var setScriptCode = TrySetProperty(script, "ScriptCode", wantCode);
+            var setGlobalCode = TrySetProperty(script, "GlobalDefinitionAreaScriptCode", wantGlobal);
+            var setAsync = TrySetProperty(script, "Async", async);
+
+            meta["scriptType"] = script.GetType().FullName;
+            meta["setScriptCode"] = setScriptCode;
+            meta["setGlobalDefinitionAreaScriptCode"] = setGlobalCode;
+            meta["setAsync"] = setAsync;
+
+            // 写不进去就到此为止：ScriptCode 都没落下，再去跑 SyntaxCheck 只是拿一个
+            // 已知会弄崩 V21 的调用，去检查一份根本不存在的脚本。这个判断以前排在
+            // SyntaxCheck 之后，等于先冒一次崩溃风险，才发现这一步本来就该失败。
+            if (!setScriptCode)
+            {
+                throw new InvalidOperationException($"ScriptCode property could not be written on {script.GetType().FullName}.");
+            }
+
+            // 读回核对（换行按 \n 归一后逐字比较）。调用方要求的非默认值没落下同样算失败。
+            var codeMatches = SameScriptText(TryGetPropertyValue(script, "ScriptCode")?.ToString(), wantCode);
+            var globalMatches = SameScriptText(TryGetPropertyValue(script, "GlobalDefinitionAreaScriptCode")?.ToString(), wantGlobal);
+            var readAsync = TryGetPropertyValue(script, "Async");
+            var asyncMatches = readAsync is bool ra && ra == async;
+            meta["readback"] = new JsonObject
+            {
+                ["scriptCodeMatches"] = codeMatches,
+                ["globalDefinitionMatches"] = globalMatches,
+                ["asyncMatches"] = asyncMatches
+            };
+            var notApplied = new List<string>();
+            if (!codeMatches) notApplied.Add("ScriptCode");
+            if (!globalMatches && wantGlobal.Length > 0) notApplied.Add("GlobalDefinitionAreaScriptCode");
+            if (!asyncMatches && async) notApplied.Add("Async");
+            if (notApplied.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Read-back of '{target}' does not match what was written: {string.Join(", ", notApplied)}. The script is NOT as requested.");
+            }
+
+            // SyntaxCheck 默认不跑（issue #36）：TIA V21 上对 Unified 的 Script 对象调
+            // SyntaxCheck() 会偶发抛 NonRecoverableException 并带走整个 Portal 进程，
+            // 脚本已写进内存却随进程一起丢掉。检查是可选的增值动作，不该让「写脚本」
+            // 这件必须成功的事去赌它。需要证据的调用方显式传 syntaxCheck: true。
+            meta["syntaxCheckRequested"] = syntaxCheck;
+            if (!syntaxCheck)
+            {
+                // 不发 syntaxErrorCount：缺席必须读成「没查」，而不是「查了 0 个错」。
+                meta["syntaxCheckStatus"] = "skipped";
+                meta["syntaxCheckSkippedReason"] =
+                    "SyntaxCheck was not run (default). On TIA V21 it can crash the Portal process " +
+                    "(NonRecoverableException) and take the just-written ScriptCode with it. " +
+                    "Pass syntaxCheck=true only when you need the evidence and can afford the risk.";
+                return;
+            }
+
+            object? syntaxResult = null;
+            try
+            {
+                syntaxResult = script.GetType().GetMethod("SyntaxCheck", Type.EmptyTypes)?.Invoke(script, Array.Empty<object>());
+                if (syntaxResult != null)
+                {
+                    var syntaxErrors = TryGetEnumerableStrings(syntaxResult, "Errors").ToList();
+                    var syntaxWarnings = TryGetEnumerableStrings(syntaxResult, "Warnings").ToList();
+                    meta["syntaxCheckStatus"] = "ran";
+                    meta["syntaxResultType"] = syntaxResult.GetType().FullName;
+                    meta["syntaxResult"] = syntaxResult.ToString();
+                    meta["syntaxErrors"] = ToJsonArray(syntaxErrors);
+                    meta["syntaxWarnings"] = ToJsonArray(syntaxWarnings);
+                    meta["syntaxErrorCount"] = syntaxErrors.Count;
+                    meta["syntaxWarningCount"] = syntaxWarnings.Count;
+                    meta["syntaxPropertyName"] = TryGetPropertyValue(syntaxResult, "PropertyName")?.ToString() ?? string.Empty;
+                    meta["syntaxMembers"] = string.Join(" | ", DescribeMembers(syntaxResult, 80).Select(m => $"{m.Kind}:{m.Name}:{m.Type}"));
+                }
+                else
+                {
+                    // 这个 Script 类型上根本没有 SyntaxCheck 方法，同样不是「0 个错」。
+                    meta["syntaxCheckStatus"] = "unavailable";
+                    meta["syntaxCheckSkippedReason"] = $"No SyntaxCheck() method on {script.GetType().FullName}.";
+                }
+            }
+            catch (Exception ex)
+            {
+                var real = ex is TargetInvocationException tie && tie.InnerException != null ? tie.InnerException : ex;
+                meta["syntaxCheckStatus"] = "faulted";
+                meta["syntaxError"] = $"{real.GetType().FullName}: {real.Message}";
+
+                // NonRecoverableException 不是「这一步没做成」，是 Portal 进程已经没了。
+                // 刚写进去的 ScriptCode 没保存就随进程消失，这时候再返回 Success 是在撒谎。
+                if (ModelContextProtocol.PortalFailureClassifier.IsPortalProcessLost(real))
+                {
+                    throw new InvalidOperationException(
+                        "SyntaxCheck killed the TIA Portal process (" + real.GetType().Name + "). " +
+                        "The ScriptCode was written in memory but is NOT saved - the whole session is gone. " +
+                        "Reconnect, re-apply the script with syntaxCheck=false, and save. This is issue #36.", real);
+                }
+            }
+        }
+
+        private static bool SameScriptText(string? actual, string expected) =>
+            actual != null && string.Equals(actual.Replace("\r\n", "\n"), expected.Replace("\r\n", "\n"), StringComparison.Ordinal);
 
         public ResponseMessage EnsureUnifiedHmiDynamization(string hmiSoftwarePath, string screenName, string itemName, string propertyName, string dynamizationType = "")
         {

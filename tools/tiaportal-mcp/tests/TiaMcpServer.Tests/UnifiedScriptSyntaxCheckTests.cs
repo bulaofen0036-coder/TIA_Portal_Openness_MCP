@@ -82,6 +82,16 @@ namespace TiaMcpServer.Tests
             check(tool.Contains("bool syntaxCheck = false)"),
                 "MCP 工具暴露的 syntaxCheck 必须默认 false（issue #36）");
 
+            // 画面事件脚本（issue #38）走同一个 ApplyEventScript，也必须默认不查。
+            check(portal.Contains("public ResponseMessage SetUnifiedHmiScreenEventScriptCode(string hmiSoftwarePath, string screenName, string eventType, string scriptCode, string globalDefinitionAreaScriptCode = \"\", bool async = false, bool syntaxCheck = false)"),
+                "Portal.SetUnifiedHmiScreenEventScriptCode 的 syntaxCheck 必须默认 false（issue #38 沿用 #36）");
+            var screenTool = tool.IndexOf("public static ResponseMessage SetUnifiedHmiScreenEventScriptCode(", StringComparison.Ordinal);
+            var screenToolEnd = screenTool < 0 ? -1 : tool.IndexOf("{", screenTool, StringComparison.Ordinal);
+            check(screenTool > 0 && screenToolEnd > screenTool && tool.Substring(screenTool, screenToolEnd - screenTool).Contains("bool syntaxCheck = false)"),
+                "MCP 工具 SetUnifiedHmiScreenEventScriptCode 暴露的 syntaxCheck 必须默认 false");
+            check(portal.Contains("ApplyEventScript(handler, $\"{buttonName}.{eventType}\"") && portal.Contains("ApplyEventScript(handler, $\"{screenName}.{eventName}\""),
+                "按钮事件与画面事件共用同一个写脚本流程（读回 + SyntaxCheck 规则只有一份）");
+
             // 默认关闭时绝不能发 syntaxErrorCount：调用方读到「没有这个键」必须理解成
             // 「没查」。发一个 0 出去，等于把「没做检查」谎报成「检查通过」。
             check(portal.Contains("meta[\"syntaxCheckStatus\"] = \"skipped\"") &&
