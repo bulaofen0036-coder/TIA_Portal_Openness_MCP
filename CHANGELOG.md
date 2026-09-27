@@ -1,5 +1,79 @@
 ﻿# Change Log
 
+## [Unreleased] - 审查与加固：并发、CallTool、HTTP 桥、下载安全、假成功
+
+对照 Openness 手册（V18–V21，本地 RAG）逐项核过的一轮审查。`runtime/v21` 未重新构建，
+这些修复要等下次发版构建引擎才会到用户手里（`Validate-Bundle.ps1` 现在会就此给出警告）。
+
+### 修复
+
+- **引擎在部分 V21 机器上根本起不来。** 只认 `_InstalledSW\TIAP21\TIA_Opns\Path`，而 V21
+  安装（实测 V21 Upd2 装在非 C: 盘）不写这个值：启动即 `Could not find DLL
+  'Siemens.Engineering.Base'`，MCP 宿主只看到一句 "Connection closed"。现在按手册的
+  程序集注册表位置 `Openness\21.0\PublicAPI\…` 兜底定位，版本自动探测也认它。
+- **Openness 调用从不串行。** SDK 对每个请求各起一个任务，宿主并行发来的几个 `tools/call`
+  会同时进入进程级单例 `Portal`。现在所有需要博途句柄的工具过同一把闸（排队期间取消就放弃）。
+- **CallTool 对 9 个工具是坏的。** 异步工具返回的是被序列化的 `Task` 对象而不是结果；
+  带 `IMcpServer`/`RequestContext` 注入参数的工具（ExportBlocks、ExportTypes、
+  ImportBlocksFromDocuments…）永远报缺参。现在按直接调用的方式等待结果、填注入参数、
+  原样返回目标工具的响应；多余/拼错的参数名在执行前就拒绝；失败 `isError=true`。
+- **参数名大小写被静默忽略。** SDK 按参数名精确绑定（实测 `FindTools({"Query":…})` 不报错、
+  query 被丢掉），而参数诊断按不区分大小写放行。现在诊断区分大小写并给出正确拼写。
+  原来那条「大小写不同不算错」的离线哨兵是按错误前提写的，已改为钉住实测行为。
+- **HTTP 桥超时一次就连累后续所有请求。** 超时的请求留下的读线程继续读共享流，吞掉下一条响应。
+  改为单读线程 + 按 id 路由；超时默认 600 s（`--http-timeout-seconds`），超时时向引擎发
+  `notifications/cancelled`；引擎挂掉时立即 502 而不是一路超时。
+- **GoOffline 吞掉了自己抛的异常**，以普通消息返回；现在报错，并回读状态确认已离线。
+- **GoOnline 的 `ipAddress` 从未生效。** 代码找一个不存在的 `GoOnline(address)` 重载，
+  找不到就静默用组态地址。改为手册的做法：`ConnectionConfiguration.ApplyConfiguration`
+  选路由后再 `GoOnline()`；已在线时明确报错（手册：在线时调用会抛异常）。异常不再伪装成
+  `NotReachable` 状态。
+- **CheckDownloadReadiness 的 `IsConsistent` 是写死的 true。** 现在逐块读 `IsConsistent`，
+  未编译的块/类型列入 `Issues`。
+- **下载后 CPU 可能停在 STOP。** 手册在下载**后**委托里处理 `StartModules`，而这里的
+  后委托是空的。前后两个委托现在用同一张应答表。
+- **`DataBlockReinitialization` 的应答不是该枚举的成员**（手册：`StopPlcAndReinitialize` /
+  `NoAction`），应答设不进去、下载无声失败。已改正；设不进去的应答不再被吞，会说明合法取值。
+- **MoveBlockToGroup 失败会丢块。** 先删后导，导入失败时 `finally` 把唯一的导出副本也删了。
+  现在导入失败先放回原组，放不回就保留导出文件并给出恢复命令。
+- **ImportBlocksFromDirectory(overwrite=false) 在 `Find` 失败时照样覆盖导入**，
+  导入结果为空也记成成功。两处都改为记失败。
+- **OpenProject 先关当前工程再校验路径**，路径写错就白白丢掉未保存的修改。改为先校验。
+- **CloseProject 会关掉用户自己的工程。** 与 Open/Create 一样加 `closeForeignProject` 守卫。
+  另：经 `Projects.Open` 兜底或 `OpenSession` 打开的工程原来被当成「用户的」。
+- **SetWatchTableModifyValue 忽略写入结果**，没写进去也报「已设置」；各失败分支现在都报错。
+- **DownloadToPlc：`Ok=false` 但没有错误文本时按成功返回**；现在任何失败都 `isError=true`。
+
+### 安全
+
+- **中止正在运行的测试/调试功能改为显式选择**：新参数 `abortActiveTests`（默认 false）。
+  手册：`ActiveTestCanBeAborted=AcceptAll` 会在装载时取消测试与调试功能。
+  每次下载的全部提示及应答写在 `Meta.downloadPrompts`。
+- **会动 CPU 或删工程数据的 7 个工具**（DownloadToPlc、GoOnline、SetWatchTableModifyValue、
+  DeletePlc*）在默认精简档里以本名列出，`CallTool` 拒绝转发它们（宿主的逐工具审批因此能看到真名）；
+  `InvokeObject`/`InvokeService` 带 `allowWrite=true` 同样拒绝经 `CallTool` 调用。
+- **全部工具带 MCP annotations**（readOnly / destructive / idempotent / openWorld），
+  由一张 `ToolSafety` 表统一给出；原来一个都没有，按规范默认值每个工具都「可能破坏」。
+- **HTTP**：前缀监听回环以外的地址且没有 API key 时拒绝启动；拒绝非本机 `Origin` 的浏览器请求；
+  key 可用环境变量 `TIA_MCP_HTTP_API_KEY` 提供，并从启动日志中抹掉；比较改为定长时间。
+
+### 优化
+
+- 工具返回的 JSON 文本不再把每个引号、汉字转义成 `\uXXXX`（模型读到的就是这些转义），
+  中文内容的响应因此小数倍；大响应寄存的头部同理。
+- 按名解析类型的整个 AppDomain 扫描结果缓存；块/类型遍历的名称正则只编译一次；
+  导入用的临时 XML 不再无限堆积。
+
+### 文档 / 工程
+
+- 插件的 MCP 配置内联进 `.claude-plugin/plugin.json`，删除根目录 `.mcp.json`（在克隆出来的仓库里
+  `${CLAUDE_PLUGIN_ROOT}` 无法展开，服务器起不来）；`plugin.json` 版本号从 2.2.5 更正为 2.7.3。
+- 握手指令与编写指南里点名的 `ImportBlocksFromScl` 早已下线，改为 `ImportBlocksFromDocuments`；
+  死引用闸现在也扫握手指令、Bootstrap 文案和 SKILL.md。
+- 工具数量在 README / SKILL / 配置脚本 / 清单里统一为实数（222，精简档 62）。
+  能力矩阵生成器不再把带 `\"` 的描述截坏。
+- 离线回归：163 → 272 条（工具安全表、CallTool 绑定与调用、HTTP 路由与安全、下载提示应答）。
+
 ## [2.7.3] - 2026-09-16 - 写 Unified JS 脚本不再赌上整个博途进程；画面分组里的画面不再隐形
 
 ### 修复

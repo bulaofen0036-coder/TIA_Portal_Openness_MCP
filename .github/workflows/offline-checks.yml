@@ -9,6 +9,9 @@ on:
     branches: [master]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   offline-tests:
     # 回归套件是**控制台 Exe**，不是 VSTest 工程：

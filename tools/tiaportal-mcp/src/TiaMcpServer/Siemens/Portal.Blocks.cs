@@ -421,6 +421,23 @@ namespace TiaMcpServer.Siemens
         //   2) Encoding/BOM: block/type XML carrying Chinese comments must be UTF-8 *with BOM*
         //      or TIA imports the text as mojibake (中文乱码). Callers (and the model that wrote
         //      the file) frequently emit BOM-less UTF-8, so we always re-emit with a BOM here.
+        private const string ImportCopyPrefix = "tia_mcp_import_";
+
+        /// <summary>Every rewritten import used to leave its temp copy behind for good. The import reads
+        /// the file synchronously, so a copy older than an hour is certainly finished with.</summary>
+        private static void PruneOldImportCopies()
+        {
+            try
+            {
+                var cutoff = DateTime.UtcNow.AddHours(-1);
+                foreach (var f in Directory.EnumerateFiles(Path.GetTempPath(), ImportCopyPrefix + "*.xml"))
+                {
+                    try { if (File.GetLastWriteTimeUtc(f) < cutoff) File.Delete(f); } catch { /* in use or gone */ }
+                }
+            }
+            catch { /* best effort */ }
+        }
+
         private static string PrepareXmlForImport(string path)
         {
             try
@@ -441,7 +458,8 @@ namespace TiaMcpServer.Siemens
                 // Already correct: version matches (or unknown) AND a BOM is present -> import as-is.
                 if (fixedText == text && hasBom) return path;
 
-                var tmp = Path.Combine(Path.GetTempPath(), "tia_mcp_import_" + Guid.NewGuid().ToString("N") + ".xml");
+                PruneOldImportCopies();
+                var tmp = Path.Combine(Path.GetTempPath(), ImportCopyPrefix + Guid.NewGuid().ToString("N") + ".xml");
                 File.WriteAllText(tmp, fixedText, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
                 return tmp;
             }
@@ -570,29 +588,38 @@ namespace TiaMcpServer.Siemens
 
                         if (!overwrite)
                         {
+                            // overwrite=false is a promise not to replace anything. If we cannot check
+                            // whether the block exists, we cannot keep it, so this file is skipped -
+                            // it used to fall through and import with Override anyway.
+                            PlcBlock? exists;
                             try
                             {
-                                var exists = group.Blocks.Find(name);
-                                if (exists != null)
-                                {
-                                    failed.Add(new ImportFailure { Path = file, Error = $"Block '{name}' already exists (overwrite=false)" });
-                                    continue;
-                                }
+                                exists = group.Blocks.Find(name);
                             }
-                            catch
+                            catch (Exception fx)
                             {
-                                // best effort only; if Find fails, we still import with Override semantics below
+                                failed.Add(new ImportFailure { Path = file, Error = $"Could not check whether block '{name}' already exists ({fx.Message}); not imported because overwrite=false" });
+                                continue;
+                            }
+                            if (exists != null)
+                            {
+                                failed.Add(new ImportFailure { Path = file, Error = $"Block '{name}' already exists (overwrite=false)" });
+                                continue;
                             }
                         }
 
                         var list = group.Blocks.Import(fi, ImportOptions.Override);
-                        if (list != null && list.Count > 0)
+                        var names = list?.Select(b => b?.Name).Where(n => !string.IsNullOrWhiteSpace(n)).Cast<string>().ToList()
+                                    ?? new List<string>();
+                        if (names.Count > 0)
                         {
-                            imported.AddRange(list.Select(b => b?.Name).Where(n => !string.IsNullOrWhiteSpace(n))!.Cast<string>());
+                            imported.AddRange(names);
                         }
                         else
                         {
-                            imported.Add(name);
+                            // An import that yields no block did not import anything; it used to be
+                            // counted as imported under the file name.
+                            failed.Add(new ImportFailure { Path = file, Error = "Import returned no block (nothing was imported)" });
                         }
                     }
                     catch (Exception ex)

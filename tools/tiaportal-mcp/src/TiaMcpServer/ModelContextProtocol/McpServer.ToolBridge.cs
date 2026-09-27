@@ -1,20 +1,23 @@
+using ModelContextProtocol;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace TiaMcpServer.ModelContextProtocol
 {
     // The escape hatch that lets the lite roster be the default without losing anything.
     //
-    // Shipping all 212 tools costs ~40k tokens of JSON schema in every single turn and
-    // exceeds what Copilot (128) and Windsurf (100) will even load. Shipping only the ~48
-    // lite tools fixes that but used to be a dead end: a model in lite could not reach
+    // Shipping the whole roster costs ~40k tokens of JSON schema in every single turn and
+    // exceeds what Copilot (128) and Windsurf (100) will even load. Shipping only the lite
+    // tools fixes that but used to be a dead end: a model in lite could not reach
     // ExportPlcWatchTable at all, and had no way to find out it existed.
     //
     // FindTools + CallTool close that gap: two tools (~700 tokens) buy on-demand access to
@@ -23,7 +26,7 @@ namespace TiaMcpServer.ModelContextProtocol
     // pattern that Anthropic, VS Code and the agent gateways all converged on during 2025-26.
     public static partial class McpServer
     {
-        // name -> the static method carrying [McpServerTool]. Built once; ~212 entries.
+        // name -> the static method carrying [McpServerTool]. Built once.
         private static Dictionary<string, MethodInfo>? _allToolMethods;
 
         private static Dictionary<string, MethodInfo> AllToolMethods()
@@ -46,40 +49,16 @@ namespace TiaMcpServer.ModelContextProtocol
             return d == null ? "" : d.Description;
         }
 
-        /// <summary>Renders one tool's signature the way the model needs to call it through CallTool.</summary>
-        private static string RenderSignature(string name, MethodInfo m)
-        {
-            var parts = new List<string>();
-            foreach (var p in m.GetParameters())
-            {
-                string t = FriendlyTypeName(p.ParameterType);
-                // Optional params are what a model most often gets wrong, so show the actual
-                // default rather than a bare "?".
-                if (!p.HasDefaultValue) { parts.Add(p.Name + ": " + t); continue; }
-                string def;
-                if (p.DefaultValue == null) def = "null";
-                else if (p.DefaultValue is bool) def = ((bool)p.DefaultValue) ? "true" : "false";
-                else if (p.DefaultValue is string) def = "\"" + p.DefaultValue + "\"";
-                else def = Convert.ToString(p.DefaultValue, System.Globalization.CultureInfo.InvariantCulture) ?? "null";
-                parts.Add(p.Name + "?: " + t + " = " + def);
-            }
-            return name + "(" + string.Join(", ", parts) + ")";
-        }
-
-        private static string FriendlyTypeName(Type t)
-        {
-            var u = Nullable.GetUnderlyingType(t) ?? t;
-            if (u == typeof(string)) return "string";
-            if (u == typeof(bool)) return "boolean";
-            if (u == typeof(int) || u == typeof(long)) return "integer";
-            if (u == typeof(double) || u == typeof(float) || u == typeof(decimal)) return "number";
-            if (u.IsArray) return FriendlyTypeName(u.GetElementType()!) + "[]";
-            return u.Name;
-        }
+        /// <summary>The SDK-owned parameters a tool method may declare. They are never part of the
+        /// arguments the model sends, so FindTools does not show them and CallTool fills them.</summary>
+        private static bool IsInjectedParameterType(Type t) =>
+            t == typeof(IMcpServer)
+            || t == typeof(RequestContext<CallToolRequestParams>)
+            || t == typeof(CancellationToken);
 
         [McpServerTool(Name = "FindTools"), Description(
-            "[L0][Meta] Search the FULL tool roster (all ~200 tools), including ones not listed in this session. " +
-            "The server ships a ~48-tool 'lite' roster by default so the tool list stays small and every host can load it; " +
+            "[L0][Meta] Search the FULL tool roster, including tools not listed in this session. " +
+            "By default the server lists only a core 'lite' roster so the tool list stays small and every host can load it; " +
             "everything else is reached through this tool plus CallTool. " +
             "USE THIS whenever the visible tools do not cover what you need, before concluding the server cannot do something. " +
             "Search by capability words, not exact names: 'watch table', 'HMI screen', 'download', 'cross reference', 'GSD'. " +
@@ -138,7 +117,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 {
                     var m = all[h.Value];
                     bool listed = !lite || LiteToolNames.Contains(h.Value);
-                    lines.Add(RenderSignature(h.Value, m)
+                    lines.Add(ReflectiveToolInvoker.RenderSignature(h.Value, m, Injector(null, null, default))
                               + (listed ? "  [already listed - call it directly]" : "  [call via CallTool]"));
                     lines.Add("    " + ToolDescription(m));
                 }
@@ -159,146 +138,125 @@ namespace TiaMcpServer.ModelContextProtocol
         }
 
         [McpServerTool(Name = "CallTool"), Description(
-            "[L0][Meta] Invoke ANY tool in the full roster by name, including ones not listed in this session. " +
+            "[L0][Meta] Invoke a tool from the full roster by name, including ones not listed in this session. " +
             "Use FindTools first to get the exact name and parameter signature. " +
-            "Behaves exactly like calling the tool directly: same work, same result, same safety checks. " +
+            "Returns exactly what calling the tool directly returns, and unknown argument names are rejected before anything runs. " +
+            "Tools that download to a CPU, go online, write watch tables or delete blocks/types/tag tables/external sources " +
+            "are refused here: call those by their own name so the user sees what will run. " +
             "Example: name='ExportPlcWatchTable', argumentsJson='{\"softwarePath\":\"PLC_1\",\"watchTableName\":\"WT1\"}'.")]
-        public static ResponseMessage CallTool(
+        public static async Task<object?> CallTool(
+            IMcpServer server,
+            RequestContext<CallToolRequestParams> context,
             [Description("name: exact tool name from FindTools, e.g. 'ExportPlcWatchTable'.")] string name,
-            [Description("argumentsJson: JSON object of the tool's arguments, e.g. '{\"softwarePath\":\"PLC_1\"}'. Omit or '{}' for a no-argument tool.")] string argumentsJson = "")
+            [Description("argumentsJson: JSON object of the tool's arguments, e.g. '{\"softwarePath\":\"PLC_1\"}'. Omit or '{}' for a no-argument tool.")] string argumentsJson = "",
+            CancellationToken cancellationToken = default)
         {
             string target = (name ?? "").Trim();
-            try
+            if (target.Length == 0)
+                throw new McpException("CallTool: 'name' is required. Call FindTools to look up a tool name.", McpErrorCode.InvalidParams);
+
+            // Self-recursion would be a loop with no purpose; refuse it explicitly.
+            if (string.Equals(target, "CallTool", StringComparison.OrdinalIgnoreCase))
+                throw new McpException("CallTool cannot invoke itself. Pass the target tool's own name.", McpErrorCode.InvalidParams);
+
+            var all = AllToolMethods();
+            if (!all.TryGetValue(target, out var method))
             {
-                if (target.Length == 0)
-                    return new ResponseMessage { Message = "CallTool: 'name' is required. Call FindTools to look up a tool name.", Meta = BridgeMeta(false) };
-
-                // Self-recursion would be a loop with no purpose; refuse it explicitly.
-                if (string.Equals(target, "CallTool", StringComparison.OrdinalIgnoreCase))
-                    return new ResponseMessage { Message = "CallTool cannot invoke itself. Pass the target tool's own name.", Meta = BridgeMeta(false) };
-
-                var all = AllToolMethods();
-                MethodInfo? method;
-                if (!all.TryGetValue(target, out method))
-                {
-                    // A wrong name is the likeliest failure, so spend the message on the fix
-                    // rather than on restating the problem.
-                    var near = all.Keys
-                        .Where(k => k.IndexOf(target, StringComparison.OrdinalIgnoreCase) >= 0
-                                 || target.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0)
-                        .OrderBy(k => k, StringComparer.Ordinal).Take(8).ToList();
-                    // Containment misses the commonest case of all - a typo in the middle of an
-                    // otherwise correct name ("ExportPlcWatchTabel"). Fall back to shared prefix.
-                    if (near.Count == 0)
-                        near = all.Keys
-                            .Select(k => new KeyValuePair<int, string>(CommonPrefixLength(k, target), k))
-                            .Where(x => x.Key >= 6)
-                            .OrderByDescending(x => x.Key).ThenBy(x => x.Value, StringComparer.Ordinal)
-                            .Take(5).Select(x => x.Value).ToList();
-                    return new ResponseMessage
-                    {
-                        Message = "No tool named '" + target + "'." + (near.Count > 0
-                            ? " Did you mean: " + string.Join(", ", near) + "?"
-                            : " Call FindTools with a capability keyword to find the right name."),
-                        Meta = BridgeMeta(false),
-                    };
-                }
-
-                JsonObject args;
-                if (string.IsNullOrWhiteSpace(argumentsJson) || argumentsJson.Trim() == "{}")
-                {
-                    args = new JsonObject();
-                }
-                else
-                {
-                    JsonNode? parsed;
-                    try { parsed = JsonNode.Parse(argumentsJson); }
-                    catch (JsonException jx)
-                    {
-                        return new ResponseMessage
-                        {
-                            Message = "argumentsJson is not valid JSON (" + jx.Message + "). It must be a JSON OBJECT of the " +
-                                      "tool's parameters, e.g. {\"softwarePath\":\"PLC_1\"} - not a bare value, not the tool name.",
-                            Meta = BridgeMeta(false),
-                        };
-                    }
-                    JsonObject? obj = parsed as JsonObject;
-                    if (obj == null)
-                        return new ResponseMessage
-                        {
-                            Message = "argumentsJson must be a JSON object, e.g. {\"softwarePath\":\"PLC_1\"}. " +
-                                      "Expected signature: " + RenderSignature(target, method!),
-                            Meta = BridgeMeta(false),
-                        };
-                    args = obj;
-                }
-
-                var ps = method.GetParameters();
-                var call = new object?[ps.Length];
-                var missing = new List<string>();
-                for (int i = 0; i < ps.Length; i++)
-                {
-                    var p = ps[i];
-                    // Match case-insensitively: models routinely send PascalCase for a camelCase param.
-                    JsonNode? value = null;
-                    bool found = false;
-                    foreach (var kv in args)
-                    {
-                        if (!string.Equals(kv.Key, p.Name, StringComparison.OrdinalIgnoreCase)) continue;
-                        value = kv.Value; found = kv.Value != null; break;
-                    }
-                    if (!found)
-                    {
-                        if (p.HasDefaultValue) { call[i] = p.DefaultValue; continue; }
-                        missing.Add(p.Name!);
-                        call[i] = p.ParameterType.IsValueType ? Activator.CreateInstance(p.ParameterType) : null;
-                        continue;
-                    }
-                    try { call[i] = value!.Deserialize(p.ParameterType, BridgeJson); }
-                    catch (Exception cx)
-                    {
-                        return new ResponseMessage
-                        {
-                            Message = "Argument '" + p.Name + "' of " + target + " could not be read as " +
-                                      FriendlyTypeName(p.ParameterType) + ": " + cx.Message +
-                                      ". Expected signature: " + RenderSignature(target, method!),
-                            Meta = BridgeMeta(false),
-                        };
-                    }
-                }
-
-                if (missing.Count > 0)
-                {
-                    return new ResponseMessage
-                    {
-                        Message = target + " is missing required argument(s): " + string.Join(", ", missing) +
-                                  ". Expected signature: " + RenderSignature(target, method!),
-                        Meta = BridgeMeta(false),
-                    };
-                }
-
-                object? result = method!.Invoke(null, call);
-                // Tools return their own strongly-typed response objects; hand that JSON through
-                // unchanged so the model sees exactly what a direct call would have produced.
-                string payload = result == null
-                    ? "null"
-                    : JsonSerializer.Serialize(result, result.GetType(), BridgeJson);
-
-                return new ResponseMessage
-                {
-                    Message = payload,
-                    Meta = BridgeMeta(true),
-                };
+                // A wrong name is the likeliest failure, so spend the message on the fix
+                // rather than on restating the problem.
+                var near = all.Keys
+                    .Where(k => k.IndexOf(target, StringComparison.OrdinalIgnoreCase) >= 0
+                             || target.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0)
+                    .OrderBy(k => k, StringComparer.Ordinal).Take(8).ToList();
+                // Containment misses the commonest case of all - a typo in the middle of an
+                // otherwise correct name ("ExportPlcWatchTabel"). Fall back to shared prefix.
+                if (near.Count == 0)
+                    near = all.Keys
+                        .Select(k => new KeyValuePair<int, string>(CommonPrefixLength(k, target), k))
+                        .Where(x => x.Key >= 6)
+                        .OrderByDescending(x => x.Key).ThenBy(x => x.Value, StringComparer.Ordinal)
+                        .Take(5).Select(x => x.Value).ToList();
+                throw new McpException("No tool named '" + target + "'." + (near.Count > 0
+                    ? " Did you mean: " + string.Join(", ", near) + "?"
+                    : " Call FindTools with a capability keyword to find the right name."), McpErrorCode.InvalidParams);
             }
-            catch (TargetInvocationException tie)
+
+            // Canonical casing from here on, so the safety table and the error messages agree.
+            target = method.GetCustomAttribute<McpServerToolAttribute>()?.Name ?? method.Name;
+
+            if (ToolSafety.Classify(target).DirectOnly)
+                throw new McpException(
+                    "CallTool refuses '" + target + "': it changes a running CPU or deletes engineering data, so it must be " +
+                    "called by its own name - the host then shows the user exactly what will run. It is in this session's " +
+                    "tool list; call " + target + " directly.", McpErrorCode.InvalidRequest);
+
+            JsonObject args;
+            if (string.IsNullOrWhiteSpace(argumentsJson) || argumentsJson.Trim() == "{}")
             {
-                var inner = tie.InnerException ?? tie;
-                return new ResponseMessage { Message = target + " failed: " + inner.Message, Meta = BridgeMeta(false) };
+                args = new JsonObject();
             }
-            catch (Exception ex)
+            else
             {
-                return new ResponseMessage { Message = "CallTool('" + target + "') failed: " + ex.Message, Meta = BridgeMeta(false) };
+                JsonNode? parsed;
+                try { parsed = JsonNode.Parse(argumentsJson); }
+                catch (JsonException jx)
+                {
+                    throw new McpException(
+                        "argumentsJson is not valid JSON (" + jx.Message + "). It must be a JSON OBJECT of the " +
+                        "tool's parameters, e.g. {\"softwarePath\":\"PLC_1\"} - not a bare value, not the tool name.",
+                        McpErrorCode.InvalidParams);
+                }
+                args = parsed as JsonObject
+                    ?? throw new McpException(
+                        "argumentsJson must be a JSON object, e.g. {\"softwarePath\":\"PLC_1\"}. " +
+                        "Expected signature: " + ReflectiveToolInvoker.RenderSignature(target, method, Injector(server, context, cancellationToken)),
+                        McpErrorCode.InvalidParams);
             }
+
+            // The generic reflection bridges run any public method once allowWrite is set. Through
+            // CallTool the host would only ever see "CallTool"; make the write visible instead.
+            if ((target == "InvokeObject" || target == "InvokeService") && IsTrue(args, "allowWrite"))
+                throw new McpException(
+                    target + " with allowWrite=true is refused through CallTool: it can invoke any public Openness method, " +
+                    "including ones that close or delete. Start the server with --profile full so " + target +
+                    " is listed and the host can ask the user before it runs.", McpErrorCode.InvalidRequest);
+
+            var binding = ReflectiveToolInvoker.Bind(target, method, args, Injector(server, context, cancellationToken), BridgeJson);
+            if (binding.Error != null)
+                throw new McpException(binding.Error, McpErrorCode.InvalidParams);
+
+            // The target's own response object goes back unchanged, so the SDK serializes it with
+            // the same options as a direct call: same field names, same shape, same error handling.
+            // A target that throws propagates as-is (McpException or not), exactly like a direct call.
+            return await ReflectiveToolInvoker.InvokeAsync(method, binding.Arguments).ConfigureAwait(false);
+        }
+
+        private static ReflectiveToolInvoker.Injector Injector(
+            IMcpServer? server, RequestContext<CallToolRequestParams>? context, CancellationToken cancellationToken)
+        {
+            return (Type t, out object? value) =>
+            {
+                value = null;
+                if (!IsInjectedParameterType(t)) return false;
+                if (t == typeof(IMcpServer)) value = server;
+                else if (t == typeof(RequestContext<CallToolRequestParams>)) value = context;
+                else value = cancellationToken;
+                return true;
+            };
+        }
+
+        private static bool IsTrue(JsonObject args, string key)
+        {
+            foreach (var kv in args)
+            {
+                if (!string.Equals(kv.Key, key, StringComparison.OrdinalIgnoreCase)) continue;
+                if (kv.Value is JsonValue v)
+                {
+                    if (v.TryGetValue<bool>(out var b)) return b;
+                    if (v.TryGetValue<string>(out var s)) return string.Equals(s, "true", StringComparison.OrdinalIgnoreCase);
+                }
+            }
+            return false;
         }
 
         private static int CommonPrefixLength(string a, string b)

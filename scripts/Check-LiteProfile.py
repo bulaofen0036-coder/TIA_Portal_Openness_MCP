@@ -8,7 +8,7 @@ could neither list a block nor use the PREFERRED document import path. Nothing c
 because nothing checked it. This does.
 
 It also guards the check itself. When lite became the default, "full" was still being requested
-by *unsetting* the env var — so both probes returned the same ~48 tools and every assertion here
+by *unsetting* the env var — so both probes returned the same lite roster and every assertion here
 passed vacuously. full must now be requested explicitly AND come back strictly larger.
 
 Usage:  python scripts/Check-LiteProfile.py [path-to-TiaMcpServer.exe]

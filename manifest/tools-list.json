@@ -1,9 +1,9 @@
 {
-  "package": "TIA_MCP_Delivery_v2.4.0",
-  "generatedAt": "2026-09-16T17:25:02.533852+08:00",
+  "package": "TIA_MCP_Delivery_v2.7.3",
+  "generatedAt": "2026-09-27T11:20:51.178124+08:00",
   "source": "live MCP tools/list of TiaMcpServer.exe",
   "toolCount": 222,
-  "note": "Full roster (--profile full). The default lite profile lists ~49 of these; the rest stay reachable via FindTools + CallTool. Runtime tools/list remains authoritative.",
+  "note": "Full roster (--profile full). The default lite profile lists only the core tools; the rest stay reachable via FindTools + CallTool. Runtime tools/list remains authoritative.",
   "tools": [
     {
       "name": "AddDevice",
@@ -405,7 +405,7 @@
         "name",
         "argumentsJson"
       ],
-      "description": "[L0][Meta] Invoke ANY tool in the full roster by name, including ones not listed in this session. Use FindTools first to get the exact name and parameter signature. Behaves exactly like calling the tool directly: same work, same result, same safety checks. Example: name='ExportPlcWatchTable', argumentsJson='{\"softwarePath\":\"PLC_1\",\"watchTableName\":\"WT1\"}'."
+      "description": "[L0][Meta] Invoke a tool from the full roster by name, including ones not listed in this session. Use FindTools first to get the exact name and parameter signature. Returns exactly what calling the tool directly returns, and unknown argument names are rejected before anything runs. Tools that download to a CPU, go online, write watch tables or delete blocks/types/tag tables/external sources are refused here: call those by their own name so the user sees what will run. Example: name='ExportPlcWatchTable', argumentsJson='{\"softwarePath\":\"PLC_1\",\"watchTableName\":\"WT1\"}'."
     },
     {
       "name": "CheckDownloadReadiness",
@@ -435,8 +435,10 @@
       "domain": "Project",
       "method": "CloseProject",
       "returnType": "",
-      "parameters": [],
-      "description": "[L1][Project] Close the currently open project or multi-user session. Requires: Connect + OpenProject. Any unsaved changes are lost — call SaveProject first. After closing, the connection remains active but no project is open."
+      "parameters": [
+        "closeForeignProject"
+      ],
+      "description": "[L1][Project] Close the currently open project or multi-user session. Requires: Connect + OpenProject. Any unsaved changes are lost — call SaveProject first. After closing, the connection remains active but no project is open. A project this session did not open (the user's own, attached from a running TIA Portal) is NOT closed unless closeForeignProject=true."
     },
     {
       "name": "CompareSoftwareToOnline",
@@ -835,9 +837,10 @@
         "stopBeforeDownload",
         "password",
         "pgPcInterface",
-        "targetIpAddress"
+        "targetIpAddress",
+        "abortActiveTests"
       ],
-      "description": "[L1][Category:PLC-Online][ONLINE-WRITE][PreCondition:Connect+OpenProject+CompileSoftware+CheckDownloadReadiness] Download the compiled PLC program to the physical CPU over the network. The CPU will stop briefly during download and restart automatically (controlled by startAfterDownload). SAFETY: Verify no personnel are near the machine before downloading. This changes live PLC behavior. Workflow: Connect → OpenProject → CompileSoftware → CheckDownloadReadiness → DownloadToPlc → GetOnlineState. On success State=Success or Warning. On Error check Errors[] for details. Default options (keepActualValues=true, consistentBlocksOnly=true) are safe for most scenarios. Set keepActualValues=false only when DB initial values must be reset — this is irreversible. On a multi-NIC PC the PG/PC interface is picked automatically (the adapter sharing a subnet with the CPU); Meta.pgPcRoute reports which one was used. Override with pgPcInterface / targetIpAddress when the pick is wrong."
+      "description": "[L1][Category:PLC-Online][ONLINE-WRITE][PreCondition:Connect+OpenProject+CompileSoftware+CheckDownloadReadiness] Download the compiled PLC program to the physical CPU over the network. The CPU will stop briefly during download and restart automatically (controlled by startAfterDownload). SAFETY: Verify no personnel are near the machine before downloading. This changes live PLC behavior. Workflow: Connect → OpenProject → CompileSoftware → CheckDownloadReadiness → DownloadToPlc → GetOnlineState. On success State=Success or Warning. On Error check Errors[] for details. Default options (keepActualValues=true, consistentBlocksOnly=true) are safe for most scenarios. Set keepActualValues=false only when DB initial values must be reset — this is irreversible. On a multi-NIC PC the PG/PC interface is picked automatically (the adapter sharing a subnet with the CPU); Meta.pgPcRoute reports which one was used. Override with pgPcInterface / targetIpAddress when the pick is wrong. Meta.downloadPrompts lists every question TIA asked during the download and how it was answered. If test or commissioning functions are active on the CPU the download stops instead of cancelling them; pass abortActiveTests=true only after the user confirms nobody is using them."
     },
     {
       "name": "DumpDeviceAttributes",
@@ -1288,7 +1291,7 @@
         "query",
         "limit"
       ],
-      "description": "[L0][Meta] Search the FULL tool roster (all ~200 tools), including ones not listed in this session. The server ships a ~48-tool 'lite' roster by default so the tool list stays small and every host can load it; everything else is reached through this tool plus CallTool. USE THIS whenever the visible tools do not cover what you need, before concluding the server cannot do something. Search by capability words, not exact names: 'watch table', 'HMI screen', 'download', 'cross reference', 'GSD'. Returns each match's exact name, parameter signature with defaults, and full description; then invoke it with CallTool."
+      "description": "[L0][Meta] Search the FULL tool roster, including tools not listed in this session. By default the server lists only a core 'lite' roster so the tool list stays small and every host can load it; everything else is reached through this tool plus CallTool. USE THIS whenever the visible tools do not cover what you need, before concluding the server cannot do something. Search by capability words, not exact names: 'watch table', 'HMI screen', 'download', 'cross reference', 'GSD'. Returns each match's exact name, parameter signature with defaults, and full description; then invoke it with CallTool."
     },
     {
       "name": "GenerateAcceptanceReport",
@@ -1800,7 +1803,7 @@
         "ipAddress",
         "password"
       ],
-      "description": "[L1][Category:PLC-Online][ONLINE-CONNECT][PreCondition:Connect+OpenProject] Establish an online connection from TIA Portal to the physical PLC. Required before DownloadToPlc to confirm reachability, or for future online monitoring tools. Returns State=Online on success. If ipAddress is omitted, uses the IP address configured in the project's hardware configuration. If ipAddress is provided, overrides the configured IP for this session (useful for commissioning with a different IP). Common failures: NotReachable (wrong IP / no cable), Protected (CPU requires authentication — supply password), Incompatible (firmware mismatch)."
+      "description": "[L1][Category:PLC-Online][ONLINE-CONNECT][PreCondition:Connect+OpenProject] Establish an online connection from TIA Portal to the physical PLC. Required before DownloadToPlc to confirm reachability, or for future online monitoring tools. Returns State=Online on success. If ipAddress is omitted, uses the IP address configured in the project's hardware configuration. If ipAddress is provided, it selects which configured connection route to use (multi-NIC PCs, several target interfaces); Openness cannot connect to an address the project does not configure, so to reach a different IP change it in the hardware configuration first. Common failures: NotReachable (wrong IP / no cable), Protected (CPU requires authentication — supply password), Incompatible (firmware mismatch)."
     },
     {
       "name": "ImportAlarmClasses",

@@ -63,6 +63,18 @@ namespace TiaMcpServer.Tests
             Console.WriteLine("== DescribeBlockLogic 的 SCL 回读逐行还原：下标 / 调用 / 常量 / 引号（issue #42）==");
             SymbolQuotingReadbackTests.Run(Check);
 
+            Console.WriteLine("== 工具安全表：annotations / Openness 串行闸 / CallTool 拒绝名单 ==");
+            ToolSafetyTests.Run(Check, Skip);
+
+            Console.WriteLine("== CallTool：异步工具要拿到结果本身，注入参数要被填上 ==");
+            ToolBridgeTests.Run(Check);
+
+            Console.WriteLine("== HTTP 传输：按 id 路由响应（超时不再连累后续请求）+ 安全判定 ==");
+            HttpBridgeTests.Run(Check);
+
+            Console.WriteLine("== 下载提示应答：只用手册里的枚举值，取消测试功能必须显式选择 ==");
+            DownloadPromptPolicyTests.Run(Check);
+
             Console.WriteLine(_fail == 0
                 ? $"{_pass} passed, {_fail} failed, {_skip} skipped."
                 : $"{_pass} passed, {_fail} failed, {_skip} skipped.  <<< 有失败");

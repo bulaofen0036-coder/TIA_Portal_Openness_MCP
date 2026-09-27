@@ -20,7 +20,11 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 _here = os.path.dirname(os.path.abspath(__file__))
 _bundle = os.path.dirname(_here)
-EXE = os.path.join(_bundle, "tools", "tiaportal-mcp", "src", "TiaMcpServer", "bin", "Release", "net48", "TiaMcpServer.exe")
+# Same order as tia.cmd / 预热.bat: the shipped runtime first (git clone and plugin carry only this),
+# the dev build output as the fallback.
+EXE = os.path.join(_bundle, "runtime", "v21", "TiaMcpServer.exe")
+if not os.path.isfile(EXE):
+    EXE = os.path.join(_bundle, "tools", "tiaportal-mcp", "src", "TiaMcpServer", "bin", "Release", "net48", "TiaMcpServer.exe")
 if len(sys.argv) > 1:
     EXE = sys.argv[1]
 if not os.path.isfile(EXE):

@@ -682,6 +682,19 @@ namespace TiaMcpServer.Siemens
                 }
             }
 
+            // Validate before closing anything, so a bad path cannot cost the open project.
+            if (string.IsNullOrWhiteSpace(projectPath))
+            {
+                LastConnectError = "projectPath is empty";
+                return false;
+            }
+
+            if (!File.Exists(projectPath))
+            {
+                LastConnectError = $"Project file not found: {projectPath}";
+                return false;
+            }
+
             if (_project != null)
             {
                 (_project as Project)?.Close();
@@ -698,18 +711,6 @@ namespace TiaMcpServer.Siemens
             try
             {
                 LastConnectError = null;
-
-                if (string.IsNullOrWhiteSpace(projectPath))
-                {
-                    LastConnectError = "projectPath is empty";
-                    return false;
-                }
-
-                if (!File.Exists(projectPath))
-                {
-                    LastConnectError = $"Project file not found: {projectPath}";
-                    return false;
-                }
 
                 var projects = GetProjects();
                 var projectName = Path.GetFileNameWithoutExtension(projectPath);
@@ -751,6 +752,9 @@ namespace TiaMcpServer.Siemens
                                 if (opened is ProjectBase pb)
                                 {
                                     _project = pb;
+                                    // We opened it: without this our own project counts as the
+                                    // user's and CloseProject/OpenProject refuse to touch it.
+                                    _projectOpenedByUs = true;
                                     LastConnectError = null;
                                     return true;
                                 }
@@ -968,6 +972,7 @@ namespace TiaMcpServer.Siemens
                     {
                         // Correctly cast MultiuserProject to Project
                         _project = _session.Project;
+                        _projectOpenedByUs = _project != null;
                         return _project != null;
                     }
                 }

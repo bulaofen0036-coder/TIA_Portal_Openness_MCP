@@ -110,7 +110,7 @@ GetVersionControlStatus(changedOnly=true)
   `ImportFromDocuments` / `ImportBlocksFromDocuments` read/write the diff-friendly
   SIMATIC SD text format (`.s7dcl` + `.s7res`) on V20+ and are flagged *PREFERRED on
   V21+*. The SimaticML XML chain remains for backward compatibility.
-- **183 tools** across project, hardware, PLC, HMI, and online operations,
+- **222 tools** across project, hardware, PLC, HMI, and online operations,
   layered `[L0]`/`[L1]`/`[L2]` so a normal session only needs L0 + L1.
 
 ## Requirements
@@ -141,8 +141,8 @@ GetVersionControlStatus(changedOnly=true)
    **Claude Desktop / Claude Code / Cursor / VS Code** (existing config backed up
    as `.bak`, other servers preserved). Restart the AI client to load it.
    Options: `config --host vscode` (or `claude|claude-code|cursor`), `config --print`
-   to copy a snippet manually. The server lists **~55 core tools of 222 by default**
-   (~8,500 instead of ~38,800 tokens of schema per turn) so weaker models are not drowned
+   to copy a snippet manually. The server lists **62 core tools of 222 by default**
+   (about 57 KB instead of 196 KB of tool schema per turn) so weaker models are not drowned
    and VS Code/Copilot's 128-tool cap and Windsurf's 100 never trip. Nothing is lost: the
    model reaches every other tool on demand with `FindTools("plain words")` +
    `CallTool(name, argumentsJson)`, and the handshake instructions tell it so. Pass
