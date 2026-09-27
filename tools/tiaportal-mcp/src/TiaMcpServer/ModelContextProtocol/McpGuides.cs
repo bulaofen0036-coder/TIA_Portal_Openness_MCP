@@ -132,7 +132,8 @@ Mixed LAD+SCL blocks are supported by .s7dcl. After import: CompileSoftware, the
 
             ["db"] =
 @"DB / UDT / TAG TABLES (verified):
-- Global DB: BuildPlcGlobalDbXml → ImportBlock (XML, UTF-8 WITH BOM). Members need Name + Datatype (+ optional StartValue).
+- Global DB: BuildPlcGlobalDbXml → ImportBlock (XML, UTF-8 WITH BOM), or PlcBuildAndImport kind=globaldb in one step. Members need Name + Datatype (+ optional StartValue).
+- DB memory layout: the builder defaults to Standard (non-optimized). PUT/GET partners, absolute S7 reads and classic-HMI absolute tags NEED Standard; pass ""optimized"":true only for a symbolic-only DB. PlcBuildAndImport reads the layout back (Meta.readback.memoryLayout) and fails on a mismatch; GetBlockInfo.MemoryLayout shows it for any existing DB.
 - UDT: BuildPlcUdtXml → ImportType. A UDT with no members is invalid (dryRun catches it).
 - Tag tables: BuildPlcTagTableXml → ImportPlcTagTable; logical addresses like %I0.0 / %Q0.1 / %MW10.
 - Instance DBs are created automatically when a FB call is compiled — do not author them by hand.

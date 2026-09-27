@@ -126,6 +126,17 @@ Aliases:
 - `dbNumber` may be `number`.
 - `staticMembers` may be `members`.
 
+Memory layout (issue #31):
+
+- Default is **Standard** (non-optimized access). This is what the builder has always emitted, and what
+  PUT/GET partners, absolute S7 reads (`ReadPlcLiveValuesS7`) and classic-HMI absolute tags require.
+- `"optimized": true` emits an **Optimized** DB. `"memoryLayout": "Standard" | "Optimized"` is accepted as an
+  alias; giving both with different meanings is an error.
+- Unknown top-level keys are rejected with a did-you-mean hint (a misspelt `optimised` no longer produces a
+  DB with the wrong layout silently).
+- To confirm the layout of a DB in the project, read `MemoryLayout` from `GetBlockInfo`. `PlcBuildAndImport`
+  does this automatically after import (see below).
+
 ## BuildStructuredTextXml
 
 Input:
@@ -295,7 +306,10 @@ Real import checklist:
 4. Resolve `softwarePath` and the target group path from the tree.
 5. Run `PlcBuildAndImport(..., dryRun=true)` first and inspect `WrittenFiles` / `Discovered*`.
 6. Run `PlcBuildAndImport(..., dryRun=false, compileAfter=true)`.
-7. Check `Failed` and `Compile.ErrorCount`.
+7. Check `Compile.ErrorCount`. An import failure is returned as an error (not as a normal response
+   with `Failed[]`), and for blocks the tool reads the block back: `Meta.verified` plus
+   `Meta.readback {name, number, blockKind, secondaryType, memoryLayout}`. A read-back that does not match
+   the generated XML (for example a DB built with `optimized:false` that reads back `Optimized`) is an error.
 8. Save only after successful compile/readback.
 
 Supported `kind` values:

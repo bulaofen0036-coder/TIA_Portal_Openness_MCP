@@ -55,9 +55,17 @@ namespace TiaMcpServer.ModelContextProtocol
             });
         }
 
+        private static readonly string[] GlobalDbKeys =
+        {
+            "dbName", "name", "dbNumber", "number", "staticMembers", "members", "optimized", "memoryLayout"
+        };
+
         public static JsonObject BuildGlobalDb(string json)
         {
             var root = ParseObject(json, "$");
+            // 未知键直接报错：拼错的 "optimised" 如果被静默忽略，调用方会拿到一个布局不对的 DB 却毫不知情。
+            RejectUnknownKeys(root, "$", GlobalDbKeys);
+            var memoryLayout = ReadGlobalDbMemoryLayout(root);
             var dbName = ReadString(root, "$.dbName", "dbName", "name");
             var dbNumber = ReadInt(root, "$.dbNumber", "dbNumber", "number");
             var membersNode = root["staticMembers"] as JsonArray ?? root["members"] as JsonArray;
@@ -77,13 +85,53 @@ namespace TiaMcpServer.ModelContextProtocol
                 })
                 .ToArray();
 
-            var xml = PlcGlobalDbXmlBuilder.BuildXml(dbName, dbNumber, members);
+            var xml = PlcGlobalDbXmlBuilder.BuildXml(dbName, dbNumber, members, memoryLayout);
             return BuildResult("plc-build-global-db-xml", xml, new JsonObject
             {
                 ["dbName"] = dbName,
                 ["dbNumber"] = dbNumber,
-                ["memberCount"] = members.Length
+                ["memberCount"] = members.Length,
+                ["memoryLayout"] = memoryLayout
             });
+        }
+
+        /// <summary>
+        /// $.optimized（issue #31 的写法）与 $.memoryLayout（模板里的写法）二选一；
+        /// 两个都给且互相矛盾时报错，而不是悄悄挑一个。都不给时保持一贯的 Standard。
+        /// </summary>
+        private static string ReadGlobalDbMemoryLayout(JsonObject root)
+        {
+            var optimized = ReadNullableBool(root, "optimized");
+            string? layout = null;
+            if (root.TryGetPropertyValue("memoryLayout", out var node) && node != null)
+            {
+                if (node is not JsonValue value || !value.TryGetValue<string>(out var text))
+                    throw new ArgumentException("Expected JSON string at $.memoryLayout: \"Standard\" or \"Optimized\".");
+                layout = PlcGlobalDbXmlBuilder.NormalizeMemoryLayout(text);
+            }
+
+            if (optimized.HasValue)
+            {
+                var fromFlag = optimized.Value ? "Optimized" : "Standard";
+                if (layout != null && layout != fromFlag)
+                    throw new ArgumentException($"$.optimized={optimized.Value.ToString().ToLowerInvariant()} contradicts $.memoryLayout=\"{layout}\". Give only one of them.");
+                return fromFlag;
+            }
+
+            return layout ?? PlcGlobalDbXmlBuilder.DefaultMemoryLayout;
+        }
+
+        private static void RejectUnknownKeys(JsonObject root, string path, IReadOnlyList<string> known)
+        {
+            foreach (var entry in root)
+            {
+                if (known.Contains(entry.Key, StringComparer.Ordinal)) continue;
+                var near = ArgDiagnostics.NearestName(entry.Key, known);
+                throw new ArgumentException(
+                    $"Unknown JSON property {path}.{entry.Key}" +
+                    (near != null ? $" — did you mean '{near}'?" : "") +
+                    $" Allowed: {string.Join(", ", known)}.");
+            }
         }
 
         public static JsonObject BuildStructuredText(string json, bool innerOnly = false)

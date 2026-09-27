@@ -18,7 +18,23 @@ namespace TiaMcpServer.ModelContextProtocol
     {
         private static readonly XNamespace InterfaceNs = "http://www.siemens.com/automation/Openness/SW/Interface/v5";
 
-        public static XDocument BuildDocument(string dbName, int dbNumber, IEnumerable<PlcDbMemberDefinition> staticMembers)
+        /// <summary>
+        /// 默认的存储器布局。一直以来生成的都是 Standard（非优化）：PUT/GET、S7 绝对地址读取、
+        /// 经典 HMI 的绝对地址变量都依赖它，所以默认值不能改。
+        /// </summary>
+        public const string DefaultMemoryLayout = "Standard";
+
+        /// <summary>SimaticML 的 MemoryLayout 取值只有这两个，大小写按 TIA 导出的写法规范化。</summary>
+        public static string NormalizeMemoryLayout(string? memoryLayout)
+        {
+            var value = (memoryLayout ?? "").Trim();
+            if (value.Length == 0) return DefaultMemoryLayout;
+            if (string.Equals(value, "Standard", StringComparison.OrdinalIgnoreCase)) return "Standard";
+            if (string.Equals(value, "Optimized", StringComparison.OrdinalIgnoreCase)) return "Optimized";
+            throw new ArgumentException($"MemoryLayout '{memoryLayout}' 无效，只能是 Standard（非优化，PUT/GET 需要）或 Optimized（优化访问）。", nameof(memoryLayout));
+        }
+
+        public static XDocument BuildDocument(string dbName, int dbNumber, IEnumerable<PlcDbMemberDefinition> staticMembers, string memoryLayout = DefaultMemoryLayout)
         {
             if (string.IsNullOrWhiteSpace(dbName))
                 throw new ArgumentException("DB 名称不能为空。", nameof(dbName));
@@ -29,6 +45,7 @@ namespace TiaMcpServer.ModelContextProtocol
             if (members.Length == 0)
                 throw new ArgumentException("全局 DB 至少需要 1 个 Static 成员。", nameof(staticMembers));
             ValidateMembers(members);
+            var layout = NormalizeMemoryLayout(memoryLayout);
 
             return new XDocument(
                 new XDeclaration("1.0", "utf-8", null),
@@ -46,17 +63,17 @@ namespace TiaMcpServer.ModelContextProtocol
                                     new XElement(InterfaceNs + "Section",
                                         new XAttribute("Name", "Static"),
                                         members.Select(BuildMember)))),
-                            new XElement("MemoryLayout", "Standard"),
+                            new XElement("MemoryLayout", layout),
                             new XElement("Name", dbName),
                             new XElement("Namespace"),
                             new XElement("Number", dbNumber),
                             new XElement("ProgrammingLanguage", "DB")))));
         }
 
-        public static string BuildXml(string dbName, int dbNumber, IEnumerable<PlcDbMemberDefinition> staticMembers)
+        public static string BuildXml(string dbName, int dbNumber, IEnumerable<PlcDbMemberDefinition> staticMembers, string memoryLayout = DefaultMemoryLayout)
         {
             using var writer = new Utf8StringWriter();
-            BuildDocument(dbName, dbNumber, staticMembers).Save(writer, SaveOptions.None);
+            BuildDocument(dbName, dbNumber, staticMembers, memoryLayout).Save(writer, SaveOptions.None);
             return writer.ToString();
         }
 

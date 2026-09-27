@@ -75,6 +75,9 @@ namespace TiaMcpServer.Tests
             Console.WriteLine("== 下载提示应答：只用手册里的枚举值，取消测试功能必须显式选择 ==");
             DownloadPromptPolicyTests.Run(Check);
 
+            Console.WriteLine("== GlobalDB 存储器布局可选 + 导入后读回布局（issue #31）==");
+            PlcGlobalDbBuilderTests.Run(Check);
+
             Console.WriteLine(_fail == 0
                 ? $"{_pass} passed, {_fail} failed, {_skip} skipped."
                 : $"{_pass} passed, {_fail} failed, {_skip} skipped.  <<< 有失败");

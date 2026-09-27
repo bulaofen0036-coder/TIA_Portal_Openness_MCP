@@ -54,5 +54,17 @@
     <!-- 下载对话框的应答表：答案必须是手册里该提示枚举的成员，否则设不进去、下载无声失败；
          「取消正在进行的测试/调试功能」必须是显式选择。 -->
     <Compile Include="..\..\src\TiaMcpServer\Siemens\DownloadPromptPolicy.cs" Link="DownloadPromptPolicy.cs" />
+    <!-- PLC 构建器（issue #31/#30）：JSON 适配层 + 各 XML 构建器全是零依赖，一并链进来才能从 JSON 入口测。
+         导入后读回的比对规则抽在 BlockSnapshotCompare.cs：布局 / OB 类型 / 块号对不上时必须报出来。 -->
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\PlcBuilderToolJson.cs" Link="PlcBuilderToolJson.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\PlcUdtXmlBuilder.cs" Link="PlcUdtXmlBuilder.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\PlcTagTableXmlBuilder.cs" Link="PlcTagTableXmlBuilder.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\PlcGlobalDbXmlBuilder.cs" Link="PlcGlobalDbXmlBuilder.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\StructuredTextXmlBuilder.cs" Link="StructuredTextXmlBuilder.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\FlgNetCallXmlBuilder.cs" Link="FlgNetCallXmlBuilder.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\PlcFcBlockXmlComposer.cs" Link="PlcFcBlockXmlComposer.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\PlcFbBlockXmlComposer.cs" Link="PlcFbBlockXmlComposer.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\PlcLadFcBlockXmlComposer.cs" Link="PlcLadFcBlockXmlComposer.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\BlockSnapshotCompare.cs" Link="BlockSnapshotCompare.cs" />
   </ItemGroup>
 </Project>

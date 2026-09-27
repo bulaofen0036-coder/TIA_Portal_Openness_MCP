@@ -550,9 +550,9 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
-        [McpServerTool(Name = "BuildPlcGlobalDbXml"), Description("[L2][PLC-Builders][Offline] Build a TIA V21 PLC GlobalDB XML document from structured JSON. Input: {dbName,dbNumber,staticMembers:[{name,datatype,externalWritable?,commentZhCn?,startValue?}]}. It only returns XML; it does not connect to TIA Portal, import blocks, write files, or modify projects.")]
+        [McpServerTool(Name = "BuildPlcGlobalDbXml"), Description("[L2][PLC-Builders][Offline] Build a TIA V21 PLC GlobalDB XML document from structured JSON. Input: {dbName,dbNumber,optimized?,staticMembers:[{name,datatype,externalWritable?,commentZhCn?,startValue?}]}. optimized defaults to false = Standard (non-optimized) memory layout, which PUT/GET and absolute S7 reads require; optimized=true gives an Optimized DB (memoryLayout:'Standard'|'Optimized' is accepted as an alias). Unknown JSON keys are rejected. It only returns XML; it does not connect to TIA Portal, import blocks, write files, or modify projects.")]
         public static ResponseXmlBuild BuildPlcGlobalDbXml(
-            [Description("globalDbJson: JSON object with dbName/name, dbNumber/number, and staticMembers[] or members[].")] string globalDbJson)
+            [Description("globalDbJson: JSON object with dbName/name, dbNumber/number, optional optimized (bool, default false = Standard) or memoryLayout, and staticMembers[] or members[].")] string globalDbJson)
         {
             try
             {
@@ -635,14 +635,14 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
-        [McpServerTool(Name = "PlcBuildAndImport"), Description("[L1][PLC-Software] MAIN tool for creating new PLC blocks from natural language. Build one PLC artifact (UDT/tag table/GlobalDB/FC/FB) from structured JSON, then optionally import and compile. Use dryRun=true first to validate. Workflow: describe block in JSON → dryRun → review → dryRun=false to import. Replaces the multi-step Build*Xml + ImportBlock sequence.")]
+        [McpServerTool(Name = "PlcBuildAndImport"), Description("[L1][PLC-Software] MAIN tool for creating new PLC blocks from natural language. Build one PLC artifact (UDT/tag table/GlobalDB/FC/FB) from structured JSON, then optionally import and compile. Use dryRun=true first to validate. Workflow: describe block in JSON → dryRun → review → dryRun=false to import. Replaces the multi-step Build*Xml + ImportBlock sequence. After a block import it reads the block back (name, number, OB type, memory layout) and returns Meta.verified + Meta.readback; any import failure or read-back mismatch is an error.")]
         public static ResponsePlcProgramImport PlcBuildAndImport(
             [Description("softwarePath: PLC software path, e.g. 'PLC_1'. Required only when dryRun=false.")] string softwarePath,
             [Description("kind: udt|tagtable|globaldb|fc|fb")] string kind,
             [Description("json: structured JSON matching the corresponding BuildPlc* tool.")] string json,
             [Description("typeGroupPath: PLC data type group path for kind=udt.")] string typeGroupPath = "",
             [Description("tagFolderPath: PLC tag table group path for kind=tagtable.")] string tagFolderPath = "",
-            [Description("blockGroupPath: PLC block group path for kind=globaldb|fc.")] string blockGroupPath = "",
+            [Description("blockGroupPath: PLC block group path for kind=globaldb|fc|fb.")] string blockGroupPath = "",
             [Description("compileAfter: compile PLC after import when dryRun=false.")] bool compileAfter = true,
             [Description("dryRun: true builds XML and returns the import plan without importing/compiling.")] bool dryRun = true)
         {
@@ -675,8 +675,9 @@ namespace TiaMcpServer.ModelContextProtocol
                 var discoveredTagTables = classifiedKind == "tagtable" ? new List<string> { classifiedObjectName } : new List<string>();
                 var discoveredBlocks = classifiedKind == "block" ? new List<string> { classifiedObjectName } : new List<string>();
 
+                PlcBlockVerificationOutcome? verification = null;
                 if (!dryRun && failed.Count == 0)
-                    compile = PlcBuildAndImportApply(softwarePath, typeGroupPath, tagFolderPath, blockGroupPath, compileAfter, xmlPath, classifiedKind, classifiedObjectName, importedTypes, importedTagTables, importedBlocks, failed);
+                    compile = PlcBuildAndImportApply(softwarePath, typeGroupPath, tagFolderPath, blockGroupPath, compileAfter, xmlPath, classifiedKind, classifiedObjectName, importedTypes, importedTagTables, importedBlocks, failed, out verification);
 
                 var response = BuildPlcProgramImportResponse(
                     tempDir,
@@ -707,6 +708,35 @@ namespace TiaMcpServer.ModelContextProtocol
                 response.Meta["capabilityDecision"] = capability.Decision;
                 response.Meta["capabilityWarnings"] = new JsonArray(capability.Warnings.Select(x => (JsonNode)x).ToArray());
                 response.Meta["recommendedNextActions"] = new JsonArray(capability.NextActions.Select(x => (JsonNode)x).ToArray());
+                if (verification != null)
+                {
+                    response.Meta["verified"] = verification.State == PlcBlockVerificationState.Verified;
+                    response.Meta["verifyDetail"] = verification.Detail;
+                    if (verification.Actual is { } actual)
+                    {
+                        response.Meta["readback"] = new JsonObject
+                        {
+                            ["name"] = actual.Name,
+                            ["number"] = actual.Number,
+                            ["blockKind"] = actual.BlockKind,
+                            ["secondaryType"] = actual.SecondaryType,
+                            ["memoryLayout"] = actual.MemoryLayout
+                        };
+                    }
+                }
+
+                // 失败就是失败：以前这里照常返回，宿主看到的是一条 isError=false 的响应，
+                // ScaffoldProject / PatchProject 也因此把没导进去（或读回对不上）的一步记成 "ok"。
+                if (failed.Count > 0)
+                {
+                    var modified = importedTypes.Count + importedTagTables.Count + importedBlocks.Count > 0;
+                    throw new McpException(
+                        $"PlcBuildAndImport kind={normalizedKind} failed: "
+                        + string.Join(" | ", failed.Select(f => f.Error))
+                        + $". Generated XML kept at '{xmlPath}'."
+                        + (modified ? " ⚠ The project HAS been modified (the object was imported) — inspect it in TIA before retrying." : ""),
+                        McpErrorCode.InternalError);
+                }
                 return response;
             }
             catch (Exception ex) when (ex is not McpException)
@@ -727,8 +757,10 @@ namespace TiaMcpServer.ModelContextProtocol
             List<string> importedTypes,
             List<string> importedTagTables,
             List<string> importedBlocks,
-            List<ImportFailure> failed)
+            List<ImportFailure> failed,
+            out PlcBlockVerificationOutcome? verification)
         {
+            verification = null;
             if (classifiedKind == "type")
             {
                 try { Portal.ImportType(softwarePath, typeGroupPath, xmlPath); importedTypes.Add(classifiedObjectName); }
@@ -743,6 +775,15 @@ namespace TiaMcpServer.ModelContextProtocol
             {
                 try { Portal.ImportBlock(softwarePath, blockGroupPath, xmlPath); importedBlocks.Add(classifiedObjectName); }
                 catch (PortalException pex) { failed.Add(new ImportFailure { Path = xmlPath, Error = pex.Message }); }
+
+                if (importedBlocks.Count > 0)
+                {
+                    // 与 ImportBlock 同一套读回：XML 里声明的块名 + 编号 + OB 类型 + 存储器布局。
+                    // 对不上就是失败 —— 例如 optimized=false 的 DB 读回是 Optimized，PUT/GET 会在现场才出问题。
+                    verification = VerifyImportedBlock(softwarePath, xmlPath);
+                    if (verification.State == PlcBlockVerificationState.Mismatch)
+                        failed.Add(new ImportFailure { Path = xmlPath, Error = "read-back does not match the generated XML: " + verification.Detail });
+                }
             }
             else
             {

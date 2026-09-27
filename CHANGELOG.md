@@ -43,6 +43,20 @@
   另：经 `Projects.Open` 兜底或 `OpenSession` 打开的工程原来被当成「用户的」。
 - **SetWatchTableModifyValue 忽略写入结果**，没写进去也报「已设置」；各失败分支现在都报错。
 - **DownloadToPlc：`Ok=false` 但没有错误文本时按成功返回**；现在任何失败都 `isError=true`。
+- **`PlcBuildAndImport` 导入失败照常返回**（`isError=false`，失败只写在 `Failed[]` 里），
+  `ScaffoldProject` / `PatchProject` 因此把没导进去的一步记成 "ok"。现在导入失败或读回不符都报错，
+  两个编排工具随之如实记为 failed。
+
+### 新功能
+
+- **GlobalDB 可选存储器布局，导入后读回确认（#31）。** `BuildPlcGlobalDbXml` /
+  `PlcBuildAndImport kind=globaldb` 接受 `optimized: true|false`（也认模板里的
+  `memoryLayout: "Standard"|"Optimized"`，两者矛盾时报错）。**默认仍是 Standard（非优化）**——
+  这一直是构建器实际写出的值，PUT/GET、S7 绝对地址读取、经典 HMI 绝对地址变量都依赖它。
+  JSON 里的未知键不再被静默丢弃（拼错的 `optimised` 会报错并提示正确拼写）。
+- **`PlcBuildAndImport` 导入块后读回校验**：块名 + 块号 + OB 类型 + 存储器布局，结果在
+  `Meta.verified` / `Meta.readback`；读回与生成的 XML 不符即报错。`ImportBlock` 的读回也多比
+  一项存储器布局。
 
 ### 安全
 
