@@ -321,11 +321,46 @@ Supported `kind` values:
 | `globaldb` | `SW.Blocks.GlobalDB` | `ImportBlock` |
 | `fc` | `SW.Blocks.FC` | `ImportBlock` |
 | `fb` | `SW.Blocks.FB` | `ImportBlock` |
+| `ob` | `SW.Blocks.OB` | `ImportBlock` |
 
 Not yet supported by this one-step builder:
 
-- `ob`
 - `instanceDb`
 - partial network editing
+
+## `kind=ob` / BuildPlcObXml (issue #30)
+
+Organization blocks must be built as XML. The `.s7dcl` header (`ORGANIZATION_BLOCK "Name"`) carries no OB
+number or event class, and TIA V21 imports every such OB as a **Program cycle** OB without an error: a
+Startup (OB100) or cyclic-interrupt OB silently becomes a program-cycle OB.
+
+```json
+{
+  "blockName": "Startup",
+  "blockNumber": 100,
+  "eventClass": "Startup",
+  "temps": [ { "name": "i", "datatype": "Int" } ],
+  "structuredText": { "operations": [ { "op": "assignment", "target": "i", "value": "0" } ] }
+}
+```
+
+| `eventClass` | Allowed numbers | Extra |
+|---|---|---|
+| `ProgramCycle` | 1, 123..32767 | — |
+| `Startup` | 100, 123..32767 | — |
+| `CyclicInterrupt` | 30..38, 123..32767 | `cyclicTimeUs` required (µs; `cyclicTimeMs` also accepted), optional `phaseOffsetUs` |
+
+- `eventClass` may be omitted for OB1 / OB100 / OB30..38; it is inferred from the number.
+- The number/class pairing is checked before any XML is written. TIA itself rejects a wrong pairing at import
+  ("'101' is not a valid OB number").
+- The body is optional (an empty cyclic-interrupt OB is a valid placeholder).
+- The OB's start-information inputs (`Initial_Call`, `Remanence`, `LostRetentive`, `Event_Count`, …) are
+  filled in by TIA for each class; the builder leaves the Input section empty.
+- Hardware / time-of-day / time-delay interrupts and error OBs are refused: they need hardware-event or
+  schedule configuration that block XML does not carry. Export an existing OB of that type with `ExportBlock`
+  and import it with `ImportBlock`.
+- After import `PlcBuildAndImport` reads the OB back: name, number, `SecondaryType` (event class) and, for
+  cyclic interrupts, `CyclicTime`.
+- Unknown JSON keys are rejected.
 
 Use explicit existing import tools for artifacts you already have as verified TIA exports.

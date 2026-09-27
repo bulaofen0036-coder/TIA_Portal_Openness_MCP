@@ -1,0 +1,11 @@
+﻿{
+    S7_EditorMode := "SCL";
+    S7_Optimized := "TRUE";
+    S7_Version := "0.1"
+}
+ORGANIZATION_BLOCK "Spike_Startup"
+    { S7_Language := "SCL" }
+    NETWORK
+        
+    END_NETWORK
+END_ORGANIZATION_BLOCK

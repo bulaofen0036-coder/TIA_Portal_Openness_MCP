@@ -53,6 +53,9 @@ namespace TiaMcpServer.ModelContextProtocol
 
         /// <summary>Standard（非优化）/ Optimized。PUT/GET 与 S7 绝对地址读取只认 Standard。</summary>
         public string? MemoryLayout { get; set; }
+
+        /// <summary>循环中断 OB 的周期（µs）。其它块为 null。</summary>
+        public int? CyclicTimeUs { get; set; }
     }
 
     /// <summary>
@@ -96,8 +99,26 @@ namespace TiaMcpServer.ModelContextProtocol
                 // SimaticML 的 OB 导出里没有 PriorityNumber —— 真实导出对拍过，这里读不到是正常的。
                 PriorityNumber = ParseIntOrNull(attrs.Element("PriorityNumber")?.Value),
                 BlockKind = obj!.Name.LocalName,
-                MemoryLayout = NullIfBlank(attrs.Element("MemoryLayout")?.Value)
+                MemoryLayout = NullIfBlank(attrs.Element("MemoryLayout")?.Value),
+                CyclicTimeUs = ParseIntOrNull(attrs.Element("CyclicTime")?.Value)
             };
+        }
+
+        /// <summary>
+        /// XML 的块种类（SW.Blocks.OB）与读回对象的 .NET 类型名（OB）是否是同一种块。
+        /// 任何一边不知道就不下结论（返回 true）—— 只拿它排除明确不同的块。
+        /// DB100、FC100、OB100 编号相同，按编号兜底时不看种类会认错块。
+        /// </summary>
+        internal static bool KindMatches(string? expectedKind, string? actualKind)
+        {
+            if (string.IsNullOrWhiteSpace(expectedKind) || string.IsNullOrWhiteSpace(actualKind)) return true;
+            static string Norm(string k)
+            {
+                var s = k.Trim();
+                var dot = s.LastIndexOf('.');
+                return (dot >= 0 ? s.Substring(dot + 1) : s).ToLowerInvariant();
+            }
+            return Norm(expectedKind!) == Norm(actualKind!);
         }
 
         /// <summary>
@@ -151,6 +172,18 @@ namespace TiaMcpServer.ModelContextProtocol
                     unavailable.Add("MemoryLayout (not exposed on read-back)");
                 else if (!string.Equals(expected.MemoryLayout, actual.MemoryLayout, StringComparison.OrdinalIgnoreCase))
                     mismatches.Add($"MemoryLayout expected '{expected.MemoryLayout}' actual '{actual.MemoryLayout}'");
+            }
+
+            if (!KindMatches(expected.BlockKind, actual.BlockKind))
+                mismatches.Add($"block kind expected '{expected.BlockKind}' actual '{actual.BlockKind}'");
+
+            // 循环中断的周期写进了 XML 就必须生效：写错单位（ms 当 µs）只有这里抓得住。
+            if (expected.CyclicTimeUs.HasValue)
+            {
+                if (!actual.CyclicTimeUs.HasValue)
+                    unavailable.Add("CyclicTime (not exposed on read-back)");
+                else if (expected.CyclicTimeUs.Value != actual.CyclicTimeUs.Value)
+                    mismatches.Add($"CyclicTime expected '{expected.CyclicTimeUs.Value}' µs actual '{actual.CyclicTimeUs.Value}' µs");
             }
 
             // PriorityNumber 走 XML 往返必丢：导出文档里没有这一项，读回侧也常常不暴露。

@@ -46,6 +46,11 @@
 - **`PlcBuildAndImport` 导入失败照常返回**（`isError=false`，失败只写在 `Failed[]` 里），
   `ScaffoldProject` / `PatchProject` 因此把没导进去的一步记成 "ok"。现在导入失败或读回不符都报错，
   两个编排工具随之如实记为 failed。
+- **`ImportFromDocuments` 按文件名读回（#30 的用户报告）。** `OB100.s7dcl` 里声明的是 `"Startup"`，
+  导入成功却报 `verified=false`（V21 实测复现）；导入前后保持块号也按文件名找块，同样落空。现在按
+  `.s7dcl` 里声明的块名；导入的是 OB 时额外警告它已丢失块号与事件类别。
+- **导入读回按编号兜底时不看块种类**：DB100 / FC100 / OB100 编号相同，可能认错块；模糊名匹配也可能让
+  `Startup_1` 顶替 `Startup`。现在按编号兜底要求种类一致，模糊匹配只在恰好命中一个时才算。
 
 ### 新功能
 
@@ -57,6 +62,12 @@
 - **`PlcBuildAndImport` 导入块后读回校验**：块名 + 块号 + OB 类型 + 存储器布局，结果在
   `Meta.verified` / `Meta.readback`；读回与生成的 XML 不符即报错。`ImportBlock` 的读回也多比
   一项存储器布局。
+- **`PlcBuildAndImport kind=ob` 与新工具 `BuildPlcObXml`（#30）。** 支持程序循环（OB1 / OB123+）、
+  启动（OB100 / OB123+）、循环中断（OB30..38 / OB123+，`cyclicTimeUs` 必填，可选 `phaseOffsetUs`）；
+  OB1 / OB100 / OB30..38 的类别可省略、按块号推断。块号与类别的配对在生成 XML 前就校验
+  （TIA 导入期同一规则，实测 OB101 配循环中断被拒）。导入后读回块名、块号、事件类别、循环周期。
+  **OB 不要走 `.s7dcl`**：SD 文本头不带块号与事件类别，V21 实测 Startup/OB100 的内容导进去一律变成
+  「程序循环」OB 且不报错 —— 编写指南与 `ImportFromDocuments` 的警告都已写明。
 
 ### 安全
 

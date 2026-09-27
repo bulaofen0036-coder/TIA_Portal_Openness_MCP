@@ -84,11 +84,11 @@
     }
   },
   "capabilities": {
-    "mcpToolCount": 222,
+    "mcpToolCount": 223,
     "mcpToolLayers": {
-      "L0": 9,
-      "L1": 38,
-      "L2": 164
+      "L0": 10,
+      "L1": 45,
+      "L2": 168
     },
     "newToolsThisRelease": [
       "HealthCheck (v2.4.0)",
@@ -113,11 +113,11 @@
       "reflection-based API discovery for uncovered Openness shapes"
     ],
     "liteProfile": {
-      "toolCount": 52,
+      "toolCount": 62,
       "isDefault": true,
-      "scope": "L0+L1 essentials + FindTools/CallTool; covers the full golden path",
+      "scope": "core golden-path tools (plus the CPU-changing and delete tools, listed by name) + FindTools/CallTool",
       "optOut": "--profile full  (or TIA_MCP_PROFILE=full, or `tia config --full`)",
-      "note": "The other 166 tools stay reachable on demand via FindTools + CallTool; nothing is removed."
+      "note": "The other 161 tools stay reachable on demand via FindTools + CallTool; nothing is removed."
     }
   },
   "validationSnapshot": {

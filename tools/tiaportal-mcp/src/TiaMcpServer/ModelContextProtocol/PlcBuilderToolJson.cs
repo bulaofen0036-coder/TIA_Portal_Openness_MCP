@@ -134,6 +134,58 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
+        private static readonly string[] ObKeys =
+        {
+            "blockName", "obName", "name", "blockNumber", "obNumber", "number", "eventClass", "secondaryType",
+            "cyclicTimeUs", "cyclicTimeMs", "phaseOffsetUs", "temps",
+            "structuredText", "structuredTextInnerXml", "structuredTextXml", "sclInnerXml",
+            "commentZhCn", "blockCommentZhCn", "comment", "titleZhCn", "blockTitleZhCn", "title",
+            "networkCommentZhCn", "networkComment", "networkTitleZhCn", "networkTitle"
+        };
+
+        /// <summary>
+        /// kind=ob（issue #30）。新 kind 没有历史调用方，所以一开始就严格：未知键报错。
+        /// 程序体可以为空（占位用的循环中断 OB 很常见），不像 FC 那样必须给 StructuredText。
+        /// </summary>
+        public static JsonObject BuildOb(string json)
+        {
+            var root = ParseObject(json, "$");
+            RejectUnknownKeys(root, "$", ObKeys);
+            var obName = ReadString(root, "$.blockName", "blockName", "obName", "name");
+            var obNumber = ReadInt(root, "$.blockNumber", "blockNumber", "obNumber", "number");
+            var eventClass = ReadOptionalString(root, "eventClass", "secondaryType");
+
+            var cyclicUs = ReadOptionalInt(root, "cyclicTimeUs");
+            var cyclicMs = ReadOptionalInt(root, "cyclicTimeMs");
+            if (cyclicUs.HasValue && cyclicMs.HasValue && cyclicUs.Value != cyclicMs.Value * 1000)
+                throw new ArgumentException($"$.cyclicTimeUs={cyclicUs.Value} contradicts $.cyclicTimeMs={cyclicMs.Value}. Give only one of them.");
+            var cyclicTimeUs = cyclicUs ?? (cyclicMs.HasValue ? cyclicMs.Value * 1000 : (int?)null);
+            var phaseOffsetUs = ReadOptionalInt(root, "phaseOffsetUs");
+
+            var temps = ReadOptionalMembers(root, "temps", "$.temps");
+            var hasBody = root["structuredText"] is JsonObject
+                || !string.IsNullOrWhiteSpace(ReadOptionalString(root, "structuredTextInnerXml", "structuredTextXml", "sclInnerXml"));
+            var structuredTextInnerXml = hasBody ? ReadStructuredTextInnerXml(root) : "";
+
+            var normalizedClass = PlcObXmlBuilder.NormalizeEventClass(eventClass, obNumber);
+            var xml = PlcObXmlBuilder.BuildXml(obName, obNumber, normalizedClass, cyclicTimeUs, phaseOffsetUs, temps, structuredTextInnerXml,
+                ReadOptionalString(root, "commentZhCn", "blockCommentZhCn", "comment"),
+                ReadOptionalString(root, "titleZhCn", "blockTitleZhCn", "title"),
+                ReadOptionalString(root, "networkCommentZhCn", "networkComment"),
+                ReadOptionalString(root, "networkTitleZhCn", "networkTitle"));
+            var summary = new JsonObject
+            {
+                ["obName"] = obName,
+                ["obNumber"] = obNumber,
+                ["eventClass"] = normalizedClass,
+                ["tempCount"] = temps.Length,
+                ["hasBody"] = hasBody
+            };
+            if (cyclicTimeUs.HasValue) summary["cyclicTimeUs"] = cyclicTimeUs.Value;
+            if (phaseOffsetUs.HasValue) summary["phaseOffsetUs"] = phaseOffsetUs.Value;
+            return BuildResult("plc-build-ob-xml", xml, summary);
+        }
+
         public static JsonObject BuildStructuredText(string json, bool innerOnly = false)
         {
             var root = ParseObject(json, "$");

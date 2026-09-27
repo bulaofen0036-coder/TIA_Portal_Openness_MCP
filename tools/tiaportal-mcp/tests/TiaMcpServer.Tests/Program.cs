@@ -78,6 +78,12 @@ namespace TiaMcpServer.Tests
             Console.WriteLine("== GlobalDB 存储器布局可选 + 导入后读回布局（issue #31）==");
             PlcGlobalDbBuilderTests.Run(Check);
 
+            Console.WriteLine("== OB 构建：块号与类别配对、循环周期、与 V21 真实导出对拍（issue #30）==");
+            PlcObBuilderTests.Run(Check);
+
+            Console.WriteLine("== .s7dcl 声明的块名：读回不再按文件名（issue #30）==");
+            S7DclHeaderTests.Run(Check);
+
             Console.WriteLine(_fail == 0
                 ? $"{_pass} passed, {_fail} failed, {_skip} skipped."
                 : $"{_pass} passed, {_fail} failed, {_skip} skipped.  <<< 有失败");

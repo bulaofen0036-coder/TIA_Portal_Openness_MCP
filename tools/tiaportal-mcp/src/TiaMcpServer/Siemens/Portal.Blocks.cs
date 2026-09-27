@@ -1259,7 +1259,9 @@ namespace TiaMcpServer.Siemens
             // lives in a different group than the import target, deletes+recreates it (losing its
             // number and original group). We restore the number afterwards so callers/instance DBs
             // and the project tree stay stable.
-            var existing = FindBlockRecursive(plcSoftware.BlockGroup, fileNameWithoutExtension);
+            // 按 .s7dcl 里声明的块名找，不按文件名：OB100.s7dcl 里声明的可能是 "Startup"。
+            var declaredName = S7DclHeader.ReadDeclaredBlock(importPath, fileNameWithoutExtension)?.Name ?? fileNameWithoutExtension;
+            var existing = FindBlockRecursive(plcSoftware.BlockGroup, declaredName);
             int? prevNumber = null;
             bool prevAutoNumber = false;
             try { if (existing != null) { prevNumber = existing.Number; prevAutoNumber = existing.AutoNumber; } } catch { }
@@ -1292,7 +1294,7 @@ namespace TiaMcpServer.Siemens
             // are addressed by name, so this is cosmetic-but-important for a stable, diffable project).
             if (prevNumber.HasValue)
             {
-                var imported = FindBlockRecursive(plcSoftware.BlockGroup, fileNameWithoutExtension);
+                var imported = FindBlockRecursive(plcSoftware.BlockGroup, declaredName);
                 if (imported != null)
                 {
                     try
@@ -1309,7 +1311,7 @@ namespace TiaMcpServer.Siemens
                     }
                     catch (Exception ex)
                     {
-                        _logger?.LogWarning(ex, $"Could not restore block number {prevNumber} for {fileNameWithoutExtension}");
+                        _logger?.LogWarning(ex, $"Could not restore block number {prevNumber} for {declaredName}");
                     }
                 }
             }

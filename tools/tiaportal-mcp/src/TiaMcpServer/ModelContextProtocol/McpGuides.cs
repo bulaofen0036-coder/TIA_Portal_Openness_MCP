@@ -25,6 +25,7 @@ THE TOOL LIST YOU SEE IS NOT THE WHOLE SERVER. By default only the core 'lite' t
 GOLDEN PATHS (pick one, do not improvise):
 - Whole new project → ScaffoldProject with ONE JSON spec (PLC + blocks + HMI + compile + save in a single call). The DEFAULT call is a dry run (offline spec validation, nothing created); when it reports clean, call again with dryRun=false to actually create.
 - Add/modify code in an existing project → write SCL or S7DCL text files, then ImportFromDocuments (PREFERRED, .s7dcl) or GenerateBlocksFromExternalSource (.scl). NEVER hand-write SimaticML FlgNet XML for ladder logic — it is fragile (UId bookkeeping, XML entities) and the #1 cause of failed imports. Use S7DCL ladder text instead (GetAuthoringGuide topic 'lad').
+- EXCEPTION — organization blocks (OBs): do NOT author an OB as .s7dcl. The SD header carries no OB number or event class, so TIA imports every such OB as a Program-cycle OB (a Startup/OB100 or cyclic-interrupt OB silently becomes a program-cycle OB, no error). Build OBs with PlcBuildAndImport kind=ob (eventClass ProgramCycle | Startup | CyclicInterrupt + cyclicTimeUs), and keep complex logic in an FC/FB (.s7dcl is fine there) that the OB calls.
 - Read/understand a project → GetProjectTree, GetBlocksWithHierarchy. To READ ONE BLOCK'S LOGIC use DescribeBlockLogic — it returns readable LADDER rungs (series ' · ', parallel ' + ') and inline SCL, and flags contacts wired to a constant (a disabled/forced rung). Far faster and more accurate than exporting and reading FlgNet XML by hand. Do NOT hand-parse ladder XML.
 
 BEFORE WRITING CODE call GetAuthoringGuide with topic 'scl' or 'lad' — it returns the exact verified syntax and encoding rules. Most quality problems come from skipping this.
@@ -46,7 +47,7 @@ DISCIPLINE:
 @"WORKFLOW (verified order):
 Connect → (OpenProject | AttachToOpenProject | CreateProject) → GetProjectTree → read/write → CompileSoftware → SaveProject.
 - ScaffoldProject: one JSON spec builds PLC + tag tables + UDT/DB + SCL/LAD blocks + HMI screens + compile + save. dryRun=true validates offline (block shapes, file existence) without touching TIA. Use it for anything bigger than a single block.
-- PlcBuildAndImport: batch-import block set with compileAfter; also supports dryRun.
+- PlcBuildAndImport: build + import one UDT / tag table / GlobalDB / FC / FB / OB from JSON, with compileAfter and dryRun; blocks are read back after import (Meta.verified / Meta.readback).
 - softwarePath is the PLC SOFTWARE name (e.g. '5T车', 'PLC_1'), NOT the device/station name. When rejected, GetProjectTree shows the real one; fuzzy matching exists but exact is faster.
 - Openness export does not work while online: tools auto GoOffline where safe; if you see 'not supported in online mode', call GoOffline(softwarePath) and retry.
 - Cold start is slow (TIA launch). If many operations are planned, keep one session; do not Disconnect between calls.
@@ -83,6 +84,7 @@ Rules that prevent 90% of compile errors:
 - FC with return: FUNCTION ""FC_Name"" : Bool ... assign #FC_Name := ...;
 - S7-1200 TIME from an Int number of seconds: '#n * T#1S' fails ('Operator * not compatible with Int and Time'). Use PT := DINT_TO_TIME(INT_TO_DINT(#sec) * 1000).
 - Do NOT put OB1 in a .scl external source (ORGANIZATION_BLOCK ""Main""): it collides with the CPU's auto-generated OB1 and the WHOLE source rolls back atomically — even FBs that report 'compiled' do not land. Author OB1 calls separately.
+- OBs in general: build them with PlcBuildAndImport kind=ob, never as .s7dcl / .scl (text formats carry no OB number or event class — the OB lands as a program-cycle OB).
 - A comment placed BEFORE the FUNCTION_BLOCK / FUNCTION header is discarded (treated as a file-level comment). Put block comments you need to keep AFTER BEGIN, inside the block body.
 INSTRUCTION GOTCHAS (compile-verified on S7-1500/V21 — these are the ones weak models get wrong):
 - Power/exponent: use the '**' operator (#x ** 2.0). EXPT(IN1:=,IN2:=) is NOT an SCL function ('Tag EXPT not defined').

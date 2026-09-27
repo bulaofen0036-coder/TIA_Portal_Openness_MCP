@@ -7,7 +7,7 @@ description: Drive Siemens TIA Portal (博途) end-to-end through the TiaMcpServ
 
 This is the operating skill for TIA Portal MCP automation. The
 companion plugin lives at `tools/tiaportal-mcp/`. It exposes on the order of
-**222** MCP tools (default lite profile lists 62; exact runtime set: call `tools/list` on the running server) covering
+**223** MCP tools (default lite profile lists 62; exact runtime set: call `tools/list` on the running server) covering
 project, hardware, PLC, HMI, and online operations.
 
 ## 0. Always start here
@@ -50,7 +50,7 @@ else unless one of these tools' output explicitly tells you to call another:
 参数名时，照本表/§8 的"精确参数名"抄，不要猜。HMI 美化看 §12，库复用看 §15。
 
 **降门槛三件套(已内置，弱模型友好):**
-- **Lite 工具档位（默认）** — `tools/list` 默认只暴露 62 个核心工具(全部 222 个)，其余用
+- **Lite 工具档位（默认）** — `tools/list` 默认只暴露 62 个核心工具(全部 223 个)，其余用
   `FindTools` + `CallTool` 随用随取；弱模型不会在工具海里选错，VS Code 的 128 工具上限也不再爆。
   会动 CPU 或删工程数据的 7 个工具(DownloadToPlc / GoOnline / SetWatchTableModifyValue / Delete*)
   始终以本名列出，`CallTool` 拒绝转发它们。要全量：`--profile full` 或 `TIA_MCP_PROFILE=full`，

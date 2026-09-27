@@ -101,7 +101,7 @@ namespace TiaMcpServer.Tests
             var noLayout = BlockSnapshotCompare.ReadExpectedBlockFromXml(
                 "<Document><SW.Blocks.FC ID=\"0\"><AttributeList><Name>FC_X</Name><Number>5</Number></AttributeList></SW.Blocks.FC></Document>");
             check(noLayout != null && noLayout.MemoryLayout == null
-                  && BlockSnapshotCompare.CompareBlockSnapshots(noLayout, Actual("FC_X", 5, "Optimized")).State == PlcBlockVerificationState.Verified,
+                  && BlockSnapshotCompare.CompareBlockSnapshots(noLayout, Actual("FC_X", 5, "Optimized", "FC")).State == PlcBlockVerificationState.Verified,
                 "XML without MemoryLayout → layout is not compared");
         }
 
@@ -111,8 +111,8 @@ namespace TiaMcpServer.Tests
         private static string? LayoutOf(JsonObject built) =>
             XDocument.Parse(built["xml"]!.GetValue<string>()).Descendants("MemoryLayout").FirstOrDefault()?.Value;
 
-        private static PlcBlockAttributeSnapshot Actual(string name, int number, string? layout) =>
-            new PlcBlockAttributeSnapshot { Name = name, Number = number, BlockKind = "GlobalDB", MemoryLayout = layout };
+        private static PlcBlockAttributeSnapshot Actual(string name, int number, string? layout, string kind = "GlobalDB") =>
+            new PlcBlockAttributeSnapshot { Name = name, Number = number, BlockKind = kind, MemoryLayout = layout };
 
         private static bool Throws(Action action, string messageFragment)
         {

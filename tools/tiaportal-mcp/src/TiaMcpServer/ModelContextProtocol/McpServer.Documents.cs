@@ -311,6 +311,22 @@ namespace TiaMcpServer.ModelContextProtocol
                     });
                 }
 
+                // 读回按 .s7dcl 里**声明的**块名，不按文件名（issue #30：OB100.s7dcl 声明 "Startup"，
+                // 按文件名找会把一次成功的导入报成 NOT found）。头读不出来才退回文件名，并如实说明。
+                var declared = S7DclHeader.ReadDeclaredBlock(importPath, fileNameWithoutExtension);
+                var blockName = declared?.Name ?? fileNameWithoutExtension;
+                if (declared?.IsOrganizationBlock == true)
+                {
+                    // V21 实测：.s7dcl 的 ORGANIZATION_BLOCK 头不带块号和事件类别，导入后一律是程序循环 OB。
+                    warnings.Add(new JsonObject
+                    {
+                        ["name"] = blockName,
+                        ["warning"] = "OB imported from .s7dcl: the SD format carries no OB number or event class, so TIA creates a Program-cycle OB "
+                            + "(a Startup/OB100 or cyclic-interrupt OB silently becomes a program-cycle OB). Build OBs with PlcBuildAndImport kind=ob "
+                            + "and keep complex logic in an FC/FB called from it."
+                    });
+                }
+
                 var ok = WithAutoOffline(() => Portal.ImportFromDocuments(softwarePath, groupPath, importPath, fileNameWithoutExtension, option));
                 if (ok)
                 {
@@ -318,21 +334,23 @@ namespace TiaMcpServer.ModelContextProtocol
                     // Wrapped so a verification hiccup never masks a successful import.
                     bool verified = false;
                     string verifyDetail;
+                    var nameSource = declared != null
+                        ? (string.Equals(blockName, fileNameWithoutExtension, StringComparison.OrdinalIgnoreCase) ? "" : $" (declared in {fileNameWithoutExtension}.s7dcl)")
+                        : " (block header not readable; checked by file name)";
                     try
                     {
-                        var escaped = Regex.Escape(fileNameWithoutExtension);
+                        var escaped = Regex.Escape(blockName);
                         var found = Portal.GetBlocks(softwarePath, $"^{escaped}$");
-                        if (found == null || found.Count == 0) found = Portal.GetBlocks(softwarePath, escaped);
                         verified = found != null && found.Count > 0;
                         verifyDetail = verified
-                            ? $"block '{fileNameWithoutExtension}' present after import"
-                            : $"block '{fileNameWithoutExtension}' NOT found after import — check name/group";
+                            ? $"block '{blockName}'{nameSource} present after import"
+                            : $"block '{blockName}'{nameSource} NOT found after import — check name/group";
                     }
                     catch (Exception vex) { verifyDetail = "readback skipped: " + vex.Message; }
 
                     return new ResponseImportFromDocuments
                     {
-                        Message = $"Imported '{fileNameWithoutExtension}' from '{importPath}'" + (verified ? " (verified)" : ""),
+                        Message = $"Imported '{blockName}' from '{importPath}'" + (verified ? " (verified)" : ""),
                         Meta = new JsonObject
                         {
                             ["timestamp"] = DateTime.Now,

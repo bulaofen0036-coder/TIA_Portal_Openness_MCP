@@ -1,8 +1,8 @@
 {
   "package": "TIA_MCP_Delivery_v2.7.3",
-  "generatedAt": "2026-09-27T16:34:55.980067+08:00",
+  "generatedAt": "2026-09-27T16:35:22.440647+08:00",
   "source": "live MCP tools/list of TiaMcpServer.exe",
-  "toolCount": 222,
+  "toolCount": 223,
   "note": "Full roster (--profile full). The default lite profile lists only the core tools; the rest stay reachable via FindTools + CallTool. Runtime tools/list remains authoritative.",
   "tools": [
     {
@@ -253,6 +253,17 @@
         "globalDbJson"
       ],
       "description": "[L2][PLC-Builders][Offline] Build a TIA V21 PLC GlobalDB XML document from structured JSON. Input: {dbName,dbNumber,optimized?,staticMembers:[{name,datatype,externalWritable?,commentZhCn?,startValue?}]}. optimized defaults to false = Standard (non-optimized) memory layout, which PUT/GET and absolute S7 reads require; optimized=true gives an Optimized DB (memoryLayout:'Standard'|'Optimized' is accepted as an alias). Unknown JSON keys are rejected. It only returns XML; it does not connect to TIA Portal, import blocks, write files, or modify projects."
+    },
+    {
+      "name": "BuildPlcObXml",
+      "layer": "L2",
+      "domain": "PLC-Builders",
+      "method": "BuildPlcObXml",
+      "returnType": "",
+      "parameters": [
+        "obJson"
+      ],
+      "description": "[L2][PLC-Builders][Offline] Build a TIA V21 organization block (OB) XML from structured JSON. Input: {blockName,blockNumber,eventClass?,cyclicTimeUs?,phaseOffsetUs?,temps?:[{name,datatype}],structuredText?:{operations:[]} or structuredTextInnerXml?}. eventClass: ProgramCycle (OB1/OB123+), Startup (OB100/OB123+), CyclicInterrupt (OB30..38/OB123+, needs cyclicTimeUs in microseconds); it is inferred for OB1/OB100/OB30..38. The number/class pairing is checked before any XML is written. Do NOT author OBs as .s7dcl: that format carries no OB number or class and TIA imports them as program-cycle OBs. It only returns XML; import with PlcBuildAndImport kind=ob or ImportBlock."
     },
     {
       "name": "BuildPlcSymbolManifestFromXmlPath",
@@ -2276,7 +2287,7 @@
         "compileAfter",
         "dryRun"
       ],
-      "description": "[L1][PLC-Software] MAIN tool for creating new PLC blocks from natural language. Build one PLC artifact (UDT/tag table/GlobalDB/FC/FB) from structured JSON, then optionally import and compile. Use dryRun=true first to validate. Workflow: describe block in JSON → dryRun → review → dryRun=false to import. Replaces the multi-step Build*Xml + ImportBlock sequence. After a block import it reads the block back (name, number, OB type, memory layout) and returns Meta.verified + Meta.readback; any import failure or read-back mismatch is an error."
+      "description": "[L1][PLC-Software] MAIN tool for creating new PLC blocks from natural language. Build one PLC artifact (UDT/tag table/GlobalDB/FC/FB/OB) from structured JSON, then optionally import and compile. Use dryRun=true first to validate. Workflow: describe block in JSON → dryRun → review → dryRun=false to import. Replaces the multi-step Build*Xml + ImportBlock sequence. After a block import it reads the block back (name, number, OB type, memory layout) and returns Meta.verified + Meta.readback; any import failure or read-back mismatch is an error."
     },
     {
       "name": "PlugDeviceItem",

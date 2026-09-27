@@ -53,22 +53,30 @@ namespace TiaMcpServer.ModelContextProtocol
         }
 
         /// <summary>
-        /// 导入后按 "XML 里声明的块名 + 块编号" 读回一个块。
-        /// 名字找不到就按编号在全量块里兜底 —— OB 的名字可以被工程改掉，编号不会。
+        /// 导入后按 "XML 里声明的块名 + 块编号" 读回一个块，顺序：
+        /// 1. 名字精确匹配；
+        /// 2. 编号 + 块种类（OB 的名字可以被工程改掉，编号不会；但 DB100/FC100/OB100 编号相同，必须同时比种类）；
+        /// 3. 名字模糊匹配 —— 只在恰好命中一个块时才算，免得 "Startup_1" 顶替 "Startup"。
         /// </summary>
         internal static PlcBlockAttributeSnapshot? ReadBackPlcBlockSnapshot(string softwarePath, PlcBlockAttributeSnapshot expected)
         {
             var escaped = Regex.Escape(expected.Name);
-            var found = Portal.GetBlocks(softwarePath, $"^{escaped}$");
-            if (found == null || found.Count == 0)
-                found = Portal.GetBlocks(softwarePath, escaped);
-
-            PlcBlock? hit = found?.FirstOrDefault();
+            var exact = Portal.GetBlocks(softwarePath, $"^{escaped}$");
+            PlcBlock? hit = exact?.FirstOrDefault(b => BlockSnapshotCompare.KindMatches(expected.BlockKind, b.GetType().Name))
+                            ?? exact?.FirstOrDefault();
 
             if (hit == null && expected.Number.HasValue)
             {
                 var all = Portal.GetBlocks(softwarePath, "");
-                hit = all?.FirstOrDefault(b => SafeNumber(b) == expected.Number.Value);
+                hit = all?.FirstOrDefault(b => SafeNumber(b) == expected.Number.Value
+                                               && BlockSnapshotCompare.KindMatches(expected.BlockKind, b.GetType().Name));
+            }
+
+            if (hit == null)
+            {
+                var loose = Portal.GetBlocks(softwarePath, escaped);
+                if (loose != null && loose.Count == 1)
+                    hit = loose[0];
             }
 
             return hit == null ? null : SnapshotOf(hit);
@@ -90,6 +98,17 @@ namespace TiaMcpServer.ModelContextProtocol
 
             // 与 GetBlockInfo 读的是同一个属性；读不到记 unavailable，不猜。
             try { snapshot.MemoryLayout = Enum.GetName(typeof(MemoryLayout), block.MemoryLayout); } catch { }
+
+            // 循环中断 OB 的周期只是动态属性（V21 实测 GetBlockInfo 列在 Attributes 里）。
+            if (block is OB && block is IEngineeringObject eo)
+            {
+                try
+                {
+                    if (eo.GetAttributeInfos().Any(a => a.Name == "CyclicTime"))
+                        snapshot.CyclicTimeUs = Convert.ToInt32(eo.GetAttribute("CyclicTime"));
+                }
+                catch { /* 读不到记 unavailable */ }
+            }
 
             snapshot.PriorityNumber = TryReadPriority(block);
             return snapshot;

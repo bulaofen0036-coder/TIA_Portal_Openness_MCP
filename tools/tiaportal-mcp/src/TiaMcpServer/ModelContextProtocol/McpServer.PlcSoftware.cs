@@ -564,6 +564,20 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
+        [McpServerTool(Name = "BuildPlcObXml"), Description("[L2][PLC-Builders][Offline] Build a TIA V21 organization block (OB) XML from structured JSON. Input: {blockName,blockNumber,eventClass?,cyclicTimeUs?,phaseOffsetUs?,temps?:[{name,datatype}],structuredText?:{operations:[]} or structuredTextInnerXml?}. eventClass: ProgramCycle (OB1/OB123+), Startup (OB100/OB123+), CyclicInterrupt (OB30..38/OB123+, needs cyclicTimeUs in microseconds); it is inferred for OB1/OB100/OB30..38. The number/class pairing is checked before any XML is written. Do NOT author OBs as .s7dcl: that format carries no OB number or class and TIA imports them as program-cycle OBs. It only returns XML; import with PlcBuildAndImport kind=ob or ImportBlock.")]
+        public static ResponseXmlBuild BuildPlcObXml(
+            [Description("obJson: JSON object with blockName/obName/name, blockNumber/obNumber/number, optional eventClass, cyclicTimeUs (or cyclicTimeMs), phaseOffsetUs, temps[], and an optional body (structuredText.operations[] or structuredTextInnerXml). Unknown keys are rejected.")] string obJson)
+        {
+            try
+            {
+                return BuildOfflineXmlBuilderReport(PlcBuilderToolJson.BuildOb(obJson), "PLC OB XML built offline");
+            }
+            catch (Exception ex) when (ex is not McpException)
+            {
+                throw new McpException($"Invalid PLC OB builder input: {ex.Message}", ex, McpErrorCode.InvalidParams);
+            }
+        }
+
         [McpServerTool(Name = "BuildStructuredTextXml"), Description("[L2][PLC-Builders][Offline] Build a TIA V21 StructuredText/v4 XML fragment from operation JSON. Input: {operations:[{op:'if'|'else'|'endif'|'assignment'|'token'|'blank'|'newline', ...}]}. It only returns XML; it does not connect to TIA Portal, import blocks, write files, or modify projects.")]
         public static ResponseXmlBuild BuildStructuredTextXml(
             [Description("structuredTextJson: JSON object with operations[]. assignment uses target + literalValue/value; if uses condition/variable; token uses text.")] string structuredTextJson,
@@ -635,14 +649,14 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
-        [McpServerTool(Name = "PlcBuildAndImport"), Description("[L1][PLC-Software] MAIN tool for creating new PLC blocks from natural language. Build one PLC artifact (UDT/tag table/GlobalDB/FC/FB) from structured JSON, then optionally import and compile. Use dryRun=true first to validate. Workflow: describe block in JSON → dryRun → review → dryRun=false to import. Replaces the multi-step Build*Xml + ImportBlock sequence. After a block import it reads the block back (name, number, OB type, memory layout) and returns Meta.verified + Meta.readback; any import failure or read-back mismatch is an error.")]
+        [McpServerTool(Name = "PlcBuildAndImport"), Description("[L1][PLC-Software] MAIN tool for creating new PLC blocks from natural language. Build one PLC artifact (UDT/tag table/GlobalDB/FC/FB/OB) from structured JSON, then optionally import and compile. Use dryRun=true first to validate. Workflow: describe block in JSON → dryRun → review → dryRun=false to import. Replaces the multi-step Build*Xml + ImportBlock sequence. After a block import it reads the block back (name, number, OB type, memory layout) and returns Meta.verified + Meta.readback; any import failure or read-back mismatch is an error.")]
         public static ResponsePlcProgramImport PlcBuildAndImport(
             [Description("softwarePath: PLC software path, e.g. 'PLC_1'. Required only when dryRun=false.")] string softwarePath,
-            [Description("kind: udt|tagtable|globaldb|fc|fb")] string kind,
+            [Description("kind: udt|tagtable|globaldb|fc|fb|ob")] string kind,
             [Description("json: structured JSON matching the corresponding BuildPlc* tool.")] string json,
             [Description("typeGroupPath: PLC data type group path for kind=udt.")] string typeGroupPath = "",
             [Description("tagFolderPath: PLC tag table group path for kind=tagtable.")] string tagFolderPath = "",
-            [Description("blockGroupPath: PLC block group path for kind=globaldb|fc|fb.")] string blockGroupPath = "",
+            [Description("blockGroupPath: PLC block group path for kind=globaldb|fc|fb|ob.")] string blockGroupPath = "",
             [Description("compileAfter: compile PLC after import when dryRun=false.")] bool compileAfter = true,
             [Description("dryRun: true builds XML and returns the import plan without importing/compiling.")] bool dryRun = true)
         {
@@ -720,7 +734,8 @@ namespace TiaMcpServer.ModelContextProtocol
                             ["number"] = actual.Number,
                             ["blockKind"] = actual.BlockKind,
                             ["secondaryType"] = actual.SecondaryType,
-                            ["memoryLayout"] = actual.MemoryLayout
+                            ["memoryLayout"] = actual.MemoryLayout,
+                            ["cyclicTimeUs"] = actual.CyclicTimeUs
                         };
                     }
                 }
@@ -867,7 +882,9 @@ namespace TiaMcpServer.ModelContextProtocol
                 "function" => "fc",
                 "fb" => "fb",
                 "functionblock" => "fb",
-                _ => throw new ArgumentException("Unsupported PLC build kind. Supported values: udt|tagtable|globaldb|fc|fb.")
+                "ob" => "ob",
+                "organizationblock" => "ob",
+                _ => throw new ArgumentException("Unsupported PLC build kind. Supported values: udt|tagtable|globaldb|fc|fb|ob.")
             };
         }
 
@@ -880,6 +897,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 "globaldb" => PlcBuilderToolJson.BuildGlobalDb(json),
                 "fc" => PlcBuilderToolJson.ComposeFcBlock(json),
                 "fb" => PlcBuilderToolJson.ComposeFbBlock(json),
+                "ob" => PlcBuilderToolJson.BuildOb(json),
                 _ => throw new ArgumentException("Unsupported PLC build kind: " + kind)
             };
         }
@@ -894,7 +912,7 @@ namespace TiaMcpServer.ModelContextProtocol
         private static PlcBuildCapabilityDecision AnalyzePlcBuildCapability(string kind, string json)
         {
             var result = new PlcBuildCapabilityDecision();
-            if (kind != "fc" && kind != "fb")
+            if (kind != "fc" && kind != "fb" && kind != "ob")
             {
                 result.Decision = "declaration-xml";
                 result.NextActions.Add("Import generated declaration XML in dependency order, then run CompileAndDiagnosePlc.");
@@ -941,7 +959,11 @@ namespace TiaMcpServer.ModelContextProtocol
             {
                 result.Decision = "external-scl-recommended";
                 result.Warnings.Add("The PLC XML DSL is intentionally narrow. Complex SCL expressions were detected: " + string.Join("; ", risky.Take(8)));
-                result.NextActions.Add("Prefer a native .scl/.s7dcl external source and import via ImportFromDocuments/ImportBlocksFromDocuments, or use a verified SCL template from templates/plc/scl-examples.");
+                if (kind == "ob")
+                    // .s7dcl 导 OB 会丢块号和事件类别（变成程序循环 OB），不能把 OB 本身推给那条路。
+                    result.NextActions.Add("Keep the OB itself on kind=ob (an OB authored as .s7dcl loses its number and event class). Put the complex logic in an FC/FB authored as .s7dcl (ImportBlocksFromDocuments) and call it from the OB body.");
+                else
+                    result.NextActions.Add("Prefer a native .scl/.s7dcl external source and import via ImportFromDocuments/ImportBlocksFromDocuments, or use a verified SCL template from templates/plc/scl-examples.");
                 result.NextActions.Add("If you still use XML DSL, split expressions into verified primitive operations and run dryRun=true plus CompileAndDiagnosePlc.");
             }
             else
