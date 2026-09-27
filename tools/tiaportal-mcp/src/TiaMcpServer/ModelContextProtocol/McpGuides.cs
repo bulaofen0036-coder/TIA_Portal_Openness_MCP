@@ -135,6 +135,7 @@ Mixed LAD+SCL blocks are supported by .s7dcl. After import: CompileSoftware, the
             ["db"] =
 @"DB / UDT / TAG TABLES (verified):
 - Global DB: BuildPlcGlobalDbXml → ImportBlock (XML, UTF-8 WITH BOM), or PlcBuildAndImport kind=globaldb in one step. Members need Name + Datatype (+ optional StartValue).
+- PUT/GET between two PLCs needs an S7 connection in the calling PLC's connection table: CreateS7Connection (TIA V21+; partnerPlc for a PLC in this project, partnerIp for one in another project). The instruction's ID input is the connection's local ID (hex, e.g. 16#101); list them with GetPlcConnections.
 - DB memory layout: the builder defaults to Standard (non-optimized). PUT/GET partners, absolute S7 reads and classic-HMI absolute tags NEED Standard; pass ""optimized"":true only for a symbolic-only DB. PlcBuildAndImport reads the layout back (Meta.readback.memoryLayout) and fails on a mismatch; GetBlockInfo.MemoryLayout shows it for any existing DB.
 - UDT: BuildPlcUdtXml → ImportType. A UDT with no members is invalid (dryRun catches it).
 - Tag tables: BuildPlcTagTableXml → ImportPlcTagTable; logical addresses like %I0.0 / %Q0.1 / %MW10.

@@ -13,7 +13,10 @@ namespace TiaMcpServer.Siemens
         HardwareHmiConnection,
 
         /// <summary>SIMATIC SD / S7DCL document export (ExportAsDocuments), available V20 and newer.</summary>
-        DocumentExport
+        DocumentExport,
+
+        /// <summary>PLC connection table (S7 connections etc.) via Siemens.Engineering.HW.CommunicationConnections (V21+ only; absent on V20).</summary>
+        PlcConnections
     }
 
     public class CapabilityInfo
@@ -36,14 +39,16 @@ namespace TiaMcpServer.Siemens
             new Dictionary<TiaFeature, int>
             {
                 [TiaFeature.HardwareHmiConnection] = 21,
-                [TiaFeature.DocumentExport] = 20
+                [TiaFeature.DocumentExport] = 20,
+                [TiaFeature.PlcConnections] = 21
             };
 
         private static readonly IReadOnlyDictionary<TiaFeature, string> Notes =
             new Dictionary<TiaFeature, string>
             {
                 [TiaFeature.HardwareHmiConnection] = "Siemens.Engineering.HW.CommunicationConnections is not exposed on TIA V20; hardware HMI connection creation requires V21 or newer.",
-                [TiaFeature.DocumentExport] = "ExportAsDocuments (SIMATIC SD / S7DCL) requires TIA Portal V20 or newer."
+                [TiaFeature.DocumentExport] = "ExportAsDocuments (SIMATIC SD / S7DCL) requires TIA Portal V20 or newer.",
+                [TiaFeature.PlcConnections] = "Siemens.Engineering.HW.CommunicationConnections is not exposed on TIA V20; creating or listing PLC connections (S7 connections for PUT/GET) requires V21 or newer. On V20 create the connection in the TIA network view."
             };
 
         /// <summary>True when the connected portal version supports the feature. Unknown version (0) is treated as supported to avoid false negatives.</summary>

@@ -73,5 +73,7 @@
     <!-- Unified 画面事件脚本与脚本模块导入（issue #38）：事件名规范化（Enum.Parse 吃数字和逗号列表）
          与模块目录预检（TIA 只回 false 或一句 "no YAML files"）。 -->
     <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\UnifiedHmiScriptArgs.cs" Link="UnifiedHmiScriptArgs.cs" />
+    <!-- S7 连接（issue #29）：ID 按十六进制、伙伴二选一、连接名唯一，以及只把挂在连接名下的编译错误算到连接头上。 -->
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\S7ConnectionArgs.cs" Link="S7ConnectionArgs.cs" />
   </ItemGroup>
 </Project>

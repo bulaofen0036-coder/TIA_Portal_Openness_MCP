@@ -34,6 +34,9 @@ namespace TiaMcpServer.Tests
             Pin("ImportBlock", s => s.Destructive, "imports use Override semantics");
             Pin("SetUnifiedHmiScreenEventScriptCode", s => s.Destructive && s.Idempotent && s.TouchesPortal && !s.DirectOnly,
                 "writes a screen script; same input, same result (issue #38)");
+            Pin("CreateS7Connection", s => !s.ReadOnly && !s.Destructive && !s.Idempotent && s.TouchesPortal && !s.DirectOnly,
+                "adds a connection; a second call adds another or is refused on the name (issue #29)");
+            Pin("GetPlcConnections", s => s.ReadOnly && s.TouchesPortal, "lists the connection table");
             Pin("ImportUnifiedHmiScriptModule", s => s.Destructive && !s.Idempotent && s.TouchesPortal && !s.DirectOnly,
                 "imports can overwrite an existing module (issue #38)");
             Pin("CloseProject", s => s.Destructive, "closing loses unsaved edits");

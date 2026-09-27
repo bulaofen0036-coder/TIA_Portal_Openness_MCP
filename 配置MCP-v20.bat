@@ -16,7 +16,7 @@ echo.
 "%EXE%" config %*
 echo.
 echo 完成后请重启对应 AI 客户端。
-echo 提示：默认写入精简档（62 个核心工具，弱模型/VS Code 也稳）。要全量 225 个工具改跑：配置MCP-v20.bat --full
+echo 提示：默认写入精简档（62 个核心工具，弱模型/VS Code 也稳）。要全量 227 个工具改跑：配置MCP-v20.bat --full
 echo 提示：连不上/报错时，跑：tia-v20.cmd doctor  一键体检（加 --fix 可自动修 Openness 用户组）
 echo 提示：其它未自动写入的宿主，跑：配置MCP-v20.bat --print  复制配置片段手动粘贴
 pause

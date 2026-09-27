@@ -2,8 +2,8 @@
 
 本文件由源码中的 `[McpServerTool]` 静态抽取生成，运行时仍以 `tools/list` 为准。
 
-- 生成时间：2026-09-27 17:03:20
-- 工具数量：225
+- 生成时间：2026-09-27 17:32:11
+- 工具数量：227
 
 ## L0
 
@@ -153,6 +153,8 @@
 |---|---|
 | GetDeviceItemIoAddresses | [L2][Hardware] READ-ONLY. List the I/O addresses of one device item (signal module, signal board, built-in CPU I/O). Returns each address as ioType + startAddress + length in ENGINE RAW VALUES (startAddress is the byte offset: %I2.0 is startAddress 2). Use this to confirm an address before and after changing it. Device item path looks like 'PLC_1/DI 8x24VDC_1' — get it from GetDeviceItemTree. |
 | SetDeviceItemIoAddress | [L2][Hardware][Destructive] Preview or change the I/O START ADDRESS of one device item (e.g. move a DI module to start at %I2.0 by passing startAddress=2). Defaults to dryRun=true. startAddress is the ENGINE RAW byte offset, not '2.0'. It writes hardware configuration, so a wrong value does NOT fail compilation — the program silently reads a different module. Read back with GetDeviceItemIoAddresses, then CompileSoftware and SaveProject. Overlapping address ranges are rejected by TIA and reported back with the reason. |
+| CreateS7Connection | [L2][Hardware] Create an S7 connection in a PLC's connection table - the connection that PUT/GET instructions reference by its ID. Requires TIA V21+ (not available on V20), Connect + OpenProject. Two cases: (1) partnerPlc = another PLC in this project: both must already be on the same subnet (ConnectDeviceNodesToProfinetSubnet); TIA creates the partner side automatically. (2) partnerIp = partner PLC in another project: an unspecified-partner connection with that address (partnerRack/partnerSlot default 0/1 = S7-1200/1500 CPU). Connection IDs are HEXADECIMAL as in TIA's connection table ('101' = 16#101); leave localConnectionId empty to let TIA assign one (TIA's default is 16#100; IDs below 16#100 were rejected by the hardware compile on S7-1200). The values are read back, and by default the CPU hardware is compiled and any error reported under this connection deletes it again (rollback) and returns the TIA message; compile errors unrelated to the connection (e.g. device security settings) are only counted. PUT/GET additionally needs 'Permit PUT/GET access' on the partner (SetPutGetAccess) and non-optimized DBs (PlcBuildAndImport kind=globaldb, optimized=false). |
+| GetPlcConnections | [L2][Hardware] List a PLC's connection table (S7, TCP, ISO-on-TCP, HMI ... connections) with local/partner IDs, names, addresses, TSAPs and whether each is fully specified. Read-only. Requires TIA V21+ (not available on V20), Connect + OpenProject. Use it to find the connection ID a PUT/GET instruction must use, or to check a connection created by CreateS7Connection. |
 | GetDeviceInfo | [L2][Hardware]Get info from a device from the current project/session |
 | GetDeviceItemInfo | [L2][Hardware]Get info from a device item from the current project/session |
 | GetDeviceItemTree | [L2][Hardware]Get a subtree view for a device item (hardware components + sub device items) |

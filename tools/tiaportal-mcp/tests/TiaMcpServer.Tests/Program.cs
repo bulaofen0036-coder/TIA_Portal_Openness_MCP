@@ -87,6 +87,9 @@ namespace TiaMcpServer.Tests
             Console.WriteLine("== Unified 画面事件名 + 脚本模块目录预检（issue #38）==");
             UnifiedHmiScriptArgsTests.Run(Check);
 
+            Console.WriteLine("== S7 连接：十六进制 ID、伙伴二选一、从硬件编译结果里挑出连接自己的错误（issue #29）==");
+            S7ConnectionArgsTests.Run(Check);
+
             Console.WriteLine(_fail == 0
                 ? $"{_pass} passed, {_fail} failed, {_skip} skipped."
                 : $"{_pass} passed, {_fail} failed, {_skip} skipped.  <<< 有失败");

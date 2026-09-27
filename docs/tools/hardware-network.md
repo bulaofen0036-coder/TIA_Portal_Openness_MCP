@@ -99,6 +99,40 @@ Rules:
 
 Do not pass aliases such as `ip`, `gateway`, or `profinetName` unless those are the exact TIA attribute names returned by `GetDeviceItemInfo` or `GetDeviceItemNetworkInfo`. The tool rejects missing and non-writable attributes and returns applied/rejected lists plus readback evidence.
 
+## CreateS7Connection / GetPlcConnections (issue #29, TIA V21+)
+
+S7 connections live in the PLC's connection table and are what PUT/GET instructions reference by their
+connection ID. TIA V21 exposes them through `Siemens.Engineering.HW.CommunicationConnections`
+(`GetService<CommunicationManagement>()` on the CPU device item). V20 does not, so both tools report
+"requires V21" there.
+
+Partner PLC in the same project (both PLCs already on one subnet, e.g. via `ConnectDeviceNodesToProfinetSubnet`):
+
+```json
+{ "plc": "PLC_1", "partnerPlc": "PLC_2", "connectionName": "S7_to_PLC2", "localConnectionId": "101" }
+```
+
+TIA creates the partner side automatically (it appears in `GetPlcConnections` for `PLC_2`).
+
+Partner PLC in another project (unspecified partner):
+
+```json
+{ "plc": "PLC_1", "partnerIp": "192.168.0.50", "connectionName": "S7_to_Remote", "localConnectionId": "102" }
+```
+
+`partnerRack` / `partnerSlot` default to 0 / 1 (S7-1200/1500 CPU).
+
+- Connection IDs are **hexadecimal**, as in TIA's connection table: `"101"` means 16#101. `16#101` and
+  `W#16#101` are accepted. Leave `localConnectionId` empty to let TIA assign one (its default is 16#100).
+  On S7-1200 (FW V4.7) IDs below 16#100 were rejected by the hardware compile.
+- Connection names must be unique on the PLC; a clash is refused before anything is created.
+- After creating, the tool reads the values back and (by default) compiles the CPU hardware. An error reported
+  under this connection deletes it again and returns TIA's message. Compile errors elsewhere on the device
+  (for example the S7-1200 "password for confidential PLC configuration data" setting) are only counted
+  (`compile.otherErrorCount`).
+- PUT/GET also needs "Permit access with PUT/GET communication" on the partner CPU (`SetPutGetAccess`) and
+  non-optimized DBs (`PlcBuildAndImport kind=globaldb` defaults to Standard).
+
 ## Safety Notes
 
 - These tools are offline project-edit tools; they do not go online and do not perform Force operations.

@@ -78,6 +78,12 @@
   `Import(DirectoryInfo[, name])`，目录须是 TIA 导出全局脚本的写法：`<名>.hmi.yml`（`ScriptModules` →
   `<名>` → `ScriptFile`）+ `<名>.hmi.js`（V21 实测）。调用 TIA 之前先查目录并讲明写法；
   导入前后各列一次模块名，`name` 参数按 TIA 实际接受的基本名传（带 `.hmi.yml` 后缀会返回 false，这里自动剥掉）。
+- **PLC 连接表：`CreateS7Connection` / `GetPlcConnections`（#29，TIA V21+）。** V21 的 Openness 暴露
+  `HW.CommunicationConnections`（CPU 设备项上 `GetService<CommunicationManagement>()`）。两台 S7-1200 实测：
+  同一工程的伙伴（`partnerPlc`，须同一子网）由 TIA 自动生成对端连接；伙伴在别的工程（`partnerIp`）建未指定伙伴的
+  连接并写入伙伴地址 / 机架 / 槽号，硬件编译通过。连接 ID 按十六进制（与连接表一致，`101` = 16#101）；
+  名字重复在创建前拒绝；创建后读回并编译 CPU 硬件，挂在这条连接下的错误（例如 ID 5 被判超范围）会把连接删掉再报错，
+  与连接无关的设备错误只计数。V20 没有这套 API，两个工具明确报 "requires V21"。
 - **按钮/画面事件脚本写完即读回**（`Meta.readback`）：以前 `setScriptCode=true` 只说明 setter 没抛。
   读回与写入不符即报错。两条路径共用一个写脚本流程。
 

@@ -1,8 +1,8 @@
 {
   "package": "TIA_MCP_Delivery_v2.7.3",
-  "generatedAt": "2026-09-27T17:03:19.739923+08:00",
+  "generatedAt": "2026-09-27T17:32:10.941975+08:00",
   "source": "live MCP tools/list of TiaMcpServer.exe",
-  "toolCount": 225,
+  "toolCount": 227,
   "note": "Full roster (--profile full). The default lite profile lists only the core tools; the rest stay reachable via FindTools + CallTool. Runtime tools/list remains authoritative.",
   "tools": [
     {
@@ -602,6 +602,26 @@
         "closeForeignProject"
       ],
       "description": "[L1][Project] Create a new empty TIA Portal project. Requires: Connect. After creation, call AddDevice to add PLCs/HMIs, then GetProjectTree to verify. The project is automatically opened after creation — no separate OpenProject call needed."
+    },
+    {
+      "name": "CreateS7Connection",
+      "layer": "L2",
+      "domain": "Hardware",
+      "method": "CreateS7Connection",
+      "returnType": "",
+      "parameters": [
+        "plc",
+        "partnerPlc",
+        "partnerIp",
+        "connectionName",
+        "localConnectionId",
+        "partnerConnectionId",
+        "localActive",
+        "partnerRack",
+        "partnerSlot",
+        "verifyWithCompile"
+      ],
+      "description": "[L2][Hardware] Create an S7 connection in a PLC's connection table - the connection that PUT/GET instructions reference by its ID. Requires TIA V21+ (not available on V20), Connect + OpenProject. Two cases: (1) partnerPlc = another PLC in this project: both must already be on the same subnet (ConnectDeviceNodesToProfinetSubnet); TIA creates the partner side automatically. (2) partnerIp = partner PLC in another project: an unspecified-partner connection with that address (partnerRack/partnerSlot default 0/1 = S7-1200/1500 CPU). Connection IDs are HEXADECIMAL as in TIA's connection table ('101' = 16#101); leave localConnectionId empty to let TIA assign one (TIA's default is 16#100; IDs below 16#100 were rejected by the hardware compile on S7-1200). The values are read back, and by default the CPU hardware is compiled and any error reported under this connection deletes it again (rollback) and returns the TIA message; compile errors unrelated to the connection (e.g. device security settings) are only counted. PUT/GET additionally needs 'Permit PUT/GET access' on the partner (SetPutGetAccess) and non-optimized DBs (PlcBuildAndImport kind=globaldb, optimized=false)."
     },
     {
       "name": "CreateVersionControlWorkspace",
@@ -1598,6 +1618,17 @@
         "softwarePath"
       ],
       "description": "[L2][Category:PLC-OpcUA][PreCondition:Connect+OpenProject] Read the full OPC UA server configuration for a PLC: server interfaces, SIMATIC interfaces, and reference namespaces — each with their Name, Enabled state, and key properties. Use this to audit what OPC UA interfaces exist before enabling or exporting them. Enabled=true means the interface is active and will be downloaded to the CPU."
+    },
+    {
+      "name": "GetPlcConnections",
+      "layer": "L2",
+      "domain": "Hardware",
+      "method": "GetPlcConnections",
+      "returnType": "",
+      "parameters": [
+        "plc"
+      ],
+      "description": "[L2][Hardware] List a PLC's connection table (S7, TCP, ISO-on-TCP, HMI ... connections) with local/partner IDs, names, addresses, TSAPs and whether each is fully specified. Read-only. Requires TIA V21+ (not available on V20), Connect + OpenProject. Use it to find the connection ID a PUT/GET instruction must use, or to check a connection created by CreateS7Connection."
     },
     {
       "name": "GetPlcExternalSources",
