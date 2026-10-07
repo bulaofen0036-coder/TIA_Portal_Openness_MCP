@@ -33,6 +33,7 @@ namespace TiaMcpServer.Siemens
 
             var items = new List<HmiDetailItem>();
             var failed = new List<HmiDetailFailure>();
+            var readable = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             var tables = new List<object>();
             if (!string.IsNullOrWhiteSpace(tagTableName))
@@ -52,7 +53,10 @@ namespace TiaMcpServer.Siemens
             }
             else
             {
-                tables.AddRange(HmiDetailRead.EnumerateTagTables(sw));
+                var walkErrors = new List<string>();
+                tables.AddRange(HmiDetailRead.EnumerateTagTables(sw, walkErrors));
+                foreach (var walkError in walkErrors)
+                    failed.Add(new HmiDetailFailure { Name = "", Container = softwarePath, Reason = walkError });
 
                 // No tag table at all is not an empty success: every WinCC HMI has at least a
                 // default table, so "none found" means the walk did not reach the collection.
@@ -78,7 +82,7 @@ namespace TiaMcpServer.Siemens
 
                 foreach (var tag in tags)
                 {
-                    if (HmiDetailRead.TryReadItem(tag, tableName, attributeNames, out var item, out var reason) && item != null)
+                    if (HmiDetailRead.TryReadItem(tag, tableName, attributeNames, out var item, out var reason, readable) && item != null)
                     {
                         items.Add(item);
                     }
@@ -95,13 +99,14 @@ namespace TiaMcpServer.Siemens
             }
 
             var success = HmiDetailRead.IsSuccess(items.Count, failed.Count);
+            var unreadable = HmiDetailRead.UnreadableAttributes(attributeNames, readable, items.Count);
             var scope = string.IsNullOrWhiteSpace(tagTableName) ? "all tables" : $"table='{tagTableName}'";
 
             return new ResponseHmiTagDetails
             {
                 Items = items,
                 Failed = failed,
-                Message = $"HMI tag details read for '{softwarePath}' ({scope}): {items.Count} of {items.Count + failed.Count}",
+                Message = $"HMI tag details read for '{softwarePath}' ({scope}): {items.Count} of {items.Count + failed.Count}" + HmiDetailRead.UnreadableNote(unreadable),
                 Meta = new JsonObject
                 {
                     ["timestamp"] = DateTime.Now,
@@ -110,7 +115,8 @@ namespace TiaMcpServer.Siemens
                     ["failedCount"] = failed.Count,
                     ["tagTableCount"] = tables.Count,
                     ["softwareKind"] = HmiSoftwareKind(sw),
-                    ["attributes"] = string.Join(",", attributeNames)
+                    ["attributes"] = string.Join(",", attributeNames),
+                    ["unreadableAttributes"] = string.Join(",", unreadable)
                 }
             };
         }
@@ -122,6 +128,14 @@ namespace TiaMcpServer.Siemens
         public ResponseHmiScreenItemDetails GetHmiScreenItemDetails(string softwarePath, string screenName, string attributes = "")
         {
             var sw = RequireHmiSoftware(softwarePath);
+            if (sw is HmiTarget)
+            {
+                // Checked against the V21 PublicAPI: a classic Hmi.Screen.Screen exposes only Name
+                // and Parent - no ScreenItems, no Width/Height.
+                throw new PortalException(PortalErrorCode.InvalidParams,
+                    $"GetHmiScreenItemDetails needs WinCC Unified: classic HMI screens ('{softwarePath}') expose no screen items through Openness."
+                    + " Export the screen (ExportHmiScreen) to inspect a classic screen.");
+            }
 
             // Same walk as every other screen tool: screens filed in a ScreenGroup are found (PR #41).
             var screen = TryFindScreenByName(sw, screenName);
@@ -136,6 +150,7 @@ namespace TiaMcpServer.Siemens
 
             var items = new List<HmiDetailItem>();
             var failed = new List<HmiDetailFailure>();
+            var readable = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var resolvedScreenName = HmiDetailRead.GetName(screen) ?? screenName;
 
             var screenItems = HmiDetailRead.EnumerateChildren(screen, "ScreenItems", out var enumerationError);
@@ -146,7 +161,7 @@ namespace TiaMcpServer.Siemens
 
             foreach (var screenItem in screenItems)
             {
-                if (HmiDetailRead.TryReadItem(screenItem, resolvedScreenName, attributeNames, out var item, out var reason) && item != null)
+                if (HmiDetailRead.TryReadItem(screenItem, resolvedScreenName, attributeNames, out var item, out var reason, readable) && item != null)
                 {
                     items.Add(item);
                 }
@@ -162,6 +177,7 @@ namespace TiaMcpServer.Siemens
             }
 
             var success = HmiDetailRead.IsSuccess(items.Count, failed.Count);
+            var unreadable = HmiDetailRead.UnreadableAttributes(attributeNames, readable, items.Count);
 
             return new ResponseHmiScreenItemDetails
             {
@@ -173,7 +189,7 @@ namespace TiaMcpServer.Siemens
                 },
                 Items = items,
                 Failed = failed,
-                Message = $"HMI screen item details read for '{softwarePath}:{resolvedScreenName}': {items.Count} of {items.Count + failed.Count}",
+                Message = $"HMI screen item details read for '{softwarePath}:{resolvedScreenName}': {items.Count} of {items.Count + failed.Count}" + HmiDetailRead.UnreadableNote(unreadable),
                 Meta = new JsonObject
                 {
                     ["timestamp"] = DateTime.Now,
@@ -181,7 +197,8 @@ namespace TiaMcpServer.Siemens
                     ["itemCount"] = items.Count,
                     ["failedCount"] = failed.Count,
                     ["softwareKind"] = HmiSoftwareKind(sw),
-                    ["attributes"] = string.Join(",", attributeNames)
+                    ["attributes"] = string.Join(",", attributeNames),
+                    ["unreadableAttributes"] = string.Join(",", unreadable)
                 }
             };
         }
@@ -207,7 +224,18 @@ namespace TiaMcpServer.Siemens
                     + " Resolve the exact path with GetProjectTree.");
             }
 
-            return softwareContainer.Software;
+            // A PLC path must not read as an HMI: PlcSoftware also has a TagTableGroup with
+            // TagTables/Tags, so the walk would list PLC tags as HMI tags and report success.
+            var software = softwareContainer.Software;
+            if (!(software is HmiTarget) && !(software is HmiSoftware))
+            {
+                throw new PortalException(PortalErrorCode.NotFound,
+                    $"'{softwarePath}' is not HMI software (it is {software.GetType().Name})."
+                    + Guard.DidYouMean(ListHmiSoftwareNames())
+                    + " Resolve the exact path with GetProjectTree.");
+            }
+
+            return software;
         }
 
         /// <summary>HMI software names in the project, for the "Did you mean" hint. Best-effort.</summary>

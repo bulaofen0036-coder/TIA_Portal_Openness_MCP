@@ -114,6 +114,19 @@ namespace TiaMcpServer.Tests
             check(brokenItem == null, "a failed item yields no half-filled entry");
             check(!string.IsNullOrWhiteSpace(brokenReason), "a failed item carries a reason");
 
+            // A misspelt attribute ('Adress') must be told apart from one whose value is null.
+            var readable = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var withNull = new FakeAttributeHolder("T", new Dictionary<string, object?> { ["Name"] = "T", ["Comment"] = null });
+            HmiDetailRead.TryReadItem(withNull, "Table", new[] { "Name", "Comment", "Adress" }, out _, out _, readable);
+            check(readable.Contains("Comment"), "an attribute that exists with a null value counts as readable");
+            check(!readable.Contains("Adress"), "an attribute the object does not have is not readable");
+            var unreadable = HmiDetailRead.UnreadableAttributes(new[] { "Name", "Comment", "Adress" }, readable, itemCount: 1);
+            check(unreadable.SequenceEqual(new[] { "Adress" }) && HmiDetailRead.UnreadableNote(unreadable).Contains("Adress"),
+                "a requested attribute no object had is reported by name");
+            check(HmiDetailRead.UnreadableAttributes(new[] { "Adress" }, readable, itemCount: 0).Count == 0
+                  && HmiDetailRead.UnreadableNote(new List<string>()) == "",
+                "nothing read means nothing to blame on the attribute names, and no note");
+
             check(HmiDetailRead.TypeSuffix(new FakeButton()) == "FakeButton",
                 "the CLR type name is reported so a reviewer can tell a button from a label");
         }
@@ -146,6 +159,16 @@ namespace TiaMcpServer.Tests
             loop.Groups = new[] { loop };
             check(HmiDetailRead.EnumerateTagTables(new FakeUnifiedHmi(Array.Empty<FakeTagTable>(), new[] { loop })).Count == 1,
                 "a self-referencing tag table group is walked once");
+
+            // A group collection that breaks half way: the tables reached are kept, the break is reported.
+            var errors = new List<string>();
+            var partialWalk = HmiDetailRead.EnumerateTagTables(
+                new FakeUnifiedHmiBrokenGroups(new[] { new FakeTagTable("Root") }), errors);
+            check(partialWalk.Count == 1 && errors.Count == 1 && errors[0].Contains("TagTableGroups"),
+                "a tag table walk that breaks half way says so instead of passing as complete (errors: " + string.Join(" | ", errors) + ")");
+            var cleanErrors = new List<string>();
+            HmiDetailRead.EnumerateTagTables(hmi, cleanErrors);
+            check(cleanErrors.Count == 0, "a clean walk reports no errors");
         }
 
         private static void RunCollectionEnumeration(Action<bool, string> check)
@@ -254,6 +277,18 @@ namespace TiaMcpServer.Tests
             }
             public IEnumerable<FakeTagTable> TagTables { get; }
             public IEnumerable<FakeTagTableGroup> TagTableGroups { get; }
+        }
+
+        private sealed class FakeUnifiedHmiBrokenGroups
+        {
+            public FakeUnifiedHmiBrokenGroups(IEnumerable<FakeTagTable> tables) { TagTables = tables; }
+            public IEnumerable<FakeTagTable> TagTables { get; }
+            public IEnumerable TagTableGroups => Broken();
+            private static IEnumerable Broken()
+            {
+                yield return new FakeTagTableGroup("Reached", Array.Empty<FakeTagTable>());
+                throw new InvalidOperationException("group collection broke half way");
+            }
         }
 
         private sealed class FakeThrowingCollectionOwner

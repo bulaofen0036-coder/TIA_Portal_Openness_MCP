@@ -133,7 +133,7 @@ namespace TiaMcpServer.ModelContextProtocol
         /// An object that cannot even be named is a failure: the caller gets it in Failed[].
         /// </summary>
         public static bool TryReadItem(object target, string container, IReadOnlyList<string> attributes,
-            out HmiDetailItem? item, out string? failureReason)
+            out HmiDetailItem? item, out string? failureReason, ISet<string>? readableAttributes = null)
         {
             item = null;
             failureReason = null;
@@ -170,7 +170,9 @@ namespace TiaMcpServer.ModelContextProtocol
 
             foreach (var attribute in attributes)
             {
-                read.Attributes[attribute] = Normalize(ReadAttribute(target, attribute));
+                if (TryReadAttribute(target, attribute, out var value))
+                    readableAttributes?.Add(attribute);
+                read.Attributes[attribute] = Normalize(value);
             }
 
             item = read;
@@ -183,6 +185,17 @@ namespace TiaMcpServer.ModelContextProtocol
         /// </summary>
         public static object? ReadAttribute(object target, string attributeName)
         {
+            TryReadAttribute(target, attributeName, out var value);
+            return value;
+        }
+
+        /// <summary>
+        /// Like <see cref="ReadAttribute"/>, but says whether the object HAS the attribute: a value
+        /// of null and "no such attribute" (a typo such as 'Adress') must not look the same.
+        /// </summary>
+        public static bool TryReadAttribute(object target, string attributeName, out object? value)
+        {
+            value = null;
             try
             {
                 var getAttribute = target.GetType().GetMethod("GetAttribute", new[] { typeof(string) });
@@ -190,7 +203,8 @@ namespace TiaMcpServer.ModelContextProtocol
                 {
                     try
                     {
-                        return getAttribute.Invoke(target, new object[] { attributeName });
+                        value = getAttribute.Invoke(target, new object[] { attributeName });
+                        return true;
                     }
                     catch
                     {
@@ -198,13 +212,14 @@ namespace TiaMcpServer.ModelContextProtocol
                     }
                 }
 
-                return target.GetType()
-                    .GetProperty(attributeName, BindingFlags.Public | BindingFlags.Instance)
-                    ?.GetValue(target);
+                var prop = target.GetType().GetProperty(attributeName, BindingFlags.Public | BindingFlags.Instance);
+                if (prop == null) return false;
+                value = prop.GetValue(target);
+                return true;
             }
             catch
             {
-                return null;
+                return false;
             }
         }
 
@@ -212,7 +227,9 @@ namespace TiaMcpServer.ModelContextProtocol
         /// All tag tables of an HMI software, including the ones filed in a TagTableGroup — the tag
         /// counterpart of the screen-group walk in HmiScreenWalk (PR #41). Depth-first, cycle-safe.
         /// </summary>
-        public static List<object> EnumerateTagTables(object hmiSoftware)
+        /// <param name="errors">Receives every group/table collection that broke off half way, so a
+        /// partial list is never reported as the complete one.</param>
+        public static List<object> EnumerateTagTables(object hmiSoftware, List<string>? errors = null)
         {
             var result = new List<object>();
             if (hmiSoftware == null) return result;
@@ -244,9 +261,10 @@ namespace TiaMcpServer.ModelContextProtocol
                                 if (group != null) children.Add(group);
                             }
                         }
-                        catch
+                        catch (Exception ex)
                         {
-                            // best-effort: keep what the walk already reached
+                            // keep what the walk already reached, but say that it is incomplete
+                            errors?.Add($"enumerating '{propName}' of '{GetNameSafe(container)}' failed: {Describe(ex)}");
                         }
                     }
                 }
@@ -266,9 +284,9 @@ namespace TiaMcpServer.ModelContextProtocol
                             if (table != null && seenTables.Add(table)) result.Add(table);
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // best-effort
+                        errors?.Add($"enumerating '{propName}' of '{GetNameSafe(container)}' failed: {Describe(ex)}");
                     }
                     break;   // first collection that exists on this container wins
                 }
@@ -354,6 +372,28 @@ namespace TiaMcpServer.ModelContextProtocol
             var prop = target.GetType().GetProperty("Name", BindingFlags.Public | BindingFlags.Instance);
             if (prop == null) return null;
             return prop.GetValue(target)?.ToString();
+        }
+
+        /// <summary>Requested attributes that no object in the result had. With at least one object
+        /// read, that is almost always a misspelt name, and an all-null column must not pass for data.</summary>
+        public static List<string> UnreadableAttributes(IReadOnlyList<string> requested, ISet<string> readable, int itemCount)
+        {
+            var result = new List<string>();
+            if (itemCount == 0) return result;
+            foreach (var a in requested)
+                if (!readable.Contains(a)) result.Add(a);
+            return result;
+        }
+
+        public static string UnreadableNote(IReadOnlyCollection<string> unreadable)
+            => unreadable.Count == 0
+                ? ""
+                : $". No object has attribute(s) {string.Join(", ", unreadable)} - check the spelling; those columns are null throughout.";
+
+        private static string GetNameSafe(object? target)
+        {
+            try { return GetName(target) ?? target?.GetType().Name ?? "?"; }
+            catch { return target?.GetType().Name ?? "?"; }
         }
 
         /// <summary>
