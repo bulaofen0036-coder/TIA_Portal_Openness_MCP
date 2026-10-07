@@ -1,9 +1,9 @@
 ﻿# Change Log
 
-## [Unreleased] - 审查与加固：并发、CallTool、HTTP 桥、下载安全、假成功
+## [2.7.4] - 2026-10-07 - 审查与加固：并发、CallTool、HTTP 桥、下载安全、假成功；HMI 属性一次读全
 
-对照 Openness 手册（V18–V21，本地 RAG）逐项核过的一轮审查。`runtime/v21` 未重新构建，
-这些修复要等下次发版构建引擎才会到用户手里（`Validate-Bundle.ps1` 现在会就此给出警告）。
+对照 Openness 手册（V18–V21，本地 RAG）逐项核过的一轮审查（PR #45，感谢 @zy13027），
+外加 PR #44（感谢 @DenLucas）的两个 HMI 只读批量工具。工具数 222 → 224。
 
 ### 修复
 
@@ -87,12 +87,12 @@
 ### 文档 / 工程
 
 - 插件的 MCP 配置内联进 `.claude-plugin/plugin.json`，删除根目录 `.mcp.json`（在克隆出来的仓库里
-  `${CLAUDE_PLUGIN_ROOT}` 无法展开，服务器起不来）；`plugin.json` 版本号从 2.2.5 更正为 2.7.3。
+  `${CLAUDE_PLUGIN_ROOT}` 无法展开，服务器起不来）；`plugin.json` 版本号从 2.2.5 起就没再跟版本走，现随发版更新。
 - 握手指令与编写指南里点名的 `ImportBlocksFromScl` 早已下线，改为 `ImportBlocksFromDocuments`；
   死引用闸现在也扫握手指令、Bootstrap 文案和 SKILL.md。
-- 工具数量在 README / SKILL / 配置脚本 / 清单里统一为实数（222，精简档 62）。
+- 工具数量在 README / SKILL / 配置脚本 / 清单里统一为实数（含 PR #44 为 224，精简档 62）。
   能力矩阵生成器不再把带 `\"` 的描述截坏。
-- 离线回归：163 → 272 条（工具安全表、CallTool 绑定与调用、HTTP 路由与安全、下载提示应答）。
+- 离线回归：163 → 355 条（工具安全表、CallTool 绑定与调用、HTTP 路由与安全、下载提示应答、HMI 批量读取）。
 
 ### 新增（PR #44）—— HMI tag and screen-item PROPERTIES are readable in one call
 
@@ -151,6 +151,16 @@
 
   This is a cheaper route for every caller, but it does **not** replace the two tools above:
   `InvokeObject` can still write, so a read-only agent must not be given it.
+
+合并前审查补充的修复（维护者）：
+
+- **传 PLC 路径会把 PLC 变量当 HMI 变量读出来并报成功。** `PlcSoftware` 同样有
+  `TagTableGroup → TagTables → Tags`。现在只接受 `HmiTarget` / `HmiSoftware`，否则报「不是 HMI 软件」。
+- **拼错的属性名看起来像数据。** `Adress` 得到一整列 null 且 `success=true`。现在区分「值为 null」与
+  「对象没有这个属性」：没有任何对象能读到的属性列入 `Meta.unreadableAttributes` 并写进 Message。
+- **变量表遍历中途出错被吞掉**，返回半张清单；现在计入 `Failed`。
+- **经典 HMI 画面**只公开 `Name`/`Parent`（V21 PublicAPI 核对），`GetHmiScreenItemDetails` 现在直接说明需要
+  WinCC Unified，而不是报一个枚举错误。
 
 ## [2.7.3] - 2026-09-16 - 写 Unified JS 脚本不再赌上整个博途进程；画面分组里的画面不再隐形
 
