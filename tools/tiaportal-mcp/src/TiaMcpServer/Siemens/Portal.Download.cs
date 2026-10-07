@@ -49,7 +49,8 @@ namespace TiaMcpServer.Siemens
             bool stopBeforeDownload = true,
             string? password = null,
             string? pgPcInterface = null,
-            string? targetIpAddress = null)
+            string? targetIpAddress = null,
+            bool abortActiveTests = false)
         {
             _logger?.LogInformation(
                 "DownloadToPlc: softwarePath={SoftwarePath} consistentOnly={C} keepDB={K} start={S} stop={T} hasPassword={P} pgPc={I} targetIp={A}",
@@ -62,8 +63,10 @@ namespace TiaMcpServer.Siemens
             if (plcSoftware == null)
                 return new ResponseDownload { Ok = false, Message = $"PLC software not found: '{softwarePath}'." };
 
-            // Declared outside the try so the catch can report which PG/PC route was used.
+            // Declared outside the try so the catch can report which PG/PC route was used,
+            // and which download prompts had been answered before it failed.
             DownloadRouteSelection? routeDiagnostics = null;
+            var prompts = new JsonArray();
 
             try
             {
@@ -85,22 +88,20 @@ namespace TiaMcpServer.Siemens
 
                 using var passwordScope = AttachPasswordHandler(configuration, password);
 
-                bool capture_keepActualValues = keepActualValues;
-                bool capture_startAfterDownload = startAfterDownload;
-                bool capture_stopBeforeDownload = stopBeforeDownload;
-                bool capture_consistentBlocksOnly = consistentBlocksOnly;
-
-                DownloadConfigurationDelegate preDelegate = (config) =>
+                var promptOptions = new DownloadPromptOptions
                 {
-                    ApplyDefaultDownloadConfig(
-                        config,
-                        capture_keepActualValues,
-                        capture_startAfterDownload,
-                        capture_stopBeforeDownload,
-                        capture_consistentBlocksOnly);
+                    KeepActualValues = keepActualValues,
+                    StartAfterDownload = startAfterDownload,
+                    StopBeforeDownload = stopBeforeDownload,
+                    ConsistentBlocksOnly = consistentBlocksOnly,
+                    AbortActiveTests = abortActiveTests,
                 };
 
-                DownloadConfigurationDelegate postDelegate = (config) => { };
+                // Both phases get the same answers. The manual's own example answers StartModules in
+                // the POST-download delegate ("sets PLC in RUN mode"); this used to be an empty
+                // lambda, so startAfterDownload=true could leave the CPU in STOP.
+                DownloadConfigurationDelegate preDelegate = config => AnswerDownloadPrompt(config, promptOptions, "pre", prompts);
+                DownloadConfigurationDelegate postDelegate = config => AnswerDownloadPrompt(config, promptOptions, "post", prompts);
 
                 // V21 fix: ConnectionConfiguration does NOT implement IConfiguration, but a
                 // ConfigurationTargetInterface (Modes -> PcInterfaces -> TargetInterfaces) DOES.
@@ -144,7 +145,7 @@ namespace TiaMcpServer.Siemens
                 if (rawResult is not DownloadResult result)
                     return new ResponseDownload { Ok = false, Message = "Download returned an unexpected result type." };
 
-                return BuildDownloadResponse(result, softwarePath, routeDiagnostics);
+                return BuildDownloadResponse(result, softwarePath, routeDiagnostics, prompts);
             }
             catch (Exception ex)
             {
@@ -168,10 +169,57 @@ namespace TiaMcpServer.Siemens
                 return new ResponseDownload
                 {
                     Ok = false,
-                    Message = $"Download failed: {real.Message}{routeHint}",
-                    Errors = new[] { real.Message }
+                    Message = $"Download failed: {real.Message}{routeHint}{ActiveTestHint(prompts)}",
+                    Errors = new[] { real.Message },
+                    Meta = new JsonObject { ["softwarePath"] = softwarePath, ["downloadPrompts"] = prompts.DeepClone() }
                 };
             }
+        }
+
+        /// <summary>Answers one download prompt per <see cref="DownloadPromptPolicy"/> and records what
+        /// was asked and what was answered, so the caller can see why a download stopped.</summary>
+        private void AnswerDownloadPrompt(DownloadConfiguration config, DownloadPromptOptions options, string phase, JsonArray log)
+        {
+            var typeName = config.GetType().Name;
+            var decision = DownloadPromptPolicy.Decide(typeName, options);
+            string? error = null;
+            bool applied = false;
+            if (decision.Selection != null)
+                applied = DownloadConfigSetSelection(config, decision.Selection, out error);
+            else if (decision.Checked != null)
+                applied = DownloadConfigSetChecked(config, decision.Checked.Value, out error);
+
+            string message = "";
+            try { message = config.GetType().GetProperty("Message")?.GetValue(config) as string ?? ""; }
+            catch { }
+
+            _logger?.LogDebug("Download prompt ({Phase}) {Type}: {Answer} applied={Applied}", phase, typeName,
+                decision.Selection ?? decision.Checked?.ToString() ?? "(unanswered)", applied);
+            var entry = new JsonObject
+            {
+                ["phase"] = phase,
+                ["type"] = typeName,
+                ["message"] = message,
+                ["answer"] = decision.Selection ?? (decision.Checked.HasValue ? (decision.Checked.Value ? "Checked" : "Unchecked") : "(unanswered)"),
+                ["applied"] = applied,
+                ["why"] = decision.Why,
+            };
+            if (error != null) entry["error"] = error;
+            lock (log) log.Add(entry);
+        }
+
+        /// <summary>When the download stopped because active tests were left alone, say how to proceed.</summary>
+        private static string ActiveTestHint(JsonArray prompts)
+        {
+            foreach (var p in prompts)
+            {
+                var type = p?["type"]?.GetValue<string>() ?? "";
+                var answer = p?["answer"]?.GetValue<string>() ?? "";
+                if ((type == "ActiveTestCanBeAborted" || type == "ActiveTestCanPreventDownload") && answer == "NoAction")
+                    return " Test or commissioning functions are active on the CPU and were NOT cancelled. "
+                         + "Confirm with the user that nobody is using them, then retry with abortActiveTests=true.";
+            }
+            return "";
         }
 
         // ---- PG/PC route selection (issue #14) --------------------------------------------------
@@ -212,6 +260,7 @@ namespace TiaMcpServer.Siemens
             public object? Configuration;   // what to hand to Download(); null = fall back to the raw configuration
             public string Description = "(no route selected — raw connection configuration)";
             public string? Error;           // set when an explicit pgPcInterface/targetIpAddress filter matched nothing
+            public bool Applied;            // ApplyConfiguration accepted the chosen route (false = best guess only)
             public List<DownloadRoute> Candidates = new List<DownloadRoute>();
         }
 
@@ -366,6 +415,7 @@ namespace TiaMcpServer.Siemens
                         {
                             selection.Configuration = route.Target;
                             selection.Description = route.Describe();
+                            selection.Applied = true;
                             return selection;
                         }
                     }
@@ -435,17 +485,41 @@ namespace TiaMcpServer.Siemens
                 issues.Add($"Error accessing DownloadProvider: {ex.Message}");
             }
 
-            // Check compile consistency via ICompilable
+            // Compile consistency, measured: read PlcBlock/PlcType.IsConsistent (documented in the
+            // Openness manual) for everything in the program. This used to be hard-coded to true,
+            // so an uncompiled program was reported ready for download.
             try
             {
-                var compilable = plcSoftware.GetService<ICompilable>();
-                if (compilable != null)
+                var blocks = new List<PlcBlock>();
+                GetBlocksRecursive(plcSoftware.BlockGroup, blocks);
+                var types = new List<PlcType>();
+                GetTypesRecursive(plcSoftware.TypeGroup, types);
+
+                var inconsistent = new List<string>();
+                foreach (var b in blocks)
                 {
-                    // We skip an actual compile here; check block consistency heuristically
-                    isConsistent = true; // Assume consistent unless caller has run CompileSoftware
+                    bool ok;
+                    try { ok = b.IsConsistent; } catch { ok = false; }
+                    if (!ok) inconsistent.Add(b.Name);
                 }
+                foreach (var t in types)
+                {
+                    bool ok;
+                    try { ok = t.IsConsistent; } catch { ok = false; }
+                    if (!ok) inconsistent.Add(t.Name + " (type)");
+                }
+
+                isConsistent = inconsistent.Count == 0;
+                if (!isConsistent)
+                    issues.Add($"{inconsistent.Count} block(s)/type(s) are not compiled (IsConsistent=false): "
+                        + string.Join(", ", inconsistent.Take(20)) + (inconsistent.Count > 20 ? ", ..." : "")
+                        + ". Run CompileSoftware first.");
             }
-            catch { }
+            catch (Exception ex)
+            {
+                isConsistent = false;
+                issues.Add($"Could not read block consistency ({ex.Message}); compile before downloading.");
+            }
 
             ScoreDownloadRoutes(routes, null);
             var routesJson = new JsonArray();
@@ -483,98 +557,55 @@ namespace TiaMcpServer.Siemens
             };
         }
 
-        private void ApplyDefaultDownloadConfig(
-            DownloadConfiguration config,
-            bool keepActualValues,
-            bool startAfterDownload,
-            bool stopBeforeDownload,
-            bool consistentBlocksOnly)
+        /// <summary>Sets CurrentSelection by enum member name. False (with the reason) when the
+        /// configuration has no such property or the name is not one of its values. This used to be
+        /// swallowed, which left the prompt unanswered and the download failing for no stated reason.</summary>
+        private static bool DownloadConfigSetSelection(object config, string selectionName, out string? error)
         {
-            var typeName = config.GetType().Name;
-            _logger?.LogDebug("ApplyDownloadConfig: {TypeName}", typeName);
-
-            switch (typeName)
-            {
-                case "StopModules":
-                    // StopModulesSelections = { NoAction, StopAll } — NOT "StopModule" (verified
-                    // against V21 PublicAPI; the old value parsed to nothing and left the prompt
-                    // "unhandled", which aborted every download).
-                    DownloadConfigSetSelection(config, stopBeforeDownload ? "StopAll" : "NoAction");
-                    break;
-
-                case "StopHSystemOrModule":
-                    DownloadConfigSetSelection(config, stopBeforeDownload ? "StopModule" : "NoAction");
-                    break;
-
-                case "StopHSystem":
-                    DownloadConfigSetSelection(config, stopBeforeDownload ? "StopHSystem" : "NoAction");
-                    break;
-
-                case "StartModules":
-                case "StartBackupModules":
-                    DownloadConfigSetSelection(config, startAfterDownload ? "StartModule" : "NoAction");
-                    break;
-
-                case "DataBlockReinitialization":
-                    DownloadConfigSetSelection(config, keepActualValues ? "KeepActualValues" : "Reinitialize");
-                    break;
-
-                case "DataBlockReinitializationOrKeepActualValues":
-                    DownloadConfigSetSelection(config, keepActualValues ? "KeepActualValues" : "StopPlcAndReinitialize");
-                    break;
-
-                case "ConsistentBlocksDownload":
-                    DownloadConfigSetSelection(config, "ConsistentDownload");
-                    break;
-
-                case "AllBlocksDownload":
-                    if (!consistentBlocksOnly)
-                        DownloadConfigSetSelection(config, "DownloadAllBlocks");
-                    break;
-
-                case "CheckBeforeDownload":
-                case "AlarmTextLibrariesDownload":
-                case "UserManagementDownload":
-                case "DownloadCertificate":
-                    DownloadConfigSetChecked(config, true);
-                    break;
-
-                case "DifferentTargetConfiguration":
-                case "ActiveTestCanBeAborted":
-                case "ActiveTestCanPreventDownload":
-                    DownloadConfigSetSelection(config, "AcceptAll");
-                    break;
-            }
-        }
-
-        private static void DownloadConfigSetSelection(object config, string selectionName)
-        {
+            error = null;
             try
             {
                 var prop = config.GetType().GetProperty("CurrentSelection");
-                if (prop == null) return;
+                if (prop == null) { error = "no CurrentSelection property"; return false; }
                 var enumType = prop.PropertyType;
-                if (!enumType.IsEnum) return;
-                var value = Enum.Parse(enumType, selectionName, ignoreCase: true);
-                prop.SetValue(config, value);
+                if (!enumType.IsEnum) { error = "CurrentSelection is not an enum"; return false; }
+                if (!Enum.GetNames(enumType).Any(n => string.Equals(n, selectionName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    error = $"'{selectionName}' is not a {enumType.Name} value (valid: {string.Join(", ", Enum.GetNames(enumType))})";
+                    return false;
+                }
+                prop.SetValue(config, Enum.Parse(enumType, selectionName, ignoreCase: true));
+                return true;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                error = (ex.InnerException ?? ex).Message;
+                return false;
+            }
         }
 
-        private static void DownloadConfigSetChecked(object config, bool value)
+        private static bool DownloadConfigSetChecked(object config, bool value, out string? error)
         {
+            error = null;
             try
             {
                 var prop = config.GetType().GetProperty("Checked");
-                prop?.SetValue(config, value);
+                if (prop == null) { error = "no Checked property"; return false; }
+                prop.SetValue(config, value);
+                return true;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                error = (ex.InnerException ?? ex).Message;
+                return false;
+            }
         }
 
         private ResponseDownload BuildDownloadResponse(
             DownloadResult result,
             string softwarePath,
-            DownloadRouteSelection? route)
+            DownloadRouteSelection? route,
+            JsonArray prompts)
         {
             var errors = new List<string>();
             var warnings = new List<string>();
@@ -584,10 +615,25 @@ namespace TiaMcpServer.Siemens
                    || result.State == DownloadResultState.Information
                    || result.State == DownloadResultState.Warning;
 
+            // DifferentTargetConfiguration is still accepted automatically. When TIA asked it, the
+            // CPU at that address does not match the configured hardware (a wrong IP reaches another
+            // machine's CPU the same way), so a success must not stay silent about it.
+            string targetNote = "";
+            foreach (var p in prompts)
+                if (p?["type"]?.GetValue<string>() == "DifferentTargetConfiguration" && p?["answer"]?.GetValue<string>() == "AcceptAll")
+                {
+                    targetNote = " TIA reported that the online modules differ from the configured hardware and the download went ahead"
+                               + " (Meta.downloadPrompts) - confirm with the user that this was the intended CPU.";
+                    warnings.Add(targetNote.Trim());
+                    break;
+                }
+
             return new ResponseDownload
             {
                 Ok = ok,
-                Message = $"Download {result.State}: {result.ErrorCount} error(s), {result.WarningCount} warning(s).",
+                Message = $"Download {result.State}: {result.ErrorCount} error(s), {result.WarningCount} warning(s)."
+                          + targetNote
+                          + (ok ? "" : ActiveTestHint(prompts)),
                 State = result.State.ToString(),
                 ErrorCount = result.ErrorCount,
                 WarningCount = result.WarningCount,
@@ -601,7 +647,10 @@ namespace TiaMcpServer.Siemens
                     // Which PG/PC adapter the download actually left through — the thing you need
                     // to see first when a multi-NIC PC downloads "successfully" to the wrong place.
                     ["pgPcRoute"] = route?.Description ?? string.Empty,
-                    ["pgPcRouteCandidates"] = route?.Candidates.Count ?? 0
+                    ["pgPcRouteCandidates"] = route?.Candidates.Count ?? 0,
+                    // Every question TIA asked and how it was answered: the only way to see that a
+                    // download stopped because, say, a commissioning session was left running.
+                    ["downloadPrompts"] = prompts.DeepClone()
                 }
             };
         }

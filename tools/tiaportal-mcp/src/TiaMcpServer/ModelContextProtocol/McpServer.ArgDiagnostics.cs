@@ -26,12 +26,46 @@ namespace TiaMcpServer.ModelContextProtocol
     // ───────────────────────────────────────────────────────────────────────────
     public static partial class McpServer
     {
-        /// <summary>注册工具的**唯一**入口：参数诊断在最外层，大响应护栏在里层。
+        /// <summary>注册工具的**唯一**入口：参数诊断在最外层，其次是 Openness 串行闸，大响应护栏在里层。
         /// 每一处把工具交给 MCP 服务器的地方都必须走这里 —— 只接一半的层，
         /// 就是后加的注册点静默丢掉另一半的由来。
-        /// 诊断放最外层是因为它必须在参数绑定之前拦住调用（副作用一点都不许发生）。</summary>
+        /// 诊断放最外层是因为它必须在参数绑定之前拦住调用（副作用一点都不许发生），
+        /// 也不该为了报一句「参数写错了」去排队等闸。</summary>
         public static IList<McpServerTool> WrapTools(IList<McpServerTool> tools) =>
-            WrapWithArgDiagnostics(WrapWithResponseGuard(tools));
+            WrapWithArgDiagnostics(WrapWithPortalGate(WrapWithResponseGuard(Annotate(tools))));
+
+        /// <summary>把 ToolSafety 的判定写进协议层的 annotations。不写的话，按 MCP 规范的默认值
+        /// 每个工具都是「可能破坏、会碰外部世界」，宿主没法区分 GetBlocks 和 DownloadToPlc。
+        /// 外面几层包装都原样转发 ProtocolTool，所以写在最里层的对象上就够了。</summary>
+        public static IList<McpServerTool> Annotate(IList<McpServerTool> tools)
+        {
+            if (tools == null) return new List<McpServerTool>();
+            foreach (var t in tools)
+            {
+                var pt = t?.ProtocolTool;
+                if (pt == null) continue;
+                var s = ToolSafety.Classify(pt.Name);
+                pt.Annotations ??= new ToolAnnotations();
+                pt.Annotations.ReadOnlyHint = s.ReadOnly;
+                pt.Annotations.DestructiveHint = s.Destructive;
+                pt.Annotations.IdempotentHint = s.Idempotent;
+                pt.Annotations.OpenWorldHint = s.OpenWorld;
+            }
+            return tools;
+        }
+
+        /// <summary>需要 TIA Portal 句柄的工具统一过同一把闸，见 <see cref="PortalGateTool"/>。</summary>
+        public static IList<McpServerTool> WrapWithPortalGate(IList<McpServerTool> tools)
+        {
+            if (tools == null) return new List<McpServerTool>();
+            var outList = new List<McpServerTool>(tools.Count);
+            foreach (var t in tools)
+            {
+                if (t == null) continue;
+                outList.Add(ToolSafety.Classify(t.ProtocolTool?.Name).TouchesPortal ? new PortalGateTool(t) : t);
+            }
+            return outList;
+        }
 
         /// <summary>逐个包装，让参数错误能自己把话说清楚。</summary>
         public static IList<McpServerTool> WrapWithArgDiagnostics(IList<McpServerTool> tools)
@@ -158,5 +192,44 @@ namespace TiaMcpServer.ModelContextProtocol
                 IsError = true,
                 Content = new List<ContentBlock> { new TextContentBlock { Text = message } }
             };
+    }
+
+    /// <summary>
+    /// 同一时刻只让一个工具调用碰 TIA Portal。
+    ///
+    /// SDK 对每条进来的请求各起一个任务处理，宿主一次发出的几个并行 tools/call
+    /// 会在不同线程上同时进入 Portal —— 而 Portal 是进程级单例，字段（当前工程、
+    /// 会话、SoftwareContainer 缓存、LastConnectError…）全都没有同步。两个调用交错时，
+    /// 一个的 OpenProject 可以换掉另一个正在遍历的工程，结果是张冠李戴而不是报错。
+    /// 串行化放在注册层而不是 Portal 里：Portal 的方法彼此嵌套调用，在那里加锁要么漏、要么自锁。
+    /// </summary>
+    internal sealed class PortalGateTool : McpServerTool
+    {
+        internal static readonly SemaphoreSlim Gate = new SemaphoreSlim(1, 1);
+
+        private readonly McpServerTool _inner;
+
+        public PortalGateTool(McpServerTool inner)
+        {
+            _inner = inner ?? throw new ArgumentNullException(nameof(inner));
+        }
+
+        public override Tool ProtocolTool => _inner.ProtocolTool;
+
+        public override async ValueTask<CallToolResult> InvokeAsync(
+            RequestContext<CallToolRequestParams> request,
+            CancellationToken cancellationToken = default)
+        {
+            // 排队期间被取消的调用直接放弃，不能在客户端已经不要结果之后才去动工程。
+            await Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                return await _inner.InvokeAsync(request, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                Gate.Release();
+            }
+        }
     }
 }

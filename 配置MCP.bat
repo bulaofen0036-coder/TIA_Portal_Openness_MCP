@@ -16,8 +16,8 @@ echo.
 "%EXE%" config %*
 echo.
 echo 完成后请重启对应 AI 客户端。
-echo 提示：默认只列出 ~55 个核心工具（其余 ~167 个 AI 用 FindTools/CallTool 随用随取，能力不缺）。
-echo 提示：想一次列全部 203 个工具，跑：配置MCP.bat --full （注意 VS Code/Copilot 上限 128、Windsurf 100，超了会直接加载失败）
+echo 提示：默认只列出 62 个核心工具（其余 160 个 AI 用 FindTools/CallTool 随用随取，能力不缺）。
+echo 提示：想一次列全部 222 个工具，跑：配置MCP.bat --full （注意 VS Code/Copilot 上限 128、Windsurf 100，超了会直接加载失败）
 echo 提示：连不上/报错时，跑：tia.cmd doctor  一键体检（加 --fix 可自动修 Openness 用户组）
 echo 提示：其它未自动写入的宿主，跑：配置MCP.bat --print  复制配置片段手动粘贴
 pause

@@ -314,7 +314,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     "NAMES ARE EXACT: plc software path defaults to 'PLC_1', HMI to 'HMI_RT_1'. If a name/path is rejected, call GetProjectTree / GetSoftwareTree to read the real names instead of guessing.",
                     "ON ERROR: read the error message — it names the recovery tool (e.g. 'call OpenProject/AttachToOpenProject'). Do that instead of retrying the same call or switching tools at random.",
                     "BIG TASKS: to create or extend a whole project in one shot, prefer ScaffoldProject (one JSON spec) over many small calls; pass dryRun=true first to validate the spec offline.",
-                    "WRITING CODE: call GetAuthoringGuide('scl' or 'lad') BEFORE authoring block code — it returns the verified syntax and encoding rules. NEVER hand-write FlgNet XML for ladder logic; use S7DCL text via ImportFromDocuments/ImportBlocksFromScl.",
+                    "WRITING CODE: call GetAuthoringGuide('scl' or 'lad') BEFORE authoring block code — it returns the verified syntax and encoding rules. NEVER hand-write FlgNet XML for ladder logic; use S7DCL text via ImportFromDocuments/ImportBlocksFromDocuments.",
                     "ENCODING: .scl external source = UTF-8 without BOM; .s7dcl/.s7res and all XML = UTF-8 WITH BOM. Wrong BOM is the #1 cause of mojibake/import failures with Chinese text.",
                 };
 
@@ -532,6 +532,21 @@ namespace TiaMcpServer.ModelContextProtocol
                     forbiddenToolNames.Count == 0
                         ? $"Checked {toolNameList.Count} MCP tools; no force-write tool exposed (read-only force-table getters allowed)."
                         : "Forbidden force-write tool names: " + string.Join(", ", forbiddenToolNames));
+
+                // CallTool refuses the tools that change a CPU or delete engineering data, so each
+                // one has to be in the session's own tool list or it is unreachable - and being
+                // listed is what makes the host's approval prompt name it.
+                var unlistedDirectOnly = ToolSafety.DirectOnlyTools
+                    .Where(x => IsLiteProfile() && !LiteToolNames.Contains(x))
+                    .OrderBy(x => x, StringComparer.Ordinal)
+                    .ToList();
+                Add(
+                    "safety.direct-only-listed",
+                    "CPU-changing and deleting tools are listed under their own name",
+                    unlistedDirectOnly.Count == 0,
+                    unlistedDirectOnly.Count == 0
+                        ? $"All {ToolSafety.DirectOnlyTools.Count} direct-only tools ({string.Join(", ", ToolSafety.DirectOnlyTools.OrderBy(x => x, StringComparer.Ordinal))}) are listed; CallTool refuses them."
+                        : "Direct-only tools missing from this session's tool list (unreachable): " + string.Join(", ", unlistedDirectOnly));
 
                 var requiredTools = new[]
                 {

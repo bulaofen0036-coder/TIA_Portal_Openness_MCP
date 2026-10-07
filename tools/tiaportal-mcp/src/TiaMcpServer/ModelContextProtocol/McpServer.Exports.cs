@@ -71,9 +71,8 @@ namespace TiaMcpServer.ModelContextProtocol
             {
                 if (t == null) continue;
                 var name = t.ProtocolTool?.Name;
-                outList.Add(name != null && ExportToolNames.Contains(name)
-                    ? t
-                    : new ResponseGuardTool(t));
+                // 分页工具不寄存（见上），但同样要去掉多余的转义。
+                outList.Add(new ResponseGuardTool(t, shrink: !(name != null && ExportToolNames.Contains(name))));
             }
             return outList;
         }
@@ -291,11 +290,22 @@ namespace TiaMcpServer.ModelContextProtocol
 
     internal sealed class ResponseGuardTool : McpServerTool
     {
-        private readonly McpServerTool _inner;
+        // 文本内容是给模型原样读的。SDK 用默认编码器生成它：每个引号、每个非 ASCII 字符
+        // 都变成六个字符的 \u 转义序列，而且这些序列就留在文本里 —— 模型读到的正是它们。
+        // 一份带中文注释的块信息因此膨胀好几倍，也更难读。文本在传输层还会按 JSON 规则
+        // 再编码一次，所以这里不转义是安全的。
+        private static readonly JsonSerializerOptions StubJson = new JsonSerializerOptions
+        {
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        };
 
-        public ResponseGuardTool(McpServerTool inner)
+        private readonly McpServerTool _inner;
+        private readonly bool _shrink;
+
+        public ResponseGuardTool(McpServerTool inner, bool shrink = true)
         {
             _inner = inner ?? throw new ArgumentNullException(nameof(inner));
+            _shrink = shrink;
         }
 
         public override Tool ProtocolTool => _inner.ProtocolTool;
@@ -305,6 +315,10 @@ namespace TiaMcpServer.ModelContextProtocol
             CancellationToken cancellationToken = default)
         {
             var result = await _inner.InvokeAsync(request, cancellationToken).ConfigureAwait(false);
+            // 先去转义再量长度：寄存与截断按模型真正读到的文本来算。
+            try { result = RelaxJsonText(result); }
+            catch { /* 去转义失败就原样返回，绝不能吃掉结果 */ }
+            if (!_shrink) return result;
             try
             {
                 string name = ProtocolTool?.Name ?? "(unknown)";
@@ -372,6 +386,41 @@ namespace TiaMcpServer.ModelContextProtocol
             {
                 return content;   // 解不出来就当它不是信封
             }
+        }
+
+        /// <summary>把文本块里的 JSON 按宽松编码重写一遍：内容逐字不变，只去掉多余的转义。
+        /// 只动「整块就是一个 JSON 值、且里面确实有转义」的文本；解析不了（包括重复键）就原样放行。</summary>
+        internal static CallToolResult RelaxJsonText(CallToolResult result)
+        {
+            var blocks = result?.Content;
+            if (blocks == null || blocks.Count == 0) return result!;
+
+            List<ContentBlock>? rewritten = null;
+            for (int i = 0; i < blocks.Count; i++)
+            {
+                if (!(blocks[i] is TextContentBlock tb)) continue;
+                string text = tb.Text ?? "";
+                if (text.IndexOf("\\u", StringComparison.Ordinal) < 0) continue;
+                var head = text.TrimStart();
+                if (head.Length == 0 || (head[0] != '{' && head[0] != '[')) continue;
+
+                string relaxed;
+                try { relaxed = JsonNode.Parse(text)?.ToJsonString(StubJson) ?? text; }
+                catch { continue; }
+                if (relaxed.Length >= text.Length) continue;
+
+                rewritten ??= new List<ContentBlock>(blocks);
+                rewritten[i] = new TextContentBlock { Text = relaxed, Annotations = tb.Annotations, Meta = tb.Meta };
+            }
+
+            if (rewritten == null) return result!;
+            return new CallToolResult
+            {
+                Content = rewritten,
+                IsError = result!.IsError,
+                StructuredContent = result.StructuredContent,
+                Meta = result.Meta,
+            };
         }
 
         /// <summary>CallTool 转发的目标工具名；本次调用不是转发则返回 null。</summary>
@@ -444,7 +493,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 StructuredContent = stub,
                 Content = new List<ContentBlock>
                 {
-                    new TextContentBlock { Text = stub.ToJsonString() }
+                    new TextContentBlock { Text = stub.ToJsonString(StubJson) }
                 }
             };
         }

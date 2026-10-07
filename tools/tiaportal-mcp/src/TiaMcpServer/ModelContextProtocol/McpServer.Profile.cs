@@ -5,7 +5,7 @@ using System.Reflection;
 
 namespace TiaMcpServer.ModelContextProtocol
 {
-    // Tool roster size. DEFAULT = lite: ~48 essentials instead of ~200, so a small /
+    // Tool roster size. DEFAULT = lite: the core tools instead of the full roster, so a small /
     // non-expert model is not drowned in choices, hosts with a tool cap (Copilot 128,
     // Windsurf 100) can load the server at all, and every turn carries ~8k instead of
     // ~40k tokens of schema. Opt out per session with --profile full / TIA_MCP_PROFILE=full;
@@ -15,13 +15,15 @@ namespace TiaMcpServer.ModelContextProtocol
     {
         // Explicit allowlist (tool Name, not method name). Kept explicit on purpose:
         // membership must not silently change when a [Lx] description prefix is edited.
-        // = all [L0]/[L1] tools + the golden-path tools ServerInstructions/GetAuthoringGuide
+        // = the everyday [L0]/[L1] tools + the golden-path tools ServerInstructions/GetAuthoringGuide
         // tell the model to call (previously [L2] and thus missing from lite — a weak
-        // model in lite was instructed to call ImportFromDocuments and couldn't see it).
+        // model in lite was instructed to call ImportFromDocuments and couldn't see it)
+        // + every ToolSafety.DirectOnlyTools entry. Some [L1] tools (the VCI and online-state
+        // readers, GetProjectTopology, …) are deliberately left to FindTools/CallTool.
         private static readonly HashSet<string> LiteToolNames = new HashSet<string>(StringComparer.Ordinal)
         {
             // L0 — the bridge to everything not listed here. Without these two, lite is a
-            // dead end: the model cannot even discover that the other ~160 tools exist.
+            // dead end: the model cannot even discover that the other tools exist.
             "FindTools", "CallTool",
             // L0 — orientation / diagnostics
             "Bootstrap", "Doctor", "GetState", "GetAuthoringGuide",
@@ -61,7 +63,15 @@ namespace TiaMcpServer.ModelContextProtocol
             // 挡掉这几个出口等于内容直接丢：真实工程上 GetBlocks 的首页只装得下十几个块，
             // 剩下的拿不回来。它们只碰引擎自己内存里的那份副本，一个都不动 TIA 工程。
             "GetExport", "ListExports", "SaveExport", "DeleteExport", "ClearExports",
+            // 会动 CPU 或删工程数据的工具必须以本名出现在工具表里（CallTool 拒绝转发它们）：
+            // 宿主逐个工具请求批准时，用户看到的才是「DownloadToPlc」而不是一个语焉不详的「CallTool」。
+            // 这一组必须与 ToolSafety.DirectOnlyTools 完全一致 —— 离线用例钉着。
+            "DownloadToPlc", "GoOnline", "SetWatchTableModifyValue",
+            "DeletePlcBlock", "DeletePlcType", "DeletePlcTagTable", "DeletePlcExternalSource",
         };
+
+        /// <summary>The lite roster as data, for the offline suite and the self-test.</summary>
+        public static IReadOnlyCollection<string> LiteRoster => LiteToolNames;
 
         public static IList<McpServerTool> GetLiteTools()
         {
@@ -96,9 +106,9 @@ namespace TiaMcpServer.ModelContextProtocol
         }
 
         // ---- Profile resolution -----------------------------------------------------------------
-        // LITE IS THE DEFAULT. Measured on the V21 engine: the full roster is ~200 tools /
-        // ~160 KB of JSON schema (~40k tokens) that every host re-sends to the model on EVERY
-        // turn, before any work happens. Lite is ~48 tools / ~35 KB (~8k tokens).
+        // LITE IS THE DEFAULT. Measured on the V21 engine: the full roster is ~160 KB of JSON
+        // schema (~40k tokens) that every host re-sends to the model on EVERY turn, before any
+        // work happens. Lite is roughly a quarter of the tools and of the tokens.
         // It is also a hard compatibility wall, not just a cost: VS Code / Copilot refuse to
         // run agent mode above 128 tools and Windsurf is capped at 100, so the full roster
         // simply does not load there. Nothing is lost by defaulting to lite — FindTools /

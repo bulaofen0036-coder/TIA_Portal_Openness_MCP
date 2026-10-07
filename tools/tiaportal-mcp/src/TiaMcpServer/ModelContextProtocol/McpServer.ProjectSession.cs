@@ -83,21 +83,29 @@ namespace TiaMcpServer.ModelContextProtocol
                         "closeForeignProject=true - ask the user before you do.",
                         McpErrorCode.InvalidRequest);
 
-                if (Portal.ProjectIsValid)
-                {
-                    Portal.CloseProject();
-                }
-
-                // get project extension
+                // Validate BEFORE closing anything: a typo in the path used to close the current
+                // project first (discarding unsaved edits) and only then report the bad path.
                 string extension = Path.GetExtension(path).ToLowerInvariant();
 
                 // use regex to check if extension is .ap\d+ or .als\d+
                 if (!Regex.IsMatch(extension, @"^\.ap\d+$") &&
                     !Regex.IsMatch(extension, @"^\.als\d+$"))
                 {
-                    throw new McpException("Invalid project file extension. Use .apXX for projects or .alsXX for sessions, where XX=18,19,20,....", McpErrorCode.InvalidParams);
+                    throw new McpException("Invalid project file extension. Use .apXX for projects or .alsXX for sessions, where XX=18,19,20,.... Nothing was closed.", McpErrorCode.InvalidParams);
                 }
 
+                if (!File.Exists(path))
+                {
+                    throw new McpException($"Project file not found: '{path}'. Nothing was closed.", McpErrorCode.InvalidParams);
+                }
+
+                if (Portal.ProjectIsValid)
+                {
+                    // The foreign-project check above already ran, so this only closes our own
+                    // project (or the user's, when they agreed via closeForeignProject=true).
+                    Portal.CloseProject();
+                }
+
                 bool success = false;
 
                 if (extension.StartsWith(".ap"))
@@ -512,11 +520,21 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
-        [McpServerTool(Name = "CloseProject"), Description("[L1][Project] Close the currently open project or multi-user session. Requires: Connect + OpenProject. Any unsaved changes are lost — call SaveProject first. After closing, the connection remains active but no project is open.")]
-        public static ResponseCloseProject CloseProject()
+        [McpServerTool(Name = "CloseProject"), Description("[L1][Project] Close the currently open project or multi-user session. Requires: Connect + OpenProject. Any unsaved changes are lost — call SaveProject first. After closing, the connection remains active but no project is open. A project this session did not open (the user's own, attached from a running TIA Portal) is NOT closed unless closeForeignProject=true.")]
+        public static ResponseCloseProject CloseProject(
+            [Description("closeForeignProject: DEFAULT false. If the open project belongs to the user (this session did not open it), the call is REFUSED rather than closing their work. Only pass true after the user has agreed to close it.")] bool closeForeignProject = false)
         {
             try
             {
+                // Same guard as OpenProject/CreateProject: closing the user's project discards their
+                // unsaved edits in the TIA Portal window they are working in.
+                var foreign = Portal.ForeignOpenProjectName();
+                if (foreign != null && !closeForeignProject)
+                    throw new McpException(
+                        "CloseProject refused: the open project '" + foreign + "' was not opened by this session - it belongs " +
+                        "to the user, and closing it discards their unsaved edits. Pass closeForeignProject=true only after " +
+                        "the user has agreed.", McpErrorCode.InvalidRequest);
+
                 bool success;
 
                 if (Portal.IsLocalSession)

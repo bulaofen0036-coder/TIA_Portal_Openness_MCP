@@ -540,24 +540,44 @@ namespace TiaMcpServer.Siemens
             string modifyValue,
             string trigger = "Permanent")
         {
-            if (IsProjectNull()) return new ResponseMessage { Message = "No project open." };
+            // Every failure below used to come back as an ordinary message (isError=false), and the
+            // setter results were ignored, so "set to ModifyValue=..." was reported even when nothing was set.
+            if (IsProjectNull())
+                throw new PortalException(PortalErrorCode.InvalidState, "No project open. Call Connect + OpenProject first.");
             var plc = GetPlcSoftware(softwarePath);
-            if (plc == null) return new ResponseMessage { Message = $"PLC software not found: '{softwarePath}'." };
+            if (plc == null)
+                throw new PortalException(PortalErrorCode.NotFound, $"PLC software not found: '{softwarePath}'." + AvailablePlcPathsSuffix());
 
             try
             {
                 var group = ResolvePlcWatchAndForceTableGroup(plc);
-                if (group == null) return new ResponseMessage { Message = "WatchAndForceTableGroup not accessible." };
+                if (group == null)
+                    throw new PortalException(PortalErrorCode.OpennessError, "WatchAndForceTableGroup not accessible; nothing was changed.");
 
                 var table = FindOrCreateWatchTable(group, tableName);
-                if (table == null) return new ResponseMessage { Message = $"Could not find or create watch table '{tableName}'." };
+                if (table == null)
+                    throw new PortalException(PortalErrorCode.OpennessError, $"Could not find or create watch table '{tableName}'; nothing was changed.");
 
                 var entry = FindOrCreateTableEntry(table, "Entries", address);
-                if (entry == null) return new ResponseMessage { Message = $"Could not create entry for address '{address}'." };
+                if (entry == null)
+                    throw new PortalException(PortalErrorCode.OpennessError, $"Could not create an entry for address '{address}' in '{tableName}'.");
 
-                TrySetProperty(entry, "Address", address);
-                TrySetProperty(entry, "ModifyValue", modifyValue);
-                SetEnumPropertyByName(entry, "ModifyTrigger", trigger);
+                // Address is normally fixed when the entry is created; only a failed write to a
+                // DIFFERENT current value matters.
+                if (!TrySetProperty(entry, "Address", address))
+                {
+                    var current = entry.GetType().GetProperty("Address")?.GetValue(entry)?.ToString();
+                    if (!string.Equals(current, address, StringComparison.OrdinalIgnoreCase))
+                        throw new PortalException(PortalErrorCode.OpennessError,
+                            $"Watch table '{tableName}': could not set Address='{address}' on the entry (it reads '{current}').");
+                }
+                if (!TrySetProperty(entry, "ModifyValue", modifyValue))
+                    throw new PortalException(PortalErrorCode.OpennessError,
+                        $"Watch table '{tableName}': ModifyValue='{modifyValue}' was NOT set on entry '{address}' (the value may not suit the tag's data type).");
+                if (!SetEnumPropertyByName(entry, "ModifyTrigger", trigger, out var triggerError))
+                    throw new PortalException(PortalErrorCode.InvalidParams,
+                        $"Watch table '{tableName}': ModifyTrigger='{trigger}' was NOT set on entry '{address}': {triggerError}. "
+                        + "ModifyValue was written; the entry keeps its previous trigger.");
 
                 return new ResponseMessage
                 {
@@ -573,10 +593,14 @@ namespace TiaMcpServer.Siemens
                     }
                 };
             }
+            catch (PortalException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "EnsureWatchTableEntry failed");
-                return new ResponseMessage { Message = $"Error: {ex.Message}" };
+                throw new PortalException(PortalErrorCode.OpennessError, $"Setting the watch table entry failed: {ex.Message}", inner: ex);
             }
         }
 
@@ -695,16 +719,29 @@ namespace TiaMcpServer.Siemens
             catch { return null; }
         }
 
-        private static void SetEnumPropertyByName(object target, string propertyName, string valueName)
+        /// <summary>Sets an enum property by member name. False, with the reason, when it could not be set
+        /// (it used to swallow everything, so a mistyped trigger was reported as applied).</summary>
+        private static bool SetEnumPropertyByName(object target, string propertyName, string valueName, out string? error)
         {
+            error = null;
             try
             {
                 var prop = target.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
-                if (prop == null || !prop.PropertyType.IsEnum) return;
-                var enumValue = Enum.Parse(prop.PropertyType, valueName, ignoreCase: true);
-                prop.SetValue(target, enumValue);
+                if (prop == null) { error = $"'{propertyName}' does not exist on {target.GetType().Name}"; return false; }
+                if (!prop.PropertyType.IsEnum) { error = $"'{propertyName}' is not an enum"; return false; }
+                if (!Enum.GetNames(prop.PropertyType).Any(n => string.Equals(n, valueName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    error = $"'{valueName}' is not a valid {propertyName} (valid: {string.Join(", ", Enum.GetNames(prop.PropertyType))})";
+                    return false;
+                }
+                prop.SetValue(target, Enum.Parse(prop.PropertyType, valueName, ignoreCase: true));
+                return true;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                error = (ex.InnerException ?? ex).Message;
+                return false;
+            }
         }
 
         // ── Watch Table Current Values (read-only) ────────────────────────────
@@ -6532,13 +6569,9 @@ namespace TiaMcpServer.Siemens
                     .FirstOrDefault(m => m.Name == "GetService" && m.IsGenericMethodDefinition && m.GetParameters().Length == 0);
                 if (getService == null) return null;
 
-                var serviceType = AppDomain.CurrentDomain.GetAssemblies()
-                    .SelectMany(a =>
-                    {
-                        try { return a.GetTypes(); } catch { return Array.Empty<Type>(); }
-                    })
-                    .FirstOrDefault(t => t.Name.Equals(serviceTypeNameSuffix, StringComparison.OrdinalIgnoreCase) ||
-                                         t.FullName?.EndsWith("." + serviceTypeNameSuffix, StringComparison.OrdinalIgnoreCase) == true);
+                var serviceType = ScanLoadedTypes("service:" + serviceTypeNameSuffix.ToLowerInvariant(),
+                    t => t.Name.Equals(serviceTypeNameSuffix, StringComparison.OrdinalIgnoreCase) ||
+                         t.FullName?.EndsWith("." + serviceTypeNameSuffix, StringComparison.OrdinalIgnoreCase) == true);
                 if (serviceType == null) return null;
 
                 return getService.MakeGenericMethod(serviceType).Invoke(target, Array.Empty<object>());

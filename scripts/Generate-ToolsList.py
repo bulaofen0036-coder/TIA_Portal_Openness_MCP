@@ -16,7 +16,7 @@ EXE = pathlib.Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else (
 )
 OUT = pathlib.Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else ROOT / "manifest" / "tools-list.json"
 
-# --profile full is REQUIRED, not cosmetic: the engine now defaults to the ~49-tool lite
+# --profile full is REQUIRED, not cosmetic: the engine now defaults to the lite
 # roster, so a plain launch would silently write a manifest listing a quarter of the server
 # and the bundle validator would then flag the mismatch it just caused. The manifest documents
 # what the engine CAN do; which subset a session lists is a separate, per-host decision.
@@ -24,6 +24,15 @@ process = subprocess.Popen([str(EXE), "--logging", "0", "--profile", "full"],
                            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                            stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", bufsize=1)
 seq = 0
+
+
+def release_version():
+    """The version at the top of CHANGELOG.md, so the manifest never carries a stale hard-coded one."""
+    for line in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^## \[(\d+\.\d+\.\d+)\]", line)
+        if m:
+            return m.group(1)
+    return "unknown"
 
 
 def request(method, params=None):
@@ -67,11 +76,11 @@ try:
         })
     rows.sort(key=lambda item: item["name"].lower())
     document = {
-        "package": "TIA_MCP_Delivery_v2.4.0",
+        "package": "TIA_MCP_Delivery_v" + release_version(),
         "generatedAt": datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).isoformat(),
         "source": f"live MCP tools/list of {EXE.name}",
         "toolCount": len(rows),
-        "note": "Full roster (--profile full). The default lite profile lists ~49 of these; "
+        "note": "Full roster (--profile full). The default lite profile lists only the core tools; "
                 "the rest stay reachable via FindTools + CallTool. Runtime tools/list remains authoritative.",
         "tools": rows,
     }

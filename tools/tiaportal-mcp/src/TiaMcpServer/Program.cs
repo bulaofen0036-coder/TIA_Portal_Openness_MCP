@@ -47,7 +47,8 @@ namespace TiaMcpServer
                 LogDiag($"=== {DateTime.Now:O} PID={System.Diagnostics.Process.GetCurrentProcess().Id} ===");
                 LogDiag($"BaseDir: {AppContext.BaseDirectory}");
                 LogDiag($"Exe: {Assembly.GetExecutingAssembly().Location}");
-                LogDiag($"Args: {string.Join(" ", args)}");
+                // The HTTP API key must not end up in the plain-text logs next to the exe.
+                LogDiag($"Args: {HttpSecurity.RedactArgs(args)}");
 
                 var options = CliOptions.ParseArgs(args);
 
@@ -671,6 +672,16 @@ namespace TiaMcpServer
 
         public static async Task RunHttpHost(CliOptions? options)
         {
+            // Refuse before the MCP host or the listener start, so a refusal is one clear line
+            // and exit code 2 rather than an unhandled exception with a stack trace.
+            var refusal = HttpMcpServer.StartupRefusal(options);
+            if (refusal != null)
+            {
+                LogDiag(refusal);
+                Environment.ExitCode = 2;
+                return;
+            }
+
             // Two blocking streams form the bidirectional channel between HTTP and the MCP server.
             var httpToMcp = new McpBlockingStream();
             var mcpToHttp = new McpBlockingStream();
@@ -717,6 +728,14 @@ namespace TiaMcpServer
 
                 await host.RunAsync();
             });
+
+            // If the MCP host dies (bad config, a fault during startup), end its output stream so
+            // the HTTP side answers 502 at once instead of letting every request run into the timeout.
+            _ = mcpTask.ContinueWith(t =>
+            {
+                LogDiag("MCP host (HTTP transport) stopped" + (t.IsFaulted ? ": " + t.Exception?.GetBaseException().Message : "."));
+                mcpToHttp.CompleteWriting();
+            }, TaskScheduler.Default);
 
             await HttpMcpServer.Run(options, httpToMcp, mcpToHttp, LogDiag).ConfigureAwait(false);
             await mcpTask.ConfigureAwait(false);

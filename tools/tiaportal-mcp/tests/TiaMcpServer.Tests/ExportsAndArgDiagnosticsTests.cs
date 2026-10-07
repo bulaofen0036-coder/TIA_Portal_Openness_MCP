@@ -64,10 +64,19 @@ internal static class ExportsAndArgDiagnosticsTests
             Check(ArgDiagnostics.Check("Whatever", null, null, new[] { "x" }) == "",
                 "argdiag sentinel: null schema never blocks a call");
 
-            // SENTINEL 2: case differences are not errors (models send PascalCase routinely).
+            // Case differences ARE errors on the direct path. This used to be a sentinel asserting
+            // the opposite, on the belief that the SDK binds names case-insensitively. Measured on
+            // 0.3.0-preview.4 it does not: FindTools({"Query":"watch table"}) ran with the query
+            // silently dropped and listed the whole roster. So a PascalCase name must be reported,
+            // with the exact spelling to use.
+            var caseMsg = ArgDiagnostics.Check("CreateProject", known, required,
+                              new[] { "DirectoryPath", "ProjectName" });
+            Check(caseMsg.Contains("SILENTLY IGNORED") && caseMsg.Contains("DirectoryPath -> directoryPath")
+                  && caseMsg.Contains("case-sensitive"),
+                "argdiag: a wrong-case name is reported with the exact spelling (SDK binding is case-sensitive)");
             Check(ArgDiagnostics.Check("CreateProject", known, required,
-                      new[] { "DirectoryPath", "ProjectName" }) == "",
-                "argdiag sentinel: case-insensitive names are accepted");
+                      new[] { "directoryPath", "projectName", "CloseForeignProject" }).Contains("CloseForeignProject -> closeForeignProject"),
+                "argdiag: a wrong-case OPTIONAL name is reported too - that is the silently-ignored case");
 
             // SENTINEL 3: omitting an OPTIONAL argument is not an error.
             Check(ArgDiagnostics.Check("CreateProject", known, required,

@@ -2553,6 +2553,12 @@ namespace TiaMcpServer.ModelContextProtocol
             {
                 return Portal.EnsureWatchTableEntry(softwarePath, tableName, address, modifyValue, trigger);
             }
+            catch (PortalException pex)
+            {
+                throw new McpException(pex.Message, pex,
+                    pex.Code == PortalErrorCode.NotFound || pex.Code == PortalErrorCode.InvalidParams
+                        ? McpErrorCode.InvalidParams : McpErrorCode.InternalError);
+            }
             catch (Exception ex) when (ex is not McpException)
             {
                 throw new McpException($"Unexpected error setting watch table entry: {ex.Message}{McpHints.Recovery(ex)}", ex, McpErrorCode.InternalError);
@@ -3627,11 +3633,12 @@ namespace TiaMcpServer.ModelContextProtocol
             " Required before DownloadToPlc to confirm reachability, or for future online monitoring tools." +
             " Returns State=Online on success." +
             " If ipAddress is omitted, uses the IP address configured in the project's hardware configuration." +
-            " If ipAddress is provided, overrides the configured IP for this session (useful for commissioning with a different IP)." +
+            " If ipAddress is provided, it selects which configured connection route to use (multi-NIC PCs, several target interfaces);" +
+            " Openness cannot connect to an address the project does not configure, so to reach a different IP change it in the hardware configuration first." +
             " Common failures: NotReachable (wrong IP / no cable), Protected (CPU requires authentication — supply password), Incompatible (firmware mismatch).")]
         public static ResponseOnlineState GoOnline(
             [Description("softwarePath: path to the PLC software, e.g. 'PLC_1'")] string softwarePath,
-            [Description("ipAddress: optional IP address override, e.g. '192.168.1.10'. Leave empty to use the project's configured IP.")] string ipAddress = "",
+            [Description("ipAddress: optional target IP address, e.g. '192.168.1.10', used to pick the matching configured route. Must be one of the addresses the project configures. Leave empty to use the default route.")] string ipAddress = "",
             [Description("password: optional CPU access password. Required when the CPU has read/write protection configured. Leave empty for unprotected CPUs.")] string password = "")
         {
             try
@@ -3640,6 +3647,12 @@ namespace TiaMcpServer.ModelContextProtocol
                     softwarePath,
                     string.IsNullOrWhiteSpace(ipAddress) ? null : ipAddress,
                     string.IsNullOrWhiteSpace(password) ? null : password);
+            }
+            catch (PortalException pex)
+            {
+                throw new McpException(pex.Message, pex,
+                    pex.Code == PortalErrorCode.NotFound || pex.Code == PortalErrorCode.InvalidParams
+                        ? McpErrorCode.InvalidParams : McpErrorCode.InternalError);
             }
             catch (Exception ex) when (ex is not McpException)
             {
@@ -3923,7 +3936,10 @@ namespace TiaMcpServer.ModelContextProtocol
             " Default options (keepActualValues=true, consistentBlocksOnly=true) are safe for most scenarios." +
             " Set keepActualValues=false only when DB initial values must be reset — this is irreversible." +
             " On a multi-NIC PC the PG/PC interface is picked automatically (the adapter sharing a subnet with the CPU);" +
-            " Meta.pgPcRoute reports which one was used. Override with pgPcInterface / targetIpAddress when the pick is wrong.")]
+            " Meta.pgPcRoute reports which one was used. Override with pgPcInterface / targetIpAddress when the pick is wrong." +
+            " Meta.downloadPrompts lists every question TIA asked during the download and how it was answered." +
+            " If test or commissioning functions are active on the CPU the download stops instead of cancelling them;" +
+            " pass abortActiveTests=true only after the user confirms nobody is using them.")]
         public static ResponseDownload DownloadToPlc(
             [Description("softwarePath: path to the PLC software, e.g. 'PLC_1'")] string softwarePath,
             [Description("consistentBlocksOnly: true=download only consistent blocks (safe default), false=download all blocks even inconsistent ones")] bool consistentBlocksOnly = true,
@@ -3932,7 +3948,8 @@ namespace TiaMcpServer.ModelContextProtocol
             [Description("stopBeforeDownload: true=automatically stop CPU before download (required for most downloads), false=attempt online download without stopping")] bool stopBeforeDownload = true,
             [Description("password: optional CPU access password. Required when the CPU has download protection configured. Leave empty for unprotected CPUs.")] string password = "",
             [Description("pgPcInterface: optional PG/PC interface name (substring, case-insensitive), e.g. 'PLCSIM' or 'Realtek'. Leave empty to auto-pick the adapter that shares a subnet with the CPU. Run CheckDownloadReadiness to see the available names.")] string pgPcInterface = "",
-            [Description("targetIpAddress: optional CPU IP to download to, e.g. '192.168.0.1'. Disambiguates which route to use when the project has several CPU interfaces. Leave empty to auto-pick.")] string targetIpAddress = "")
+            [Description("targetIpAddress: optional CPU IP to download to, e.g. '192.168.0.1'. Disambiguates which route to use when the project has several CPU interfaces. Leave empty to auto-pick.")] string targetIpAddress = "",
+            [Description("abortActiveTests: DEFAULT false. When test/commissioning functions are active on the CPU, TIA asks whether to cancel them; false answers 'no action' and the download stops. true cancels them - ask the user first, somebody may be commissioning the machine.")] bool abortActiveTests = false)
         {
             try
             {
@@ -3944,11 +3961,17 @@ namespace TiaMcpServer.ModelContextProtocol
                     stopBeforeDownload,
                     string.IsNullOrWhiteSpace(password) ? null : password,
                     string.IsNullOrWhiteSpace(pgPcInterface) ? null : pgPcInterface,
-                    string.IsNullOrWhiteSpace(targetIpAddress) ? null : targetIpAddress);
+                    string.IsNullOrWhiteSpace(targetIpAddress) ? null : targetIpAddress,
+                    abortActiveTests);
 
-                if (result.Ok == false && result.Errors != null && result.Errors.Length > 0)
+                // Any failed download is an error, with or without TIA error messages: a State=Error
+                // result with no message text, or an early refusal (no provider, no route), used to
+                // come back as an ordinary successful tool result.
+                if (result.Ok == false)
                     throw new McpException(
-                        $"Download to '{softwarePath}' failed: {result.Message}",
+                        $"Download to '{softwarePath}' failed: {result.Message}"
+                        + (result.Errors != null && result.Errors.Length > 0 ? " Errors: " + string.Join(" | ", result.Errors) : "")
+                        + (result.Meta?["downloadPrompts"] is JsonArray prompts && prompts.Count > 0 ? " Prompts: " + prompts.ToJsonString() : ""),
                         McpErrorCode.InternalError);
 
                 return result;

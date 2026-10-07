@@ -207,12 +207,51 @@ if ((Test-Path -LiteralPath $changelog) -and (Test-Path -LiteralPath $csproj) -a
             Fail ("Version mismatch: manifest packageName '{0}' does not carry v{1}" -f $mf.packageName, $version)
         }
 
+        # The Claude Code plugin manifest carries its own version; a version that never moves
+        # can stop plugin updates from being picked up (it sat at 2.2.5 through 2.7.3).
+        $pluginJson = Join-Path $root ".claude-plugin\plugin.json"
+        if (Test-Path -LiteralPath $pluginJson) {
+            $pj = Get-Content -LiteralPath $pluginJson -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($pj.version -ne $version) {
+                Fail ("Version mismatch: CHANGELOG says {0}, .claude-plugin\plugin.json says {1}" -f $version, $pj.version)
+            }
+        }
+
         # The shipped engine is a binary, so a stale runtime/ is invisible in a diff.
         $exe = Join-Path $root "runtime\v21\TiaMcpServer.exe"
         if (Test-Path -LiteralPath $exe) {
             $fileVersion = (Get-Item -LiteralPath $exe).VersionInfo.FileVersion
             if ($fileVersion -notlike ("{0}*" -f $version)) {
                 Fail ("Version mismatch: CHANGELOG says {0}, runtime\v21\TiaMcpServer.exe reports {1} — rebuild the public engine" -f $version, $fileVersion)
+            }
+
+            # Same version number is not the same build: a fix can land in the source after the
+            # release build (the #42 readback fix did). The exe records its source commit in
+            # ProductVersion ("x.y.z+<sha>"); warn when engine source changed after that commit.
+            # Only a warning, and only on a full clone - a shallow CI checkout has no history.
+            $productVersion = (Get-Item -LiteralPath $exe).VersionInfo.ProductVersion
+            $shaMatch = [regex]::Match([string]$productVersion, '\+(?<sha>[0-9a-f]{7,40})')
+            $git = Get-Command git -ErrorAction SilentlyContinue
+            if ($shaMatch.Success -and $git) {
+              # Windows PowerShell 5.1 turns git's stderr into a terminating error under
+              # ErrorActionPreference=Stop (no .git in a ZIP download, unknown sha in a fork).
+              # This block is advisory, so it must never fail the run.
+              $savedPreference = $ErrorActionPreference
+              $ErrorActionPreference = "Continue"
+              try {
+                $isShallow = (& git -C $root rev-parse --is-shallow-repository 2>$null)
+                if ($isShallow -eq 'false') {
+                    $sha = $shaMatch.Groups['sha'].Value
+                    $newer = @(& git -C $root log --format=%h "$sha..HEAD" -- "tools/tiaportal-mcp/src" 2>$null)
+                    if ($LASTEXITCODE -eq 0 -and $newer.Count -gt 0) {
+                        Write-Host ("[WARN] runtime\v21\TiaMcpServer.exe was built from {0}, but {1} later commit(s) changed the engine source ({2}) - rebuild the public engine before release" -f $sha.Substring(0, [Math]::Min(8, $sha.Length)), $newer.Count, ($newer -join ', ')) -ForegroundColor Yellow
+                    }
+                }
+              } catch {
+                Write-Host ("[WARN] could not compare the runtime build with the source history: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+              } finally {
+                $ErrorActionPreference = $savedPreference
+              }
             }
         }
 
