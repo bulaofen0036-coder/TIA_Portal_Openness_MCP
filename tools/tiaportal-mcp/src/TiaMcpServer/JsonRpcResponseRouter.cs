@@ -39,7 +39,35 @@ namespace TiaMcpServer
                 return Task.FromException<string>(new IOException("The MCP host is no longer running.", closed));
 
             var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-            return _pending.TryAdd(idKey, tcs) ? tcs.Task : null;
+            if (!_pending.TryAdd(idKey, tcs)) return null;
+            // Close may have run between the check above and TryAdd; it would not have seen this entry.
+            closed = _closed;
+            if (closed != null && _pending.TryRemove(idKey, out _))
+                tcs.TrySetException(new IOException("The MCP host is no longer running.", closed));
+            return tcs.Task;
+        }
+
+        private static long _bridgeSeq;
+
+        private static readonly JsonSerializerOptions Relaxed = new JsonSerializerOptions
+        {
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        };
+
+        /// <summary>A fresh id for the request the bridge forwards to the host. Clients number their
+        /// own requests and two HTTP clients routinely both send id 5; a request that timed out also
+        /// keeps running in the host. Forwarding under a bridge-owned id means a late or foreign
+        /// response can never be handed to the wrong caller.</summary>
+        public static JsonValue NextBridgeId()
+            => JsonValue.Create("http-bridge-" + System.Threading.Interlocked.Increment(ref _bridgeSeq));
+
+        /// <summary><paramref name="json"/> (one JSON-RPC object) with its id replaced.</summary>
+        public static string WithId(string json, JsonNode? id)
+        {
+            if (JsonNode.Parse(json) is not JsonObject obj)
+                throw new JsonException("A JSON-RPC message must be a JSON object.");
+            obj["id"] = id?.DeepClone();
+            return obj.ToJsonString(Relaxed);
         }
 
         /// <summary>Stops waiting for <paramref name="idKey"/>; a response arriving later is dropped.</summary>

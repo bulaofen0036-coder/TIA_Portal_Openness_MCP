@@ -25,7 +25,15 @@ namespace TiaMcpServer.Tests
             ["ActiveTestCanBeAborted"] = new[] { "NoAction", "AcceptAll" },
             ["ActiveTestCanPreventDownload"] = new[] { "NoAction", "AcceptAll" },
             ["DifferentTargetConfiguration"] = new[] { "NoAction", "AcceptAll" },
+            // Checked against the V21 PublicAPI by reflection: these three are selections or plain
+            // messages, not check boxes, so a Checked answer never applied.
+            ["AlarmTextLibrariesDownload"] = new[] { "ConsistentDownload", "NoAction" },
+            ["UserManagementDownload"] = new[] { "KeepOnlineUserManagementData", "UpdateUserManagementDataButKeepOnlinePassword", "DownloadAllUserManagementDataResetToProject" },
         };
+
+        // Selection prompts must be answered with a selection; a Checked answer silently does nothing.
+        private static readonly string[] SelectionPrompts =
+            { "AlarmTextLibrariesDownload", "UserManagementDownload", "DifferentTargetConfiguration" };
 
         internal static void Run(Action<bool, string> check)
         {
@@ -67,6 +75,15 @@ namespace TiaMcpServer.Tests
             check(!DownloadPromptPolicy.Decide("AllBlocksDownload", defaults).Answers, "AllBlocksDownload: unanswered with consistentBlocksOnly=true");
             var check1 = DownloadPromptPolicy.Decide("CheckBeforeDownload", defaults);
             check(check1.Checked == true && check1.Selection == null, "CheckBeforeDownload is a check, not a selection");
+            foreach (var t in SelectionPrompts)
+            {
+                var sel = DownloadPromptPolicy.Decide(t, defaults);
+                check(sel.Selection != null && sel.Checked == null, t + ": answered with a selection, not Checked");
+            }
+            check(DownloadPromptPolicy.Decide("UserManagementDownload", defaults).Selection == "KeepOnlineUserManagementData",
+                "UserManagementDownload: users and passwords on the CPU are kept");
+            var cert = DownloadPromptPolicy.Decide("DownloadCertificate", defaults);
+            check(!cert.Answers && cert.Why.Contains("information"), "DownloadCertificate is information only: nothing to answer");
 
             var unknown = DownloadPromptPolicy.Decide("ProtectionLevelChanged", defaults);
             check(!unknown.Answers && unknown.Why.Contains("not handled"),

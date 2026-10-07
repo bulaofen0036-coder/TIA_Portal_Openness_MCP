@@ -608,7 +608,10 @@ namespace TiaMcpServer.Siemens
                             }
                         }
 
-                        var list = group.Blocks.Import(fi, ImportOptions.Override);
+                        // The Find above only sees this group and the file name; the block name inside the
+                        // XML can differ and the block can live in another group. ImportOptions.None makes
+                        // TIA itself refuse to replace anything.
+                        var list = group.Blocks.Import(fi, overwrite ? ImportOptions.Override : ImportOptions.None);
                         var names = list?.Select(b => b?.Name).Where(n => !string.IsNullOrWhiteSpace(n)).Cast<string>().ToList()
                                     ?? new List<string>();
                         if (names.Count > 0)

@@ -233,6 +233,12 @@ if ((Test-Path -LiteralPath $changelog) -and (Test-Path -LiteralPath $csproj) -a
             $shaMatch = [regex]::Match([string]$productVersion, '\+(?<sha>[0-9a-f]{7,40})')
             $git = Get-Command git -ErrorAction SilentlyContinue
             if ($shaMatch.Success -and $git) {
+              # Windows PowerShell 5.1 turns git's stderr into a terminating error under
+              # ErrorActionPreference=Stop (no .git in a ZIP download, unknown sha in a fork).
+              # This block is advisory, so it must never fail the run.
+              $savedPreference = $ErrorActionPreference
+              $ErrorActionPreference = "Continue"
+              try {
                 $isShallow = (& git -C $root rev-parse --is-shallow-repository 2>$null)
                 if ($isShallow -eq 'false') {
                     $sha = $shaMatch.Groups['sha'].Value
@@ -241,6 +247,11 @@ if ((Test-Path -LiteralPath $changelog) -and (Test-Path -LiteralPath $csproj) -a
                         Write-Host ("[WARN] runtime\v21\TiaMcpServer.exe was built from {0}, but {1} later commit(s) changed the engine source ({2}) - rebuild the public engine before release" -f $sha.Substring(0, [Math]::Min(8, $sha.Length)), $newer.Count, ($newer -join ', ')) -ForegroundColor Yellow
                     }
                 }
+              } catch {
+                Write-Host ("[WARN] could not compare the runtime build with the source history: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+              } finally {
+                $ErrorActionPreference = $savedPreference
+              }
             }
         }
 

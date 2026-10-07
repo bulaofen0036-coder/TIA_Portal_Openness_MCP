@@ -60,6 +60,31 @@ namespace TiaMcpServer.Siemens
 
         /// <summary>True when the open project is one the user already had open (we merely attached).</summary>
         public bool HasForeignProject => _project != null && !_projectOpenedByUs;
+
+        /// <summary>Binds an already-open project we did not open ourselves (attach, GetState).
+        /// Re-binding the project we opened keeps it ours; binding any other one makes it foreign,
+        /// or CloseProject/OpenProject would close the user's project on the strength of a flag
+        /// left over from ours.</summary>
+        private void BindExistingProject(ProjectBase? p)
+        {
+            if (_projectOpenedByUs && !IsSameProject(_project, p))
+                _projectOpenedByUs = false;
+            _project = p;
+        }
+
+        private static bool IsSameProject(ProjectBase? a, ProjectBase? b)
+        {
+            if (a == null || b == null) return false;
+            if (ReferenceEquals(a, b)) return true;
+            try
+            {
+                if (a.Equals(b)) return true;
+                var pa = (a as Project)?.Path?.FullName;
+                var pb = (b as Project)?.Path?.FullName;
+                return pa != null && string.Equals(pa, pb, StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
         private LocalSession? _session;
         // Resolving a softwarePath walks the device tree via Openness (~40 COM calls per call). Cache it per
         // open project; ReferenceEquals(_project) auto-invalidates on any project open/close/create/attach
@@ -486,7 +511,7 @@ namespace TiaMcpServer.Siemens
                             var p = s.Project;
                             var _ = p?.Name; // touch to validate not disposed
                             _session = s;
-                            _project = p;
+                            BindExistingProject(p);
                             break;
                         }
                         catch
@@ -504,7 +529,7 @@ namespace TiaMcpServer.Siemens
                         try
                         {
                             var _ = p?.Name;
-                            _project = p;
+                            BindExistingProject(p);
                             break;
                         }
                         catch
@@ -588,7 +613,7 @@ namespace TiaMcpServer.Siemens
                         if (p != null && string.Equals(p.Name, projectName, StringComparison.OrdinalIgnoreCase))
                         {
                             _session = s;
-                            _project = p;
+                            BindExistingProject(p);
                             return true;
                         }
                     }
@@ -602,7 +627,7 @@ namespace TiaMcpServer.Siemens
                         if (p != null && string.Equals(p.Name, projectName, StringComparison.OrdinalIgnoreCase))
                         {
                             _session = null;
-                            _project = p;
+                            BindExistingProject(p);
                             return true;
                         }
                     }
@@ -664,13 +689,6 @@ namespace TiaMcpServer.Siemens
         {
             _logger?.LogInformation($"Opening project: {projectPath}");
 
-            var foreign = ForeignOpenProjectName();
-            if (foreign != null && !closeForeignProject)
-            {
-                LastConnectError = ForeignProjectRefusal(foreign, "OpenProject");
-                return false;
-            }
-
             if (IsPortalNull())
             {
                 // ConnectPortal 现以 PortalException 报硬失败；此处保留 OpenProject 原有 bool 契约
@@ -680,6 +698,15 @@ namespace TiaMcpServer.Siemens
                     LastConnectError = $"Portal is null and reconnect failed: {ex.Message}";
                     return false;
                 }
+            }
+
+            // Checked AFTER the auto-connect: ConnectPortal prefers a running Portal that already has
+            // a project and binds it, so checking first would let the Close() below take the user's.
+            var foreign = ForeignOpenProjectName();
+            if (foreign != null && !closeForeignProject)
+            {
+                LastConnectError = ForeignProjectRefusal(foreign, "OpenProject");
+                return false;
             }
 
             // Validate before closing anything, so a bad path cannot cost the open project.

@@ -175,6 +175,17 @@ namespace TiaMcpServer
                 return;
             }
 
+            // Without a key only this machine may call. The startup check alone is not enough: an
+            // http://localhost:<port>/ prefix makes http.sys listen on every interface and route by
+            // the Host header, so a LAN client sending "Host: localhost" reaches this handler.
+            if (secret == null && !HttpSecurity.IsLoopbackRemote(req.RemoteEndPoint?.Address))
+            {
+                log("HTTP request rejected: no API key is set and the caller is " + req.RemoteEndPoint);
+                res.StatusCode = 403;
+                res.Close();
+                return;
+            }
+
             if (secret != null && !AuthOk(req, secret))
             {
                 res.StatusCode = 401;
@@ -266,18 +277,19 @@ namespace TiaMcpServer
                 return;
             }
 
-            // Register before writing, or a fast response could arrive with nobody waiting.
-            string idKey = JsonRpcResponseRouter.IdKey(requestId);
+            // Forward under a bridge-owned id (see NextBridgeId) and put the caller's id back on the
+            // response. Register before writing, or a fast response could arrive with nobody waiting.
+            var bridgeId = JsonRpcResponseRouter.NextBridgeId();
+            string idKey = JsonRpcResponseRouter.IdKey(bridgeId);
             var waiter = router.Expect(idKey);
             if (waiter == null)
             {
-                // Two in-flight requests with one id cannot be told apart on the way back.
                 res.StatusCode = 409;
                 res.Close();
                 return;
             }
 
-            send(body);
+            send(JsonRpcResponseRouter.WithId(body, bridgeId));
 
             string responseLine;
             var done = await Task.WhenAny(waiter, Task.Delay(timeout)).ConfigureAwait(false);
@@ -292,7 +304,7 @@ namespace TiaMcpServer
                     ["method"] = "notifications/cancelled",
                     ["params"] = new JsonObject
                     {
-                        ["requestId"] = requestId!.DeepClone(),
+                        ["requestId"] = bridgeId.DeepClone(),
                         ["reason"] = $"HTTP bridge timeout after {timeout.TotalSeconds:0}s",
                     },
                 };
@@ -303,7 +315,7 @@ namespace TiaMcpServer
                 return;
             }
 
-            try { responseLine = await waiter.ConfigureAwait(false); }
+            try { responseLine = JsonRpcResponseRouter.WithId(await waiter.ConfigureAwait(false), requestId); }
             catch (Exception ex)
             {
                 // The host stopped: say so now rather than letting every request run into the timeout.

@@ -37,7 +37,27 @@
 - **MoveBlockToGroup 失败会丢块。** 先删后导，导入失败时 `finally` 把唯一的导出副本也删了。
   现在导入失败先放回原组，放不回就保留导出文件并给出恢复命令。
 - **ImportBlocksFromDirectory(overwrite=false) 在 `Find` 失败时照样覆盖导入**，
-  导入结果为空也记成成功。两处都改为记失败。
+  导入结果为空也记成成功。两处都改为记失败。overwrite=false 时导入改用 `ImportOptions.None`：
+  `Find` 只看本组、只按文件名，块名与文件名不同或同名块在别的组时以前仍会被覆盖。
+
+合并前审查补充的修复（维护者）：
+
+- **`localhost` 前缀不等于只接本机。** http.sys 对 `http://localhost:<port>/` 监听全部网卡、按 Host 头分发，
+  局域网机器带 `Host: localhost` 就能进来，而无 key 时既不认证也不拦 Origin。现在没设 key 时逐个请求检查
+  TCP 对端，不是本机一律 403。
+- **HTTP 桥：两个客户端撞号会串响应。** 各客户端各自从 1 编号，A 的 id=5 超时后仍在引擎里跑，B 再发 id=5，
+  A 的迟到结果会交给 B。现在桥接层以自有 id 转发、回程换回调用方的 id。另修 `Expect` 与 `Close` 之间的竞态
+  （请求会等满超时而不是立即 502）。
+- **三个下载提示的应答类型不对**（V21 PublicAPI 反射核对）：`AlarmTextLibrariesDownload` 是选择项
+  （`ConsistentDownload`/`NoAction`），`UserManagementDownload` 是三选一（取 `KeepOnlineUserManagementData`，
+  不覆盖 CPU 上的用户和密码），`DownloadCertificate` 只是提示信息。以前一律答 `Checked`，从来没应用上。
+- **`DifferentTargetConfiguration` 仍自动接受，但成功时不再沉默**：Message 与 Warnings 写明在线模块与组态不一致，
+  提示确认是不是要下的那台 CPU。
+- **CloseProject/OpenProject 的「外来工程」判定会过期。** 先开自己的工程、再 `AttachToOpenProject` 到用户的工程，
+  标志仍是「我们开的」，CloseProject 会关掉用户的工程。挂接和 GetState 重绑到另一个工程时现在清掉标志
+  （重绑回自己的工程保持不变）。OpenProject 的外来检查挪到自动连接之后——自动连接会挂到已开工程的实例上。
+- **`Validate-Bundle.ps1` 在 Windows PowerShell 5.1 下会崩**：新加的 git 比对在 ZIP 下载包（无 `.git`）或
+  fork 里让 git 写 stderr，`ErrorActionPreference=Stop` 把它变成终止错误。这段只是提示，现在不会中断。
 - **OpenProject 先关当前工程再校验路径**，路径写错就白白丢掉未保存的修改。改为先校验。
 - **CloseProject 会关掉用户自己的工程。** 与 Open/Create 一样加 `closeForeignProject` 守卫。
   另：经 `Projects.Open` 兜底或 `OpenSession` 打开的工程原来被当成「用户的」。

@@ -70,11 +70,22 @@ namespace TiaMcpServer.Siemens
                     }
                     return Select(d, "DownloadAllBlocks", "consistentBlocksOnly=false");
                 case "CheckBeforeDownload":
-                case "AlarmTextLibrariesDownload":
-                case "UserManagementDownload":
-                case "DownloadCertificate":
+                    // The only one of these that is a check box (DownloadCheckConfiguration).
                     d.Checked = true;
                     d.Why = "include in the download";
+                    return d;
+                case "AlarmTextLibrariesDownload":
+                    // AlarmTextLibrariesDownloadSelections = { ConsistentDownload, NoAction }. A
+                    // selection, not a check box: answering Checked never applied.
+                    return Select(d, "ConsistentDownload", "download the alarm text libraries with the program");
+                case "UserManagementDownload":
+                    // UserManagementPreDownloadSelections = { KeepOnlineUserManagementData,
+                    // UpdateUserManagementDataButKeepOnlinePassword, DownloadAllUserManagementDataResetToProject }.
+                    // Users and passwords on the CPU are not the program's to overwrite.
+                    return Select(d, "KeepOnlineUserManagementData", "keep the user management data already on the CPU");
+                case "DownloadCertificate":
+                    // Only Parent and Message: an information prompt, there is nothing to answer.
+                    d.Why = "information only, nothing to answer";
                     return d;
                 case "DifferentTargetConfiguration":
                     return Select(d, "AcceptAll", "download although the online modules differ from the configured ones");

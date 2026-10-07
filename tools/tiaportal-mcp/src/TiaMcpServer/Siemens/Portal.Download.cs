@@ -615,10 +615,24 @@ namespace TiaMcpServer.Siemens
                    || result.State == DownloadResultState.Information
                    || result.State == DownloadResultState.Warning;
 
+            // DifferentTargetConfiguration is still accepted automatically. When TIA asked it, the
+            // CPU at that address does not match the configured hardware (a wrong IP reaches another
+            // machine's CPU the same way), so a success must not stay silent about it.
+            string targetNote = "";
+            foreach (var p in prompts)
+                if (p?["type"]?.GetValue<string>() == "DifferentTargetConfiguration" && p?["answer"]?.GetValue<string>() == "AcceptAll")
+                {
+                    targetNote = " TIA reported that the online modules differ from the configured hardware and the download went ahead"
+                               + " (Meta.downloadPrompts) - confirm with the user that this was the intended CPU.";
+                    warnings.Add(targetNote.Trim());
+                    break;
+                }
+
             return new ResponseDownload
             {
                 Ok = ok,
                 Message = $"Download {result.State}: {result.ErrorCount} error(s), {result.WarningCount} warning(s)."
+                          + targetNote
                           + (ok ? "" : ActiveTestHint(prompts)),
                 State = result.State.ToString(),
                 ErrorCount = result.ErrorCount,

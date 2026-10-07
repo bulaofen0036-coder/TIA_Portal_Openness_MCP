@@ -56,6 +56,14 @@ namespace TiaMcpServer
             return IPAddress.TryParse(host, out var ip) && IPAddress.IsLoopback(ip);
         }
 
+        /// <summary>True when the TCP peer is this machine (IPv4/IPv6 loopback, incl. IPv4-mapped).</summary>
+        public static bool IsLoopbackRemote(IPAddress? address)
+        {
+            if (address == null) return false;
+            if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
+            return IPAddress.IsLoopback(address);
+        }
+
         /// <summary>Compares secrets without an early exit, so response timing does not leak
         /// how many leading characters were right.</summary>
         public static bool ConstantTimeEquals(string? a, string? b)

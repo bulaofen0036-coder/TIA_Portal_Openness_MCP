@@ -61,6 +61,24 @@ namespace TiaMcpServer.Tests
             check(waiting.IsFaulted, "when the host's output ends, waiting requests fail instead of timing out");
             var late = p.Expect("10");
             check(late != null && late.IsFaulted, "after the host is gone new requests fail immediately");
+
+            // Two clients both send id 5, and client A's request times out but keeps running in the
+            // host. Forwarded under bridge ids, A's late answer cannot reach B.
+            var b = new JsonRpcResponseRouter();
+            var idA = JsonRpcResponseRouter.NextBridgeId();
+            var idB = JsonRpcResponseRouter.NextBridgeId();
+            check(JsonRpcResponseRouter.IdKey(idA) != JsonRpcResponseRouter.IdKey(idB), "every forwarded request gets its own bridge id");
+            b.Expect(JsonRpcResponseRouter.IdKey(idA));
+            b.Abandon(JsonRpcResponseRouter.IdKey(idA));
+            var waitB = b.Expect(JsonRpcResponseRouter.IdKey(idB))!;
+            var lateA = JsonRpcResponseRouter.WithId("{\"jsonrpc\":\"2.0\",\"id\":5,\"result\":{\"who\":\"A\"}}", idA);
+            check(!b.Route(lateA) && !waitB.IsCompleted, "client A's late response does not answer client B");
+
+            var forwarded = JsonRpcResponseRouter.WithId("{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"q\":\"中文\"}}", idB);
+            check(JsonNode.Parse(forwarded)!["id"]!.GetValue<string>() == idB.GetValue<string>() && forwarded.Contains("中文"),
+                "the forwarded request carries the bridge id and keeps its payload unescaped");
+            var back = JsonRpcResponseRouter.WithId("{\"jsonrpc\":\"2.0\",\"id\":\"x\",\"result\":{}}", JsonValue.Create(5));
+            check(JsonNode.Parse(back)!["id"]!.GetValue<int>() == 5, "the caller's own id is restored on the response");
         }
 
         private static void RunSecurity(Action<bool, string> check)
@@ -70,7 +88,14 @@ namespace TiaMcpServer.Tests
             foreach (var bad in new[] { "http://+:8765/", "http://*:8765/", "http://0.0.0.0:8765/", "http://192.168.0.10:8765/", "http://myhost:8765/", "", "127.0.0.1:8765" })
                 check(!HttpSecurity.IsLoopbackPrefix(bad), "not a loopback prefix: '" + bad + "'");
 
-            check(HttpSecurity.IsAllowedOrigin(null) && HttpSecurity.IsAllowedOrigin(""), "no Origin (a non-browser client) is allowed");
+            // A localhost prefix still listens on every interface (http.sys routes by Host header),
+            // so without a key each request's TCP peer must be this machine.
+            check(HttpSecurity.IsLoopbackRemote(System.Net.IPAddress.Loopback) && HttpSecurity.IsLoopbackRemote(System.Net.IPAddress.IPv6Loopback)
+                  && HttpSecurity.IsLoopbackRemote(System.Net.IPAddress.Loopback.MapToIPv6()), "loopback peers are local");
+            check(!HttpSecurity.IsLoopbackRemote(System.Net.IPAddress.Parse("192.168.10.28")) && !HttpSecurity.IsLoopbackRemote(null)
+                  && !HttpSecurity.IsLoopbackRemote(System.Net.IPAddress.Parse("192.168.10.28").MapToIPv6()), "a LAN peer is not local");
+
+            check(HttpSecurity.IsAllowedOrigin(null) &&HttpSecurity.IsAllowedOrigin(""), "no Origin (a non-browser client) is allowed");
             check(HttpSecurity.IsAllowedOrigin("http://localhost:3000") && HttpSecurity.IsAllowedOrigin("http://127.0.0.1")
                   && HttpSecurity.IsAllowedOrigin("http://[::1]:8080"), "local origins are allowed");
             check(!HttpSecurity.IsAllowedOrigin("https://evil.example") && !HttpSecurity.IsAllowedOrigin("http://192.168.0.5"),
