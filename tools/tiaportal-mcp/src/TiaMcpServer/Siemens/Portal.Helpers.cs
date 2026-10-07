@@ -1263,9 +1263,13 @@ namespace TiaMcpServer.Siemens
             }
 
             // 3) export -> delete -> import into target group (no native reparent)
+            var originalGroup = FindOwningBlockGroup(plcSoftware.BlockGroup, block.Name);
             var tempDir = Path.Combine(Path.GetTempPath(), "tia_mcp_move", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(tempDir);
             string method;
+            // Between Delete() and a successful import the temp export is the ONLY copy of the block.
+            // It used to be deleted in `finally` whatever happened, so a failed import lost the block.
+            bool keepExport = false;
             try
             {
                 bool usedDocs;
@@ -1279,34 +1283,64 @@ namespace TiaMcpServer.Siemens
                     usedDocs = false; // mixed-language / STL -> fall back to XML
                 }
 
-                if (usedDocs)
-                {
-                    block.Delete();
-                    var res = targetGroup.Blocks.ImportFromDocuments(new DirectoryInfo(tempDir), blockName, ImportDocumentOptions.Override);
-                    if (res == null || res.State != DocumentResultState.Success)
-                    {
-                        throw new PortalException(PortalErrorCode.ImportFailed,
-                            $"Re-import of '{blockName}' into '{targetGroupPath}' failed (documents)");
-                    }
-                    method = "documents(.s7dcl)";
-                }
-                else
-                {
-                    var xml = Path.Combine(tempDir, blockName + ".xml");
+                var xml = Path.Combine(tempDir, blockName + ".xml");
+                if (!usedDocs)
                     block.Export(new FileInfo(xml), ExportOptions.None);
-                    block.Delete();
-                    var imp = targetGroup.Blocks.Import(new FileInfo(xml), ImportOptions.Override);
-                    if (imp == null || imp.Count == 0)
+                method = usedDocs ? "documents(.s7dcl)" : "xml(SimaticML)";
+
+                block.Delete();
+
+                string? importError = null;
+                try
+                {
+                    if (!ReimportMovedBlock(targetGroup, usedDocs, tempDir, blockName, xml))
+                        importError = "the import returned no block";
+                }
+                catch (Exception ex)
+                {
+                    importError = ex.Message;
+                }
+
+                if (importError != null)
+                {
+                    string? restoreError = null;
+                    if (originalGroup == null)
                     {
-                        throw new PortalException(PortalErrorCode.ImportFailed,
-                            $"Re-import of '{blockName}' into '{targetGroupPath}' failed (xml)");
+                        restoreError = "its original group could not be determined";
                     }
-                    method = "xml(SimaticML)";
+                    else
+                    {
+                        try
+                        {
+                            if (!ReimportMovedBlock(originalGroup, usedDocs, tempDir, blockName, xml))
+                                restoreError = "the import returned no block";
+                        }
+                        catch (Exception ex)
+                        {
+                            restoreError = ex.Message;
+                        }
+                    }
+
+                    if (restoreError == null)
+                        throw new PortalException(PortalErrorCode.ImportFailed,
+                            $"Move of '{blockName}' to '{targetGroupPath}' failed ({importError}, via {method}); "
+                            + $"the block was restored to its original group '{originalGroup!.Name}'.");
+
+                    keepExport = true;
+                    throw new PortalException(PortalErrorCode.ImportFailed,
+                        $"Move of '{blockName}' to '{targetGroupPath}' failed ({importError}, via {method}) and putting it back "
+                        + $"also failed ({restoreError}). The block is no longer in the project. Its export is kept at '{tempDir}': "
+                        + (usedDocs
+                            ? $"recover it with ImportFromDocuments(softwarePath='{softwarePath}', groupPath='', importPath='{tempDir}', fileNameWithoutExtension='{blockName}')."
+                            : $"recover it with ImportBlock(softwarePath='{softwarePath}', groupPath='', importPath='{xml}')."));
                 }
             }
             finally
             {
-                try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true); } catch { /* best-effort cleanup */ }
+                if (!keepExport)
+                {
+                    try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true); } catch { /* best-effort cleanup */ }
+                }
             }
 
             // 4) verify the block is now under the target group
@@ -1319,6 +1353,31 @@ namespace TiaMcpServer.Siemens
             }
 
             return $"Moved '{blockName}' to '{targetGroupPath}' via {method}";
+        }
+
+        private static bool ReimportMovedBlock(PlcBlockGroup group, bool usedDocs, string dir, string blockName, string xml)
+        {
+            if (usedDocs)
+            {
+                var res = group.Blocks.ImportFromDocuments(new DirectoryInfo(dir), blockName, ImportDocumentOptions.Override);
+                return res != null && res.State == DocumentResultState.Success;
+            }
+            var imp = group.Blocks.Import(new FileInfo(xml), ImportOptions.Override);
+            return imp != null && imp.Count > 0;
+        }
+
+        /// <summary>The block group that directly holds the block named <paramref name="blockName"/>.</summary>
+        private static PlcBlockGroup? FindOwningBlockGroup(PlcBlockGroup group, string blockName)
+        {
+            foreach (var composition in group.Blocks)
+                if (composition is PlcBlock b && string.Equals(b.Name, blockName, StringComparison.OrdinalIgnoreCase))
+                    return group;
+            foreach (var sub in group.Groups)
+            {
+                var found = FindOwningBlockGroup(sub, blockName);
+                if (found != null) return found;
+            }
+            return null;
         }
 
         private PlcTypeGroup? GetPlcTypeGroupByPath(string softwarePath, string groupPath)
@@ -1479,8 +1538,12 @@ namespace TiaMcpServer.Siemens
             // 正则一次编译好。原来是逐块 try/catch：模式写错时每个块都被 catch 掉、
             // 最后返回空列表，对外表现成「这个 PLC 里没有匹配的块」—— 把「你的模式非法」
             // 说成了一个具体的、错的事实。
-            var filter = CompileNameFilterOrThrow(regexName);
+            // Compiled once for the whole walk, not once per group level.
+            CollectBlocks(group, list, CompileNameFilterOrThrow(regexName));
+        }
 
+        private static void CollectBlocks(PlcBlockGroup group, List<PlcBlock> list, Regex? filter)
+        {
             foreach (var composition in group.Blocks)
             {
                 if (composition is PlcBlock block)
@@ -1496,7 +1559,7 @@ namespace TiaMcpServer.Siemens
 
             foreach (var subgroup in group.Groups)
             {
-                GetBlocksRecursive(subgroup, list, regexName);
+                CollectBlocks(subgroup, list, filter);
             }
         }
 
@@ -1523,8 +1586,11 @@ namespace TiaMcpServer.Siemens
         // 与 GetBlocksRecursive 同因：返回值没人读、且子组那行是覆盖不是累积，已去掉。
         private void GetTypesRecursive(PlcTypeGroup group, List<PlcType> list, string regexName = "")
         {
-            var filter = CompileNameFilterOrThrow(regexName);
+            CollectTypes(group, list, CompileNameFilterOrThrow(regexName));
+        }
 
+        private static void CollectTypes(PlcTypeGroup group, List<PlcType> list, Regex? filter)
+        {
             foreach (var composition in group.Types)
             {
                 if (composition is PlcType type)
@@ -1540,7 +1606,7 @@ namespace TiaMcpServer.Siemens
 
             foreach (PlcTypeGroup subgroup in group.Groups)
             {
-                GetTypesRecursive(subgroup, list, regexName);
+                CollectTypes(subgroup, list, filter);
             }
         }
 
@@ -2134,6 +2200,24 @@ namespace TiaMcpServer.Siemens
             if (string.IsNullOrWhiteSpace(typeSuffix)) return null;
             var suf = typeSuffix.Trim();
 
+            return ScanLoadedTypes("suffix:" + suf.ToLowerInvariant(), t =>
+            {
+                var n = t.FullName ?? t.Name;
+                return n.EndsWith(suf, StringComparison.OrdinalIgnoreCase) || t.Name.EndsWith(suf, StringComparison.OrdinalIgnoreCase);
+            });
+        }
+
+        // A whole-AppDomain GetTypes() walk touches every type in the loaded Siemens.Engineering
+        // assemblies (tens of thousands) and used to run on every call that resolves a type by
+        // name. Found types are cached; a miss is not, because the assembly that defines the type
+        // may simply not be loaded yet.
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Type> _typeScanCache =
+            new System.Collections.Concurrent.ConcurrentDictionary<string, Type>(StringComparer.Ordinal);
+
+        private static Type? ScanLoadedTypes(string cacheKey, Func<Type, bool> match)
+        {
+            if (_typeScanCache.TryGetValue(cacheKey, out var hit)) return hit;
+
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
             {
                 Type[] types;
@@ -2142,9 +2226,9 @@ namespace TiaMcpServer.Siemens
 
                 foreach (var t in types)
                 {
-                    var n = t.FullName ?? t.Name;
-                    if (n.EndsWith(suf, StringComparison.OrdinalIgnoreCase) || t.Name.EndsWith(suf, StringComparison.OrdinalIgnoreCase))
-                        return t;
+                    if (!match(t)) continue;
+                    _typeScanCache[cacheKey] = t;
+                    return t;
                 }
             }
 

@@ -5,12 +5,13 @@
         public int? TiaMajorVersion { get; set; }
         public string? TiaPortalLocation { get; set; } // explicit install root, e.g. D:\app\TIA20\Portal V20
         public int? Logging { get; set; } // 1=stderr, 2=Debug, 3=EventLog
-        // Tool roster size: "lite" (default, ~48 tools) or "full" (everything).
+        // Tool roster size: "lite" (default, the core tools) or "full" (everything).
         // null = not given on the command line; TIA_MCP_PROFILE then decides.
         public string? Profile { get; set; }
         public string? Transport { get; set; } // "stdio" (default) or "http"
         public string? HttpPrefix { get; set; } // e.g. "http://127.0.0.1:8765/"
-        public string? HttpApiKey { get; set; } // optional X-API-Key header value
+        public string? HttpApiKey { get; set; } // optional X-API-Key header value (or TIA_MCP_HTTP_API_KEY)
+        public int? HttpTimeoutSeconds { get; set; } // how long an HTTP request waits for its response
         public bool RunFlowLightTest { get; set; }
         public bool FixCurrentFlowBinding { get; set; }
         public bool ProbeS71200Device { get; set; }
@@ -755,6 +756,15 @@
                         if (i + 1 < args.Length)
                         {
                             options.HttpApiKey = args[i + 1];
+                            i++;
+                        }
+                        break;
+
+                    case "--http-timeout-seconds":
+                        if (i + 1 < args.Length)
+                        {
+                            if (int.TryParse(args[i + 1], out var seconds) && seconds > 0)
+                                options.HttpTimeoutSeconds = seconds;
                             i++;
                         }
                         break;

@@ -40,13 +40,16 @@ namespace TiaMcpServer.ModelContextProtocol
             var req = required ?? Array.Empty<string>();
             var got = supplied ?? Array.Empty<string>();
 
+            // 区分大小写：SDK 按参数名**精确**绑定（实测 0.3.0-preview.4：FindTools 收到
+            // {"Query":…} 不报错，query 被静默丢掉，按空查询列出整张表）。这里若放过大小写
+            // 不同的名字，正好把「会被静默忽略」的那一种放了过去。
             var unknown = got
                 .Where(g => !string.IsNullOrEmpty(g))
-                .Where(g => !known.Any(k => string.Equals(k, g, StringComparison.OrdinalIgnoreCase)))
+                .Where(g => !known.Any(k => string.Equals(k, g, StringComparison.Ordinal)))
                 .ToList();
 
             var missing = req
-                .Where(r => !got.Any(g => string.Equals(g, r, StringComparison.OrdinalIgnoreCase)))
+                .Where(r => !got.Any(g => string.Equals(g, r, StringComparison.Ordinal)))
                 .ToList();
 
             if (unknown.Count == 0 && missing.Count == 0) return "";
@@ -71,6 +74,8 @@ namespace TiaMcpServer.ModelContextProtocol
                     .ToList();
                 if (hints.Count > 0)
                     sb.Append(" Did you mean: ").Append(string.Join(", ", hints)).Append('?');
+                if (unknown.Any(u => known.Any(k => string.Equals(k, u, StringComparison.OrdinalIgnoreCase))))
+                    sb.Append(" Argument names are case-sensitive.");
             }
 
             sb.Append(" Expected signature: ").Append(RenderSignature(toolName, known, req, typeOf));

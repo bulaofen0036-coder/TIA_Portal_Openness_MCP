@@ -180,7 +180,7 @@ namespace TiaMcpServer.Cli
                 ? v
                 : (TiaMcpServer.Siemens.Engineering.DetectTiaMajorVersion() ?? 21);
             string exe = McpConfigInstaller.ExeForVersion(ver);
-            // The engine itself now defaults to the ~48-tool lite roster, so a plain config is
+            // The engine itself now defaults to the lite roster, so a plain config is
             // already the right one and pins no profile. --full is the opt-out; --lite is still
             // accepted and still yields lite, since lite is the default.
             bool full = Flag(args, "--full");
@@ -222,7 +222,7 @@ namespace TiaMcpServer.Cli
             }
 
             Console.WriteLine(done > 0
-                ? $"Configured {done} host(s) for TIA V{ver} -> {exe}{(full ? " [full profile: all tools — exceeds VS Code/Copilot's 128 and Windsurf's 100 tool cap]" : " [default lite profile: ~48 core tools; the rest stay reachable via FindTools/CallTool]")}. Restart the AI client to load it. (original config backed up as *.bak)"
+                ? $"Configured {done} host(s) for TIA V{ver} -> {exe}{(full ? " [full profile: all tools — exceeds VS Code/Copilot's 128 and Windsurf's 100 tool cap]" : " [default lite profile: the core tools only; the rest stay reachable via FindTools/CallTool]")}. Restart the AI client to load it. (original config backed up as *.bak)"
                 : "No host config written. Targeted host not found, or use `config --print` to copy the snippet manually.");
             Console.WriteLine("For other hosts, run `config --print` and paste the matching snippet.");
             return failed > 0 && done == 0 ? 1 : 0;
@@ -380,7 +380,7 @@ USAGE
                                                           One-click: register this MCP into all detected AI hosts
                                                           (Claude Desktop / Claude Code / Cursor / VS Code); auto-picks
                                                           the exe matching your installed TIA version.
-                                                          Default lists ~48 core tools; the rest stay reachable
+                                                          Default lists the core tools; the rest stay reachable
                                                           on demand via FindTools + CallTool.
                                                           --full = list every tool instead (rejected by VS Code/
                                                           Copilot above 128 and Windsurf above 100)

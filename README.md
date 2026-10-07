@@ -15,6 +15,11 @@
 > **Free & open (MIT).** The server runs with **no license key** — there is no
 > license-enforcement code at all.
 
+> 🖥️ **Don't want to wire up an MCP client yourself?** Try **[TIA 助手 (TIA Assist)](https://aeenhance.com/)** —
+> the desktop edition built on this engine: unzip and run, built-in AI assistant, and every write to your
+> project waits for your approval first.
+> 👉 [aeenhance.com](https://aeenhance.com/) · [1-minute demo](https://aeenhance.com/#demo) · Trial: **bulaofen0036@gmail.com** · [Comparison ↓](#tia-助手-tia-assist--the-desktop-edition)
+
 ![Architecture](docs/assets/architecture.svg)
 
 Drive **Siemens TIA Portal V20 or V21** from any **MCP** client (stdio or HTTP):
@@ -91,6 +96,39 @@ GetVersionControlStatus(changedOnly=true)
    - CLI equivalent: add the bundle root to PATH, then `tia gen <spec>` (start with
      `--dry-run` for an offline check).
 
+## TIA 助手 (TIA Assist) — the desktop edition
+
+[![TIA Assist — talk to it, it drives TIA Portal](https://aeenhance.com/img/og-cover.jpg)](https://aeenhance.com/)
+
+This repository is the **engine**: you bring your own AI client (Cursor, Claude, VS Code…) and mount it.
+If you'd rather **open an app and start working** — or hand it to colleagues and commissioning engineers
+who have never heard of MCP — the author also ships **[TIA 助手 (TIA Assist)](https://aeenhance.com/)**:
+the same engine inside a Windows desktop app, with the AI assistant, online monitoring and trend
+recording built into the UI. *(The UI and website are currently Chinese-only.)*
+
+![TIA Assist demo: while writing an SCL block, destructive operations get their own confirmation dialog](https://aeenhance.com/video/demo-write.jpg)
+
+<sub>↑ Real screen capture (demo project): asked to write a duty/standby rotation FB for two pumps, it hit
+4 compile warnings on the first build and fixed them itself down to 0 errors / 0 warnings — pausing for a
+human "Yes" before every write. [Watch the full recording →](https://aeenhance.com/#demo)</sub>
+
+| | Open-source MCP (this repo) | TIA 助手 (desktop edition) |
+|---|---|---|
+| Form | MCP server + `tia` CLI, driven by your own AI client | Windows desktop app, **no install — unzip and run**; V20 / V21 engines bundled and picked automatically |
+| AI | Bring your own (Cursor / Claude Desktop / VS Code …) | **Built-in AI assistant**; DeepSeek, Qwen, Kimi, Zhipu or any OpenAI-compatible API — or a local **Ollama** model, fully offline, project data never leaves the plant |
+| Write safety | Up to your client | **Every write waits for your approval**; irreversible operations (e.g. deleting blocks) are confirmed separately; hash-chained audit log |
+| Online values | Read-only (S7 absolute addresses / OPC UA) | **No TIA Portal needed** — symbolic read/write over S7CommPlus; writes off by default, forced read-back when enabled |
+| Trend recording | — | Record, overlay/split, export and replay CSV |
+| Environment check | `tia.cmd doctor` (CLI) | Graphical per-item check of runtimes / Openness allow-list / user group with the fix for each, one-click diagnostic bundle |
+| License | MIT, free | Commercial — **free trial available** |
+
+**Try it**: email **bulaofen0036@gmail.com** with your TIA Portal version (V20 / V21) and what you want to
+try → get the trial package, run it, send back the machine code and receive a license key.
+The safest first run: let it explain your own project **read-only** and check whether it got it right.
+More: [AI assistant](https://aeenhance.com/assistant) · [Online debugging](https://aeenhance.com/online) · [Safety boundaries](https://aeenhance.com/security) · [Manual](https://aeenhance.com/manual) · [Get started](https://aeenhance.com/start)
+
+> Both run the same engine: bugs fixed here are fixed there too, and issues reported here help both.
+
 ## Highlights
 
 - **Stability-first public generation (v0.0.39).** `PlcBuildAndImport` now returns
@@ -110,7 +148,7 @@ GetVersionControlStatus(changedOnly=true)
   `ImportFromDocuments` / `ImportBlocksFromDocuments` read/write the diff-friendly
   SIMATIC SD text format (`.s7dcl` + `.s7res`) on V20+ and are flagged *PREFERRED on
   V21+*. The SimaticML XML chain remains for backward compatibility.
-- **183 tools** across project, hardware, PLC, HMI, and online operations,
+- **222 tools** across project, hardware, PLC, HMI, and online operations,
   layered `[L0]`/`[L1]`/`[L2]` so a normal session only needs L0 + L1.
 
 ## Requirements
@@ -141,8 +179,8 @@ GetVersionControlStatus(changedOnly=true)
    **Claude Desktop / Claude Code / Cursor / VS Code** (existing config backed up
    as `.bak`, other servers preserved). Restart the AI client to load it.
    Options: `config --host vscode` (or `claude|claude-code|cursor`), `config --print`
-   to copy a snippet manually. The server lists **~55 core tools of 222 by default**
-   (~8,500 instead of ~38,800 tokens of schema per turn) so weaker models are not drowned
+   to copy a snippet manually. The server lists **62 core tools of 222 by default**
+   (about 57 KB instead of 196 KB of tool schema per turn) so weaker models are not drowned
    and VS Code/Copilot's 128-tool cap and Windsurf's 100 never trip. Nothing is lost: the
    model reaches every other tool on demand with `FindTools("plain words")` +
    `CallTool(name, argumentsJson)`, and the handshake instructions tell it so. Pass
@@ -249,3 +287,11 @@ Bootstrap → Connect → CreateProject → AddDeviceWithFallback → AddHardwar
 → EnsureUnifiedHmiScreen → ApplyUnifiedHmiScreenDesignJson → BindUnifiedHmiTagDynamization
 → EnsureUnifiedHmiButtonAction → SaveProject → Disconnect
 ```
+
+## Contact
+
+- **Bugs / feature requests**: please open an [Issue](https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP/issues) so others hitting the same problem can find it.
+- **TIA 助手 trial, custom development, partnerships**: **bulaofen0036@gmail.com**
+- Desktop edition: **[aeenhance.com](https://aeenhance.com/)**
+
+> Siemens, TIA Portal, SIMATIC, STEP 7 and WinCC are trademarks of Siemens AG. This project and TIA 助手 are independently developed third-party tools with no affiliation with, agency for, or authorization from Siemens AG.

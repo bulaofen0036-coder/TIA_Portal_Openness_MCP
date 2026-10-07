@@ -110,36 +110,43 @@ namespace TiaMcpServer.Siemens
 
                 using var passwordScope = AttachPasswordHandler(provider.Configuration, password);
 
-                OnlineState resultState;
+                // OnlineProvider.GoOnline() takes no address. The documented way to pick the target
+                // is ConnectionConfiguration.ApplyConfiguration(...) on OnlineProvider.Configuration,
+                // then GoOnline() (Openness manual, "Setting connection parameters"). This used to look
+                // for a GoOnline(address) overload that does not exist and silently fell back to the
+                // configured address, so an ipAddress override was ignored without a word.
+                string routeNote = "";
                 if (!string.IsNullOrWhiteSpace(ipAddress))
                 {
-                    var goOnlineWithAddr = provider.GetType()
-                        .GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                        .FirstOrDefault(m => m.Name == "GoOnline" && m.GetParameters().Length == 1);
+                    // ApplyConfiguration throws while a connection is up (same manual page).
+                    if (provider.State == OnlineState.Online)
+                        throw new PortalException(PortalErrorCode.InvalidState,
+                            $"GoOnline: '{softwarePath}' is already online, so the route to {ipAddress} cannot be applied. "
+                            + "Call GoOffline first, then GoOnline with the ipAddress.");
 
-                    if (goOnlineWithAddr != null)
-                    {
-                        var addrType = goOnlineWithAddr.GetParameters()[0].ParameterType;
-                        var addrCtor = addrType.GetConstructor(new[] { typeof(string) });
-                        if (addrCtor != null)
-                        {
-                            var addr = addrCtor.Invoke(new object[] { ipAddress! });
-                            var rawState = goOnlineWithAddr.Invoke(provider, new[] { addr });
-                            resultState = rawState is OnlineState os ? os : OnlineState.Offline;
-                        }
-                        else
-                        {
-                            resultState = provider.GoOnline();
-                        }
-                    }
-                    else
-                    {
-                        resultState = provider.GoOnline();
-                    }
+                    var route = SelectDownloadRoute(provider.Configuration, null, ipAddress);
+                    if (route.Error != null)
+                        throw new PortalException(PortalErrorCode.InvalidParams,
+                            "GoOnline: " + route.Error + ". Openness can only choose among the target addresses the "
+                            + "project already configures; to reach a different IP, change it in the hardware configuration first.");
+                    if (!route.Applied)
+                        throw new PortalException(PortalErrorCode.OpennessError,
+                            $"GoOnline: ApplyConfiguration did not accept any route to {ipAddress} "
+                            + $"(candidates: {DescribeRoutes(route.Candidates)}), so the connection was NOT attempted.");
+                    routeNote = " Route: " + route.Description + ".";
                 }
-                else
+
+                OnlineState resultState;
+                try
                 {
                     resultState = provider.GoOnline();
+                }
+                catch (Exception ex) when (ex is not PortalException)
+                {
+                    // An exception here is not the NotReachable state: the attempt itself failed.
+                    _logger?.LogError(ex, "GoOnline failed for {SoftwarePath}", softwarePath);
+                    throw new PortalException(PortalErrorCode.OpennessError,
+                        $"GoOnline failed on '{softwarePath}': {ex.Message}.{routeNote}", inner: ex);
                 }
 
                 var stateName = resultState.ToString();
@@ -149,13 +156,17 @@ namespace TiaMcpServer.Siemens
                     State = stateName,
                     IsOnline = isOnline,
                     IsReachable = isOnline || stateName == "Protected",
-                    Message = BuildOnlineStateMessage(stateName, softwarePath)
+                    Message = BuildOnlineStateMessage(stateName, softwarePath) + routeNote
                 };
+            }
+            catch (PortalException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "GoOnline failed for {SoftwarePath}", softwarePath);
-                return new ResponseOnlineState { State = "NotReachable", IsOnline = false, IsReachable = false, Message = $"GoOnline failed: {ex.Message}" };
+                throw new PortalException(PortalErrorCode.OpennessError, $"GoOnline failed on '{softwarePath}': {ex.Message}", inner: ex);
             }
         }
 
@@ -180,25 +191,39 @@ namespace TiaMcpServer.Siemens
                     + AvailablePlcPathsSuffix());
             }
 
+            var provider = ResolvePlcService<OnlineProvider>(softwarePath, plcSoftware);
+            if (provider == null)
+            {
+                throw new PortalException(PortalErrorCode.OpennessError,
+                    $"GoOffline: OnlineProvider service is not available on '{softwarePath}', "
+                    + "so the offline transition was NOT performed. Any live online session is still open — "
+                    + "disconnect it in the TIA Portal UI before compiling or exporting.");
+            }
+
+            // The throw above used to sit inside a catch-all that turned it (and any Openness
+            // failure) back into an ordinary "GoOffline error: ..." message with isError=false.
             try
             {
-                var provider = ResolvePlcService<OnlineProvider>(softwarePath, plcSoftware);
-                if (provider == null)
-                {
-                    throw new PortalException(PortalErrorCode.OpennessError,
-                        $"GoOffline: OnlineProvider service is not available on '{softwarePath}', "
-                        + "so the offline transition was NOT performed. Any live online session is still open — "
-                        + "disconnect it in the TIA Portal UI before compiling or exporting.");
-                }
-
                 provider.GoOffline();
-                return new ResponseMessage { Message = $"'{softwarePath}' is now offline." };
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not PortalException)
             {
                 _logger?.LogError(ex, "GoOffline failed for {SoftwarePath}", softwarePath);
-                return new ResponseMessage { Message = $"GoOffline error: {ex.Message}" };
+                throw new PortalException(PortalErrorCode.OpennessError,
+                    $"GoOffline failed on '{softwarePath}': {ex.Message}. The online session may still be open.", inner: ex);
             }
+
+            // Read the state back instead of assuming the call worked.
+            string after;
+            try { after = provider.State.ToString(); }
+            catch (Exception ex) { after = "Unknown (" + ex.Message + ")"; }
+            if (after == "Online")
+            {
+                throw new PortalException(PortalErrorCode.OpennessError,
+                    $"GoOffline: '{softwarePath}' still reports State=Online after GoOffline(). "
+                    + "Another online session (for example one opened in the TIA Portal UI) may be holding it; try GoOfflineAll.");
+            }
+            return new ResponseMessage { Message = $"'{softwarePath}' is now offline (state: {after})." };
         }
 
         // Take EVERY PLC in the project offline, not just one. A UI-initiated online session,

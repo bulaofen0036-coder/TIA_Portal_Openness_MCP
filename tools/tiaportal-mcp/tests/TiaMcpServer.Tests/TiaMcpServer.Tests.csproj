@@ -49,5 +49,16 @@
     <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ReflectionInvokeSafety.cs" Link="ReflectionInvokeSafety.cs" />
     <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\SimaticMlText.cs" Link="SimaticMlText.cs" />
     <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\LadTextRenderer.cs" Link="LadTextRenderer.cs" />
+    <!-- 工具安全表：annotations、Openness 串行闸、CallTool 拒绝名单都从这一张表来。
+         判错了什么都不会崩 —— 宿主只是不再在下载前问一句，或者两个调用在博途句柄上交错。 -->
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ToolSafety.cs" Link="ToolSafety.cs" />
+    <!-- CallTool 的绑定与调用：异步工具曾被序列化成 Task 对象，带注入参数的工具曾永远报缺参。 -->
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ReflectiveToolInvoker.cs" Link="ReflectiveToolInvoker.cs" />
+    <!-- HTTP 传输：按 id 路由响应（超时后孤儿读线程吞掉下一条响应的那个 bug）+ 安全判定。 -->
+    <Compile Include="..\..\src\TiaMcpServer\JsonRpcResponseRouter.cs" Link="JsonRpcResponseRouter.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\HttpSecurity.cs" Link="HttpSecurity.cs" />
+    <!-- 下载对话框的应答表：答案必须是手册里该提示枚举的成员，否则设不进去、下载无声失败；
+         「取消正在进行的测试/调试功能」必须是显式选择。 -->
+    <Compile Include="..\..\src\TiaMcpServer\Siemens\DownloadPromptPolicy.cs" Link="DownloadPromptPolicy.cs" />
   </ItemGroup>
 </Project>

@@ -20,7 +20,7 @@ namespace TiaMcpServer.ModelContextProtocol
 
 FIRST CALL: Bootstrap — returns environment status, connection state, the recommended next tool, and operating rules. Do this before anything else. If the environment itself seems broken (TIA missing, group membership, nothing connects), call Doctor for a plain-language diagnosis with exact fixes.
 
-THE TOOL LIST YOU SEE IS NOT THE WHOLE SERVER. By default only ~48 core tools are listed, out of ~200. The rest — watch tables, alarms, GSD/hardware catalog, OPC UA, technology objects, HMI screens and themes, cross-reference and repair tools, online monitoring — are reached WITHOUT changing anything: call FindTools('what you need in plain words'), then CallTool(name, argumentsJson). So never conclude ""this server cannot do X"" from the visible list; run FindTools('X') first. (An operator who wants everything listed at once can start the server with --profile full, but the tool list then exceeds what VS Code/Copilot and Windsurf accept.)
+THE TOOL LIST YOU SEE IS NOT THE WHOLE SERVER. By default only the core 'lite' tools are listed, a fraction of the whole roster. The rest — watch tables, alarms, GSD/hardware catalog, OPC UA, technology objects, HMI screens and themes, cross-reference and repair tools, online monitoring — are reached WITHOUT changing anything: call FindTools('what you need in plain words'), then CallTool(name, argumentsJson). So never conclude ""this server cannot do X"" from the visible list; run FindTools('X') first. (An operator who wants everything listed at once can start the server with --profile full, but the tool list then exceeds what VS Code/Copilot and Windsurf accept.)
 
 GOLDEN PATHS (pick one, do not improvise):
 - Whole new project → ScaffoldProject with ONE JSON spec (PLC + blocks + HMI + compile + save in a single call). The DEFAULT call is a dry run (offline spec validation, nothing created); when it reports clean, call again with dryRun=false to actually create.
@@ -55,7 +55,7 @@ Connect → (OpenProject | AttachToOpenProject | CreateProject) → GetProjectTr
 
             ["scl"] =
 @"SCL AUTHORING (verified):
-Preferred import: ImportFromDocuments / ImportBlocksFromScl with .s7dcl files (UTF-8 WITH BOM). Alternative: GenerateBlocksFromExternalSource with .scl external source (UTF-8 WITHOUT BOM for ASCII-only; if the .scl has Chinese, no-BOM mojibakes it -> add a BOM or keep comments ASCII, or better author it as .s7dcl).
+Preferred import: ImportFromDocuments / ImportBlocksFromDocuments with .s7dcl files (UTF-8 WITH BOM). Alternative: GenerateBlocksFromExternalSource with .scl external source (UTF-8 WITHOUT BOM for ASCII-only; if the .scl has Chinese, no-BOM mojibakes it -> add a BOM or keep comments ASCII, or better author it as .s7dcl).
 CAUTION: GenerateBlocksFromExternalSource does NOT overwrite an existing block — re-running updates modifiedDate but keeps the OLD code (you then debug 'phantom' errors). To change a block: delete it first (InvokeObject methodName=Delete, instance DB first), then regenerate. (ImportFromDocuments/.s7dcl DOES overwrite with importOption=Override.)
 Skeleton (block names in English; for a .s7dcl Chinese comments are fine, but in a .scl external source keep comments ASCII unless the file has a BOM):
   FUNCTION_BLOCK ""FB_Name""
@@ -98,7 +98,7 @@ INSTRUCTION GOTCHAS (compile-verified on S7-1500/V21 — these are the ones weak
             ["lad"] =
 @"LADDER (LAD) — READING & AUTHORING (verified):
 READING/ANALYZING existing LAD: call DescribeBlockLogic(softwarePath, blockPath). It reconstructs each rung as a readable expression (series contacts = ' · ', parallel = ' + ', NC shown as '/operand'), lists coils ( )/(S)/(R) and MOVE/compare/timer boxes with operands, and FLAGS a contact wired to a literal constant ('⟨恒断·禁用本行⟩' = a NO contact on FALSE that silently disables its rung). Use it instead of exporting XML and tracing wires by hand — it is the accurate, fast path.
-AUTHORING: DO NOT hand-write SimaticML FlgNet XML — UId bookkeeping and entity escaping make it fail constantly. The reliable path is S7DCL ladder TEXT imported with ImportBlocksFromScl(importPath=directory) / ImportFromDocuments. Files: Block.s7dcl (+ optional Block.s7res for Chinese texts), both UTF-8 WITH BOM.
+AUTHORING: DO NOT hand-write SimaticML FlgNet XML — UId bookkeeping and entity escaping make it fail constantly. The reliable path is S7DCL ladder TEXT imported with ImportBlocksFromDocuments(importPath=directory) / ImportFromDocuments. Files: Block.s7dcl (+ optional Block.s7res for Chinese texts), both UTF-8 WITH BOM.
 S7DCL LADDER DIALECT (compile-verified on S7-1500/V21):
 Block skeleton — LAD FCs return Void:
   { S7_Optimized := ""TRUE""; S7_PreferredLanguage := ""LAD""; S7_Version := ""0.1"" }

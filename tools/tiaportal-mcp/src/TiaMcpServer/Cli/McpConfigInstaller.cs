@@ -94,7 +94,7 @@ namespace TiaMcpServer.Cli
             if (style == HostStyle.VsCode) entry["type"] = "stdio";
             entry["command"] = exePath;
             entry["args"] = new JsonArray("--tia-major-version", tiaMajorVersion.ToString());
-            // The engine defaults to the ~48-tool lite roster on its own, so the normal config
+            // The engine defaults to the lite roster on its own, so the normal config
             // needs no env at all. Only the opt-out is worth writing — and it is an opt-out with
             // consequences: the full roster exceeds what VS Code/Copilot (128) and Windsurf (100) load.
             if (full) entry["env"] = new JsonObject { ["TIA_MCP_PROFILE"] = "full" };

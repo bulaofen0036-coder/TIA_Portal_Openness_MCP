@@ -7,7 +7,7 @@ description: Drive Siemens TIA Portal (博途) end-to-end through the TiaMcpServ
 
 This is the operating skill for TIA Portal MCP automation. The
 companion plugin lives at `tools/tiaportal-mcp/`. It exposes on the order of
-**~201** MCP tools (lite profile ~43; exact runtime set: call `tools/list` on the running server) covering
+**222** MCP tools (default lite profile lists 62; exact runtime set: call `tools/list` on the running server) covering
 project, hardware, PLC, HMI, and online operations.
 
 ## 0. Always start here
@@ -50,10 +50,11 @@ else unless one of these tools' output explicitly tells you to call another:
 参数名时，照本表/§8 的"精确参数名"抄，不要猜。HMI 美化看 §12，库复用看 §15。
 
 **降门槛三件套(已内置，弱模型友好):**
-- **Lite 工具档位** — 启动 server 时设环境变量 `TIA_MCP_PROFILE=lite`，`tools/list`
-  只暴露 ~42 个 L0/L1 核心工具(而非全部 ~200)，弱模型不会在工具海里选错，VS Code 的
-  128 工具上限也不再爆。默认仍是 full；要全量工具就别设这个变量。一键写入宿主配置：
-  `tia config --lite`。(v2.2.8 实测：full=201 工具含 L2，lite=43 工具无 L2。)
+- **Lite 工具档位（默认）** — `tools/list` 默认只暴露 62 个核心工具(全部 222 个)，其余用
+  `FindTools` + `CallTool` 随用随取；弱模型不会在工具海里选错，VS Code 的 128 工具上限也不再爆。
+  会动 CPU 或删工程数据的 7 个工具(DownloadToPlc / GoOnline / SetWatchTableModifyValue / Delete*)
+  始终以本名列出，`CallTool` 拒绝转发它们。要全量：`--profile full` 或 `TIA_MCP_PROFILE=full`，
+  一键写入宿主配置：`tia config --full`。
 - **参数容错** — `softwarePath` 现在容忍多余空格/大小写，单 PLC 工程或唯一匹配时
   传"PLC"也能自动认到 `PLC_1`；找不到时报错会**列出可用 PLC 路径**。少数易错工具
   接受别名(`tableJson`↔`tagTableJson`、`screenJson`↔`designJson`、
@@ -151,7 +152,13 @@ Endpoints:
 | `GET /mcp/health` | Liveness + session count + build version |
 | `DELETE /mcp` | Terminate session (best-effort) |
 
-Auth (when `--http-api-key` is set): either header works — pick whichever your
+The key can also come from the `TIA_MCP_HTTP_API_KEY` environment variable (keeps it out of the
+process list and logs). A prefix that listens beyond loopback (`http://+:`, `http://*:`, a LAN
+address) is **refused without a key**, and browser requests from a non-local `Origin` get 403.
+A request waits up to `--http-timeout-seconds` (default 600) for its response; on timeout the
+server returns 504 and sends `notifications/cancelled` for that request id.
+
+Auth (when a key is set): either header works — pick whichever your
 client supports:
 
 ```
@@ -614,7 +621,7 @@ ImportFromDocuments(softwarePath="<plc>", groupPath="<group path or empty>",
 CompileAndDiagnosePlc(softwarePath="<plc>")     ← errorCount must be 0
 ```
 - `.s7res` must be present even when titles omitted (minimal: one `MLC_x` with `zh-CN:` + `en-US:`).
-- `ImportBlockFromScl` / `ImportBlocksFromScl` are thin aliases of the two import tools above.
+- The former ImportBlockFromScl / ImportBlocksFromScl aliases were removed; use the two import tools above.
 
 > **Boundary (known TIA limitation):** importing **LAD** from SD documents can fail
 > unless every `.s7res` item also has an **`en-US`** tag, not only `zh-CN`. The

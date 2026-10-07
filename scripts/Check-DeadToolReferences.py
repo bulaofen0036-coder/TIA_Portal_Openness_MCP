@@ -43,7 +43,29 @@ ALLOWED = {
     'DeleteGlobalDb': '同上',
     'DeleteFunctionBlock': '同上',
     'ImportInstanceTexts': '描述原文即 "not yet exposed"',
+    # 下面这些出现在 ServerInstructions / Bootstrap 自检文案 / SKILL.md 里，是内部方法名或 Openness API，不是工具
+    'GetHardDeniedReflectionReason': 'Portal 内部的反射拒绝判定方法，自检项的说明文字里点名它',
+    'DescribeGuardResult': '同上，自检项内部 helper 名',
+    'WriteValue': 'OPC UA 的写值服务名（自检在说「绝不调用它」）',
+    'ReadLineAsync': '.NET StreamReader 方法（SKILL.md 讲 HTTP 桥的实现）',
+    'CompileUnit': 'SimaticML 元素名',
+    'SetPoint': 'SKILL.md 示例里的 PLC 变量名',
+    'ApplyConfiguration': 'Openness ConnectionConfiguration.ApplyConfiguration()',
+    'GenerateBlocks': 'Openness PlcExternalSource.GenerateBlocks()',
+    'GenerateBlocksFromSource': 'Openness PlcExternalSource.GenerateBlocksFromSource()',
+    'BuildExternalSourceImportArguments': 'Portal 内部 helper 名（SKILL.md 讲实现）',
 }
+
+# Description(...) 之外，模型还会读到的文字：握手指令 / 编写指南（McpGuides.cs 的全部字符串）、
+# Bootstrap 的规则与自检文案（McpServer.cs 的全部字符串）、以及 SKILL.md 里反引号括起的名字。
+# 死名字 ImportBlocksFromScl 就是躲在握手指令里、这道闸原来不扫的地方活了好几个版本。
+EXTRA_SOURCES = [
+    os.path.join(ROOT, 'ModelContextProtocol', 'McpGuides.cs'),
+    os.path.join(ROOT, 'ModelContextProtocol', 'McpServer.cs'),
+]
+SKILL_MD = 'tools/tiaportal-mcp/skill/SKILL.md'
+ANY_STR = re.compile(r'@"(?:[^"]|"")*"|"(?:[^"\\\n]|\\.)*"', re.S)
+TICK = re.compile(r'`([A-Z][A-Za-z0-9]{3,})(?:\(|`)')
 
 VERB = re.compile(
     r'^(Get|Set|Add|Import|Export|Create|Delete|Compile|Download|Sync|Analyze'
@@ -82,6 +104,23 @@ def scan(src, extra_text=None):
                 if t in names or t in ALLOWED or not VERB.match(t):
                     continue
                 bad[t].append(os.path.basename(p) + ':' + str(line))
+
+    def flag(t, where):
+        if t not in names and t not in ALLOWED and VERB.match(t):
+            bad[t].append(where)
+
+    for p in EXTRA_SOURCES:
+        s = src.get(p)
+        if s is None:
+            continue
+        for m in ANY_STR.finditer(s):
+            line = s[:m.start()].count('\n') + 1
+            for t in set(TOK.findall(m.group(0))):
+                flag(t, os.path.basename(p) + ':' + str(line))
+    if os.path.exists(SKILL_MD):
+        md = io.open(SKILL_MD, encoding='utf-8-sig', errors='replace').read()
+        for m in TICK.finditer(md):
+            flag(m.group(1), 'SKILL.md:' + str(md[:m.start()].count('\n') + 1))
     return names, bad
 
 
@@ -104,7 +143,7 @@ def main():
     if not bad:
         print('[PASS] 工具描述里点名的工具全部真实注册（哨兵已验证闸门有效）。')
         return 0
-    print('[FAIL] 下列名字在 [Description] 文案里被点名，但没有任何 [McpServerTool] 注册它：')
+    print('[FAIL] 下列名字在面向模型的文案里（[Description] / 握手指令 / Bootstrap / SKILL.md）被点名，但没有任何 [McpServerTool] 注册它：')
     for t, locs in sorted(bad.items()):
         print('  %-38s %2d 处  %s' % (t, len(locs), ', '.join(sorted(set(locs))[:4])))
     print('修法：要么改文案说清事实与替代路径，要么把工具真的注册上。'

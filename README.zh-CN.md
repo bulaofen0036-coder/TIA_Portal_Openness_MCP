@@ -8,6 +8,9 @@
 
 > **免费开源（MIT）**：服务器**无需任何 license key** 即可运行，**不含任何授权校验代码**。
 
+> 🖥️ **不想自己配 MCP 客户端？** 试试 **[TIA 助手](https://aeenhance.com/)** —— 基于本引擎的桌面版：解压即用，内置中文 AI 助手，每次写入工程都先弹窗等你批准。
+> 👉 [官网 aeenhance.com](https://aeenhance.com/) · [看 1 分钟实录](https://aeenhance.com/#demo) · 申请试用：**bulaofen0036@gmail.com** · [详细对比 ↓](#tia-助手本引擎的桌面版)
+
 ![架构图](docs/assets/architecture.svg)
 
 在 **Windows + TIA Portal V20 或 V21** 下，通过 **MCP（stdio 或 HTTP）** 驱动博途：建项目、加硬件、生成 PLC（Tag/UDT/DB/SCL/LAD）、生成 **WinCC Unified** 画面与事件、编译诊断、保存。  
@@ -52,6 +55,36 @@ GetVersionControlStatus(changedOnly=true)
 3. **生成工程**：把现成模板 `templates\project-blueprints\scaffold_spec_motor.json`（或 `scaffold_spec_start_stop.json`）**拖到 `scripts\生成工程.bat` 图标上**——一条龙建项目→加 PLC/HMI→写块→编译→存盘。退出码 `0` 即成功。
    - 想改成自己的需求：让任意 AI 照 [`docs/AI_spec_prompt.md`](docs/AI_spec_prompt.md) 产出一份 spec（YAML/JSON 都行），再拖给 `生成工程.bat`。
    - 命令行等价写法：把根目录加进 PATH 后，`tia gen <spec>`（先 `--dry-run` 离线校验更稳）。
+
+---
+
+## TIA 助手：本引擎的桌面版
+
+[![TIA 助手 —— 跟它说中文，它去操作博途](https://aeenhance.com/img/og-cover.jpg)](https://aeenhance.com/)
+
+本仓库是**引擎**：你需要自己准备 Cursor / Claude / VS Code 这类 AI 客户端，再把它挂上去。
+如果你只想**打开就用**，或者要给不熟悉 MCP 的同事、现场调试人员用，可以看看作者做的 **[TIA 助手](https://aeenhance.com/)** ——
+同一台引擎，外面套了一个 Windows 桌面程序，AI 助手、在线监控、曲线记录都做进了界面里。
+
+![TIA 助手实录：写 SCL 块时，删除类操作单独弹窗确认](https://aeenhance.com/video/demo-write.jpg)
+
+<sub>↑ 软件实录截图（演示工程）：让它给两台水泵写一用一备轮换 FB，第一次编译有 4 条警告，它自己改到 0 错误 0 警告；每一步写操作都停下来等人点「是」。[看完整录屏 →](https://aeenhance.com/#demo)</sub>
+
+| | 开源 MCP（本仓库） | TIA 助手（桌面版） |
+|---|---|---|
+| 形态 | MCP 服务 + `tia` 命令行，接你自己的 AI 客户端 | Windows 桌面软件，**免安装、解压即用**，V20 / V21 双引擎随包自动选 |
+| AI | 自备 Cursor / Claude Desktop / VS Code 等 | **内置中文 AI 助手**；DeepSeek、千问、Kimi、智谱、OpenAI 兼容接口任选，接本机 **Ollama 可全程离线**、工程数据不出厂 |
+| 写操作把关 | 取决于你用的客户端 | **每次写入都弹窗等你批准**，不可逆操作（删块等）单独确认，审计日志带哈希链 |
+| 在线变量 | 只读（S7 绝对地址 / OPC UA，见 [在线实时读值指南](docs/在线实时读值_使用指南.md)） | **不装博途**，S7CommPlus 直连 CPU 按符号读写；写入默认关，开启后强制回读 |
+| 曲线记录 | — | 录制、叠加/拆分、导出与回放 CSV |
+| 环境体检 | `tia.cmd doctor` 命令行 | 图形化逐项检查运行库 / Openness 白名单 / 用户组，缺什么直接给修法，一键导出诊断包 |
+| 许可 | MIT，免费 | 商业授权，**可申请免费试用** |
+
+**怎么试**：发邮件到 **bulaofen0036@gmail.com**，写上你的博途版本（V20 / V21）和想试的场景 → 拿试用包，解压运行，把机器码发回来换授权 Key。
+最稳的试法：先让它**只读**把你手头的工程讲一遍，看说得对不对，满意了再让它动手。
+更多：[AI 助手](https://aeenhance.com/assistant) · [在线调试](https://aeenhance.com/online) · [安全边界](https://aeenhance.com/security) · [使用手册](https://aeenhance.com/manual) · [开始使用](https://aeenhance.com/start)
+
+> 两边用的是同一台引擎：这里修掉的 bug，TIA 助手里也会修；在 Issues 里提的问题，对两边都有用。
 
 ---
 
@@ -147,9 +180,9 @@ GetVersionControlStatus(changedOnly=true)
    它会**自动发现一切**：自己的绝对路径、注册表里的博途安装与版本、与版本匹配的 exe（V20/V21 自动选对），然后把 `tia-portal` 条目一次性写进本机检测到的所有 AI 客户端配置——**Claude Desktop / Claude Code / Cursor / VS Code**（原配置自动备份 `.bak`，其它 server 原样保留）。重启 AI 客户端即生效。  
    - 只配某一个宿主：`config --host vscode`（可选 `claude|claude-code|cursor|vscode`）；  
    - 只看不写（手动粘贴其它宿主）：`config --print`；  
-   - **工具档位**：默认就是精简档（~55 个核心工具），无需任何参数，见下文《工具档位》；想一次列全 221 个用 `config --full`；  
+   - **工具档位**：默认就是精简档（62 个核心工具），无需任何参数，见下文《工具档位》；想一次列全 222 个用 `config --full`；  
    - **连不上 / 报错**：`tia.cmd doctor` 一键体检（TIA 安装 / exe 版本匹配 / Openness 用户组 / 宿主注册状态，每项给修法；`--fix` 自动补用户组，v2.2.8）；  
-   - **拿错 exe 也没关系**：v2.2.7 起 exe 会按实际 TIA 版本**自动转投**正确的兄弟 exe（V21 exe 在纯 V20 机器上照常可用）。  
+   - **拿错 exe 也没关系**：v2.2.7 起 exe 会按实际 TIA 版本**自动转投**正确的兄弟 exe（前提是兄弟 exe 就在包里：Release zip 同时带 V20 与 V21；git 克隆和插件只带 `runtime\v21`，纯 V20 机器请用 Release zip）。  
    - 手动配置兜底：复制 `cursor-mcp.example.json` 片段，把 `REPLACE_ME` 换成本包根目录；exe 路径按上文「两种获取方式」表选（zip 用 `tools\...\bin[-v20]\Release\net48`，git clone 用 `runtime\v21`）；非标准安装位置在 `args` 加 `--tia-portal-location "<安装根>" --tia-major-version <20|21>`。
 
 3. **首次调用顺序**  
@@ -159,12 +192,12 @@ GetVersionControlStatus(changedOnly=true)
 
 ## 工具档位：精简（默认）与完整
 
-服务端共 **221** 个工具，但默认**只在 `tools/list` 里列出 ~54 个**。这不是裁能力，是裁上下文——两个原因都是硬的：
+服务端共 **222** 个工具，但默认**只在 `tools/list` 里列出 62 个**。这不是裁能力，是裁上下文——两个原因都是硬的：
 
-- **成本**：221 个工具的 JSON schema 是 **171 KB / 约 45,000 tokens**，宿主每一轮对话都要把它重发给模型。精简档是 **38 KB / 约 10,000 tokens**，等于每轮省掉约 3.5 万 tokens，模型也不必在 200 多个名字里挑。
+- **成本**：222 个工具的 `tools/list` 约 **196 KB（按 4 字符/token 估约 49,000 tokens）**，宿主每一轮对话都要把它重发给模型。精简档约 **57 KB（约 14,000 tokens）**，每轮省掉约七成，模型也不必在 200 多个名字里挑。
 - **兼容**：VS Code / GitHub Copilot 的 agent 模式**超过 128 个工具直接报错不干活**，Windsurf 上限 100。全量档在这两个宿主上根本加载不起来。
 
-**能力一个不少。** 没列出来的 ~167 个工具随用随取：
+**能力一个不少。** 没列出来的 160 个工具随用随取：
 
 ```
 FindTools("watch table")                     → 列出匹配的工具名、参数签名、完整说明
@@ -175,8 +208,8 @@ CallTool("ExportPlcWatchTable", "{...}")     → 照常执行，跟直接调用�
 
 | 档位 | 怎么开 | 列出工具 | 每轮 schema 开销 |
 |---|---|---|---|
-| 精简（默认） | 什么都不用做 | ~54 | ~10,000 tokens |
-| 完整 | `config --full`，或 `TiaMcpServer.exe --profile full`，或环境变量 `TIA_MCP_PROFILE=full` | 221 | ~45,000 tokens |
+| 精简（默认） | 什么都不用做 | 62 | ~14,000 tokens |
+| 完整 | `config --full`，或 `TiaMcpServer.exe --profile full`，或环境变量 `TIA_MCP_PROFILE=full` | 222 | ~49,000 tokens |
 
 完整档只在「宿主不限工具数、且你就是想让模型直接看到全部」时才有意义；VS Code/Copilot、Windsurf 上不要用。
 
@@ -270,3 +303,14 @@ Bootstrap → Connect → CreateProject → AddDeviceWithFallback → AddHardwar
 | `templates/plc/` | Tag、UDT、DB、FC、FB、LAD 配方、SCL 示例 |
 | `templates/hmi/` | Unified 多页 `designJson` |
 | `templates/mcp-full-e2e-verify/` | E2E 验证用导入素材 |
+
+---
+
+## 联系作者
+
+- **Bug / 功能建议**：优先提 [Issues](https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP/issues)，别人撞到同样的问题也能搜到。
+- **试用 TIA 助手、定制开发、项目合作**：**bulaofen0036@gmail.com**
+- **内测微信群**：群码七天一换，发邮件索取最新的。
+- 桌面版官网：**[aeenhance.com](https://aeenhance.com/)**
+
+> 西门子、TIA Portal、SIMATIC、STEP 7、WinCC 为 Siemens AG 的商标。本项目与 TIA 助手均为独立开发的第三方工具，与 Siemens AG 无任何隶属、代理或授权关系。
