@@ -1,8 +1,8 @@
 {
   "package": "TIA_MCP_Delivery_v2.7.3",
-  "generatedAt": "2026-09-27T11:20:51.178124+08:00",
+  "generatedAt": "2026-10-07T15:53:21.604631+08:00",
   "source": "live MCP tools/list of TiaMcpServer.exe",
-  "toolCount": 222,
+  "toolCount": 224,
   "note": "Full roster (--profile full). The default lite profile lists only the core tools; the rest stay reachable via FindTools + CallTool. Runtime tools/list remains authoritative.",
   "tools": [
     {
@@ -1519,6 +1519,19 @@
       "description": "[L2][HMI] Get HMI software type (Classic/Basic/Unified), version, and list of all screen names. Requires: Connect + OpenProject. softwarePath from GetProjectTree (e.g. 'HMI_RT_1'). Use to confirm HMI type before choosing Classic vs Unified tool variants."
     },
     {
+      "name": "GetHmiScreenItemDetails",
+      "layer": "L2",
+      "domain": "HMI",
+      "method": "GetHmiScreenItemDetails",
+      "returnType": "",
+      "parameters": [
+        "softwarePath",
+        "screenName",
+        "attributes"
+      ],
+      "description": "[L2][HMI] Read the PROPERTIES of every item on one HMI screen in one call: type (HmiButton/HmiIOField/HmiText/...), position, size, visibility, plus the screen's own size. Read-only. Screens inside a screen group are found. attributes: comma-separated list to override the default set (Name,Left,Top,Width,Height,Visible,Enabled); an attribute this item type does not have comes back null instead of failing the call. Requires: Connect + OpenProject. softwarePath from GetProjectTree, screenName from GetHmiScreens."
+    },
+    {
       "name": "GetHmiScreens",
       "layer": "L2",
       "domain": "HMI",
@@ -1528,6 +1541,19 @@
         "softwarePath"
       ],
       "description": "[L2][HMI] List all screen names in an HMI (Classic or Unified). Requires: Connect + OpenProject. softwarePath from GetProjectTree. Use before EnsureUnifiedHmiScreen/ExportHmiScreen to confirm which screens exist."
+    },
+    {
+      "name": "GetHmiTagDetails",
+      "layer": "L2",
+      "domain": "HMI",
+      "method": "GetHmiTagDetails",
+      "returnType": "",
+      "parameters": [
+        "softwarePath",
+        "tagTableName",
+        "attributes"
+      ],
+      "description": "[L2][HMI] Read the PROPERTIES of HMI tags in one call: datatype, connection, address, PLC binding, acquisition cycle. Read-only. GetHmiTags gives names only; this gives values, for one tag table or (tagTableName empty) every tag table including the ones filed in a tag table group. attributes: comma-separated list to override the default set (Name,DataType,HmiDataType,Connection,Address,PlcTag,PlcName,AcquisitionCycle); an attribute this tag type does not have comes back null instead of failing the call. Requires: Connect + OpenProject. softwarePath from GetProjectTree, e.g. 'HMI_RT_1'."
     },
     {
       "name": "GetHmiTags",

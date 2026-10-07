@@ -60,6 +60,12 @@ namespace TiaMcpServer.Tests
             Console.WriteLine("== 画面分组里的画面不许隐形（PR #41）==");
             HmiScreenWalkTests.Run(Check);
 
+            Console.WriteLine("== HMI 标签/画面元件的属性读取：缺属性不许拖垮整次调用，读不到的项不许消失 ==");
+            HmiDetailReadTests.Run(Check);
+
+            Console.WriteLine("== 反射桥：GetAttributes 批量读要放行，SetAttributes 仍要挡住 ==");
+            ReflectionInvokeSafetyTests.Run(Check);
+
             Console.WriteLine("== DescribeBlockLogic 的 SCL 回读逐行还原：下标 / 调用 / 常量 / 引号（issue #42）==");
             SymbolQuotingReadbackTests.Run(Check);
 
