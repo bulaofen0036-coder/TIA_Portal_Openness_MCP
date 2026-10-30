@@ -1,0 +1,76 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    最小离线自检套件。
+
+    为什么是控制台 Exe 而不是 VSTest 工程：这里链接的是引擎的**源文件**，
+    而引擎主体依赖 Siemens.Engineering.dll（需要本机装了 TIA Portal 才编得动），
+    托管不了整个工程。所以只把**零依赖**的那几个文件链进来，用 `dotnet run` 驱动。
+
+    ⚠️ 千万别用 `dotnet test` 跑它：那样只会还原、一个用例都不跑、然后退 0 ——
+    一个和「全部通过」长得一模一样的假绿灯。CI 里写死的是 `dotnet run`。
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- HMI 模板布局体检 + 执行 JSON 构建器：两个都零依赖。
+         盯的是「执行 JSON 检查」那条 —— 它曾经在委托缺省时退化成
+         `items.Length > 0 && errors.Count == 0`，判据里含着 errors.Count == 0，
+         永远不可能新增错误，而发版前的离线验收闸走的正是那条空转路径。
+         恒不触发的检查只有会失败的用例盯得住，而且必须同时盯 API 形状：
+         委托一旦被改回可选，空转路径立刻复活，运行期用例一条都不会红。 -->
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\HmiTemplateLayoutAnalyzer.cs" Link="HmiTemplateLayoutAnalyzer.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\HmiTemplateDesignJsonBuilder.cs" Link="HmiTemplateDesignJsonBuilder.cs" />
+    <!-- .s7res 的 en-US 扫描。原实现埋在依赖 MCP SDK 的大文件里，用 XML 解析器读 YAML，
+         对每个真实文件都抛异常又被 catch 吞掉，坏了很久没人发现 —— 抽成零依赖文件
+         就是为了能在这里被测到。 -->
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\S7ResScanner.cs" Link="S7ResScanner.cs" />
+    <!-- 参数诊断的判定逻辑与大响应寄存库：两个都零依赖，专门抽成这样就是为了能在这里被喂真输入。
+         这两块坏了都不会崩 —— 一个只是少说一句话，一个只是让某一页文本报废 —— 属于
+         「坏了也悄无声息」那一类，只有会失败的用例盯得住。 -->
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ArgDiagnostics.cs" Link="ArgDiagnostics.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ExportStore.cs" Link="ExportStore.cs" />
+    <!-- 「进程没了」和「这步失败了」的分类器。抽成零依赖文件就是为了能在这里被喂输入：
+         它埋在依赖 Siemens.Engineering 的大文件里时，没装博途的机器一行都测不到，
+         而崩溃路径本来就少见 —— 判错了也悄无声息，属于只有会失败的用例盯得住的那类。 -->
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\PortalFailureClassifier.cs" Link="PortalFailureClassifier.cs" />
+    <!-- 画面分组递归（PR #41）：分组里的画面曾对所有画面工具隐形，只报一句「找不到」。 -->
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\HmiScreenWalk.cs" Link="HmiScreenWalk.cs" />
+    <!-- DescribeBlockLogic 的回读（issue #42）：错了不报错、不崩，只会让人看到不存在的逻辑。 -->
+    <!-- HMI 属性读取（GetHmiTagDetails / GetHmiScreenItemDetails）：读错了不崩、不报错，
+         只会让评审拿到一份缺列或缺项的清单 —— 只有会失败的用例盯得住。 -->
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\HmiDetailRead.cs" Link="HmiDetailRead.cs" />
+    <!-- 反射桥的只读闸门与参数整形（GetAttributes 批量读）：闸门放错了是安全问题，
+         参数整形错了是「方法签名不匹配」，两者都不会崩。 -->
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ReflectionInvokeSafety.cs" Link="ReflectionInvokeSafety.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\SimaticMlText.cs" Link="SimaticMlText.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\LadTextRenderer.cs" Link="LadTextRenderer.cs" />
+    <!-- 工具安全表：annotations、Openness 串行闸、CallTool 拒绝名单都从这一张表来。
+         判错了什么都不会崩 —— 宿主只是不再在下载前问一句，或者两个调用在博途句柄上交错。 -->
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ToolSafety.cs" Link="ToolSafety.cs" />
+    <!-- CallTool 的绑定与调用：异步工具曾被序列化成 Task 对象，带注入参数的工具曾永远报缺参。 -->
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ReflectiveToolInvoker.cs" Link="ReflectiveToolInvoker.cs" />
+    <!-- HTTP 传输：按 id 路由响应（超时后孤儿读线程吞掉下一条响应的那个 bug）+ 安全判定。 -->
+    <Compile Include="..\..\src\TiaMcpServer\JsonRpcResponseRouter.cs" Link="JsonRpcResponseRouter.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\HttpSecurity.cs" Link="HttpSecurity.cs" />
+    <!-- HTTP 请求体解码：Content-Type 无 charset 时曾退回 Encoding.Default（中文系统 GBK），
+         UTF-8 入参被解坏（U+00A0 → 聽），全 ASCII 路径正常所以一直没被发现。 -->
+    <Compile Include="..\..\src\TiaMcpServer\HttpBodyEncoding.cs" Link="HttpBodyEncoding.cs" />
+    <!-- 下载对话框的应答表：答案必须是手册里该提示枚举的成员，否则设不进去、下载无声失败；
+         「取消正在进行的测试/调试功能」必须是显式选择。 -->
+    <Compile Include="..\..\src\TiaMcpServer\Siemens\DownloadPromptPolicy.cs" Link="DownloadPromptPolicy.cs" />
+    <!-- issue #51：动词前的全局参数曾被静默当成 MCP 服务器；连接失败曾只报新起实例那一句。
+         issue #50：Unified 连接的 InitialAddress 改写与两端 IP 挑选。 -->
+    <Compile Include="..\..\src\TiaMcpServer\Cli\CliVerbArgs.cs" Link="CliVerbArgs.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\Siemens\ConnectFailureText.cs" Link="ConnectFailureText.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\Siemens\HmiConnectionSpec.cs" Link="HmiConnectionSpec.cs" />
+    <!-- 日常编辑工具的纯逻辑：参数校验、地址规整、组路径、归档文件名、整台设备守卫。 -->
+    <Compile Include="..\..\src\TiaMcpServer\Siemens\EverydayEditSpec.cs" Link="EverydayEditSpec.cs" />
+    <!-- #54：Unified 离散报警写入前的预检（触发变量类型 / 位宽 / 同位冲突 / 报警类别）。 -->
+    <Compile Include="..\..\src\TiaMcpServer\Siemens\HmiDiscreteAlarmSpec.cs" Link="HmiDiscreteAlarmSpec.cs" />
+  </ItemGroup>
+</Project>

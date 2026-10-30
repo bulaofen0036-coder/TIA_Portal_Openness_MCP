@@ -4,14 +4,17 @@
     <Nullable>enable</Nullable>
     <LangVersion>Latest</LangVersion>
     <OutputType>Exe</OutputType>
-    <AssemblyVersion>2.2.1</AssemblyVersion>
+    <AssemblyVersion>2.7.8.1</AssemblyVersion>
     <AssemblyName>TiaMcpServer</AssemblyName>
     <BaseOutputPath>.\bin-v19</BaseOutputPath>
     <BaseIntermediateOutputPath>.\obj-v19\</BaseIntermediateOutputPath>
     <PlatformTarget>x64</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
     <DefineConstants>$(DefineConstants);TIA_V19</DefineConstants>
-    <DefaultItemExcludes>$(DefaultItemExcludes);obj\**;obj-v19\**;bin\**;bin-v19\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);obj\**;obj-v19\**;obj-v20\**;bin\**;bin-v19\**;bin-v20\**</DefaultItemExcludes>
+    <!-- Keep release binaries free of build-machine source paths (same as master). -->
+    <DebugType Condition="'$(Configuration)'=='Release'">none</DebugType>
+    <DebugSymbols Condition="'$(Configuration)'=='Release'">false</DebugSymbols>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />

@@ -35,7 +35,12 @@ namespace TiaMcpServer.ModelContextProtocol
             if (blockNumber <= 0)
                 throw new ArgumentException("FC 块编号必须大于 0。", nameof(blockNumber));
             if (string.IsNullOrWhiteSpace(structuredTextInnerXml))
-                throw new ArgumentException("StructuredText 内容不能为空。", nameof(structuredTextInnerXml));
+                throw new ArgumentException(
+                    "StructuredText 内容不能为空：JSON 里的 $.structuredText.operations 是空数组，"
+                    + "$.structuredTextInnerXml 也没给。至少给一条操作，例如 "
+                    + "{\"op\":\"line\",\"text\":\"MyTemp := TRUE;\"}。"
+                    + "（报错里的参数名是构建器内部的形参，不是你要填的 JSON 字段名。）",
+                    nameof(structuredTextInnerXml));
 
             var inputs = inputMembers?.ToArray() ?? throw new ArgumentNullException(nameof(inputMembers));
             var outputs = outputMembers?.ToArray() ?? throw new ArgumentNullException(nameof(outputMembers));

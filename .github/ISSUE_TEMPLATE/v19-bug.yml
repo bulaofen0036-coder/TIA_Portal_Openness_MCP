@@ -1,0 +1,67 @@
+name: V19 bug report
+description: Report a TIA Portal V19 engine problem (include version, self-test, TIA version)
+title: "[V19] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        V19 reports need three things before triage: the engine version, the capability self-test JSON, and the exact TIA Portal V19 build. Reports missing any of them will be asked for them first.
+  - type: textarea
+    id: version
+    attributes:
+      label: Engine version output
+      description: Paste the full output of `tia-v19.cmd version`.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: selftest
+    attributes:
+      label: Capability self-test JSON
+      description: Paste the output of `tia-v19.cmd --run-capability-self-test --self-test-connect`.
+      render: json
+    validations:
+      required: true
+  - type: input
+    id: tia-version
+    attributes:
+      label: TIA Portal version and build
+      description: "Example: TIA Portal V19 Update 5 (V19.0.0.5)"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: "Example: Windows 11 23H2, or Windows Server 2022 in a VM"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include the MCP tool names/arguments or CLI command, the project state (open/closed), and whether TIA was online.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result and logs
+      description: Paste the error text or the relevant part of the engine log. Do not paste confidential project data.
+      render: text
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Preconditions checked
+      options:
+        - label: The Windows user is in the local group `Siemens TIA Openness` and has signed out/in since joining.
+        - label: The block is consistent (compiled) and TIA is offline for export/import operations.
+        - label: The issue is not caused by a know-how protected block.

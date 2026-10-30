@@ -15,3 +15,10 @@ TiaMcp_Output/
 *.suo
 Thumbs.db
 Desktop.ini
+
+*.bak_*
+*.pdb
+bin-build/
+
+# python 缓存
+__pycache__/

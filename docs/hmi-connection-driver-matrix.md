@@ -1,5 +1,19 @@
 # HMI 连接驱动选择表
 
+## 0. 先决：经典屏 vs Unified 屏（能力边界，选屏前必读）
+
+**本套 MCP 的 HMI 全自动（连接 + 变量绑定 + 画面）只对 WinCC Unified 屏成立。**
+
+| 屏类型 | 连接创建 | 变量绑定 | 画面生成 | 结论 |
+|---|---|---|---|---|
+| **WinCC Unified**（如 MTP700 Unified Basic `6AV2 123-3GB32-0AW0`） | ✅ `EnsureUnifiedHmiConnection` | ✅ `EnsureUnifiedHmiTag`（V21 集成连接上可按 PLC 符号绑定；V20 用绝对地址） | ✅ `ApplyUnifiedHmiScreenDesignJson` | **可端到端全自动** |
+| **经典 / 精简 / 舒适屏**（KTP Basic、TP/KTP Comfort） | V21 ✅ `EnsureUnifiedHmiConnection`（硬件层接口，两端须在同一子网）；V20 ❌ 只能博途界面手建 | ⚠️ XML 导入只认绝对地址（符号 `ControllerTag` 被 Openness 拒） | ❌ 画面 XML 导入极脆（`IOField.set_Visible`、`PropertyComposition.Create` 等属性被拒） | **无法全自动**，只能 GUI 手建连接 / 导模板 |
+
+> **给调用方模型的硬规矩**：若用户没有硬性指定经典屏，且需要"自动建好 HMI"，**在 `AddDevice` 阶段就选 Unified 屏**，经典屏的变量只能按绝对地址导入、起始画面要在博途界面里设，全自动程度低于 Unified 屏。
+> 若现场必须用经典屏：TIA V21 上先把两台设备连到同一子网，再用 `EnsureUnifiedHmiConnection` 建连接；TIA V20 上连接需在 TIA 网络视图手动拉一条（约 15 秒）；变量可用**绝对地址** XML 导入（见 `hmi-plc-tag-binding-and-addressing.md`）。
+
+---
+
 本文件给出 `EnsureUnifiedHmiConnection` 与 TIA 内创建 HMI 连接时，**通讯驱动（CommunicationDriver）** 的取值规则。驱动错配会导致 HMI 变量整列红字、运行时无值或连接处显示「未连接」。
 
 ## 选择规则

@@ -1,34 +1,37 @@
-# TIA Portal MCP 工具总览（全部 189 个）
+# TIA Portal MCP 工具总览（全部 233 个）
 
 > 由 `scripts/generate-tools-reference.py` 从源码 `[McpServerTool]` 属性生成，与运行时 `tools/list` 一致。生成日期：2026-10-26。
 > 分层：**L0** 只读引导/诊断 · **L1** 高频主力 · **L2** 专用/离线构建器。
 >
-> **V19 注意**：`ExportAsDocuments`、`ExportBlocksAsDocuments`、`ImportFromDocuments`、`ImportBlocksFromDocuments` 在 V19 上返回 `NotSupportedOnVersion`（V19 没有 SIMATIC SD 文档 API）。
+> **V19 注意**：`ExportAsDocuments`、`ExportBlocksAsDocuments`、`ImportFromDocuments`、`ImportBlocksFromDocuments` 在 V19 上返回 `NotSupportedOnVersion`（V19 没有 SIMATIC SD 文档 API）；5 个 VCI 工具不编译；默认 lite 档，全量工具用 `--profile full` 或 `TIA_MCP_PROFILE=full`。
 
 ## 索引
 
 | 域 | 工具数 | 说明 |
 |---|---:|---|
 | [Bootstrap](#bootstrap) | 1 | 会话入口、状态、自检 |
-| [Diagnostics](#diagnostics) | 4 | 环境与上下文校验 |
-| [HMI](#hmi) | 19 | HMI 通用操作 |
+| [Diagnostics](#diagnostics) | 5 | 环境与上下文校验 |
+| [Exports](#exports) | 5 |  |
+| [Guide](#guide) | 1 |  |
+| [HMI](#hmi) | 22 | HMI 通用操作 |
 | [HMI-Classic](#hmi-classic) | 8 | 经典面板（KTP/精智） |
 | [HMI-Library](#hmi-library) | 6 | HMI 模板/全局库分析 |
-| [HMI-Unified](#hmi-unified) | 22 | WinCC Unified |
-| [Hardware](#hardware) | 19 | 设备、型号目录、PROFINET |
+| [HMI-Unified](#hmi-unified) | 24 | WinCC Unified |
+| [Hardware](#hardware) | 31 | 设备、型号目录、PROFINET |
+| [Meta](#meta) | 2 |  |
 | [Online-Monitoring](#online-monitoring) | 12 | 只读在线监控、S7/OPC UA 读值 |
 | [PLC-Alarms](#plc-alarms) | 5 | 报警类别与报警文本的导入导出 |
 | [PLC-Builders](#plc-builders) | 9 | 离线 XML / DSL 构建器 |
-| [PLC-Online](#plc-online) | 8 | 上线、下载、在线状态、在线/离线比较 |
+| [PLC-Online](#plc-online) | 9 | 上线、下载、在线状态、在线/离线比较 |
 | [PLC-OpcUA](#plc-opcua) | 4 | OPC UA 接口导入导出与启用开关 |
-| [PLC-Software](#plc-software) | 39 | 块/类型/变量表/编译/外部源 |
+| [PLC-Software](#plc-software) | 54 | 块/类型/变量表/编译/外部源 |
 | [PLC-TechnologyObjects](#plc-technologyobjects) | 3 | 工艺对象（TO）导入导出 |
-| [Portal](#portal) | 5 | 连接、用户组、进程 |
-| [Project](#project) | 9 | 工程创建/打开/保存/关闭/树 |
+| [Portal](#portal) | 6 | 连接、用户组、进程 |
+| [Project](#project) | 10 | 工程创建/打开/保存/关闭/树 |
 | [Reflection](#reflection) | 7 | 对象反射查询 |
 | [Reports](#reports) | 6 | 验收/诊断/交付报告 |
 | [Validation](#validation) | 3 | 离线校验套件 |
-| **合计** | **189** | |
+| **合计** | **233** | |
 
 <a id="bootstrap"></a>
 ## Bootstrap（1 个）
@@ -42,7 +45,17 @@
 ---
 
 <a id="diagnostics"></a>
-## Diagnostics（4 个）
+## Diagnostics（5 个）
+
+### `Doctor` <sub>L0</sub>
+
+[L0][Diagnostics] One-call environment doctor for non-experts. Checks TIA install, Openness group membership, and connection/project state, and returns a plain-language diagnosis with the exact fix per problem. When fix=true (default) it ENSURES Openness group membership (adds the current user; may prompt a Windows UAC dialog). Read-only apart from that one fix. Call this first when setup is failing or you are unsure the environment is ready.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `fix` | `bool` | `true` | when true (default), ensure Openness group membership (adds user, may prompt UAC). false = read-only diagnosis, no prompt. |
+
+返回：`async Task<ResponseDoctor>`
 
 ### `RunCapabilitySelfTest` <sub>L0</sub>
 
@@ -83,8 +96,94 @@
 
 ---
 
+<a id="exports"></a>
+## Exports（5 个）
+
+### `ClearExports` <sub>L1</sub>
+
+[L1][Exports] Drop parked responses in bulk. NOTE: handles already expire on their own at 24h,
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `olderThanHours` | `int` | `24` | drop handles at least this old; 0 drops every handle |
+
+返回：`ResponseMessage`
+
+### `DeleteExport` <sub>L1</sub>
+
+[L1][Exports] Drop one export handle once you are done with it. Optional — handles expire on
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `exportId` | `string` |  | the handle to drop |
+
+返回：`ResponseMessage`
+
+### `GetExport` <sub>L1</sub>
+
+[L1][Exports] Read one page of a large response that was parked under an export handle.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `exportId` | `string` |  | the handle from a truncated response, e.g. 'ex_20260902103000_0001' |
+| `offset` | `int` | `0` | character index to start at; use the previous page's nextOffset. 0 = beginning |
+| `length` | `int` | `0` | how many characters to return. 0 or omitted = this session's response limit. |
+
+返回：`ResponseMessage`
+
+### `ListExports` <sub>L1</sub>
+
+[L1][Exports] List the export handles currently held by this engine session — id, the tool
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `tool` | `string?` | `null` | optional filter, matches part of the producing tool's name |
+| `limit` | `int` | `20` | maximum handles to return |
+
+返回：`ResponseMessage`
+
+### `SaveExport` <sub>L1</sub>
+
+[L1][Exports] Write a parked response to a file in one step, instead of paging it through
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `exportId` | `string` |  | the handle from a truncated response |
+| `outputPath` | `string` |  | full file path to write, e.g. 'C:\\Temp\\IO表.csv' |
+| `raw` | `bool` | `false` | true = write the response text verbatim (JSON envelope included). Default false = write just the payload. |
+| `overwrite` | `bool` | `false` | DEFAULT false — if the file already exists the call is REFUSED rather than replacing it. Pass true only after the user agreed to overwrite that specific file. |
+
+返回：`ResponseMessage`
+
+---
+
+<a id="guide"></a>
+## Guide（1 个）
+
+### `GetAuthoringGuide` <sub>L0</sub>
+
+[L0][Guide] Verified syntax + workflow cheat sheet for authoring TIA content through this server. CALL THIS BEFORE writing any SCL/LAD/DB/HMI content — it prevents the common encoding, syntax and tool-routing mistakes. Topics: workflow, scl, lad, db, hmi, errors. Read-only, does not touch TIA Portal.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `topic` | `string` |  | one of workflow \| scl \| lad \| db \| hmi \| errors |
+
+返回：`ResponseMessage`
+
+---
+
 <a id="hmi"></a>
-## HMI（19 个）
+## HMI（22 个）
+
+### `CompileAndDiagnoseHmi` <sub>L1</sub>
+
+[L1][HMI] Compile an HMI and return structured errors/warnings, the HMI counterpart of CompileAndDiagnosePlc. Use it after generating screens/tags so you can read the diagnostics and fix them yourself instead of asking the engineer to compile in the TIA UI. WinCC Unified: HmiSoftware is not compilable on its own, so the owning device is compiled (same as the TIA UI does) and hardware diagnostics may appear alongside screen ones. Classic (Comfort/KTP): the HMI software itself is compiled. Requires: Connect + OpenProject. softwarePath from GetProjectTree, e.g. 'HMI_RT_1'.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | HMI software path, e.g. 'HMI_RT_1' |
+
+返回：`ResponseCompileDiagnose`
 
 ### `DescribeHmiScreen` <sub>L2</sub>
 
@@ -216,6 +315,18 @@
 
 返回：`ResponseHmiProgramInfo`
 
+### `GetHmiScreenItemDetails` <sub>L2</sub>
+
+[L2][HMI] Read the PROPERTIES of every item on one HMI screen in one call: type (HmiButton/HmiIOField/HmiText/...), position, size, visibility, plus the screen's own size. Read-only. Screens inside a screen group are found. attributes: comma-separated list to override the default set (Name,Left,Top,Width,Height,Visible,Enabled); an attribute this item type does not have comes back null instead of failing the call. Requires: Connect + OpenProject. softwarePath from GetProjectTree, screenName from GetHmiScreens.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | HMI software path, e.g. 'HMI_RT_1' |
+| `screenName` | `string` |  | screen name, e.g. 'MainScreen' |
+| `attributes` | `string` | `""` | comma-separated attribute names; empty = the default set |
+
+返回：`ResponseHmiScreenItemDetails`
+
 ### `GetHmiScreens` <sub>L2</sub>
 
 [L2][HMI] List all screen names in an HMI (Classic or Unified). Requires: Connect + OpenProject. softwarePath from GetProjectTree. Use before EnsureUnifiedHmiScreen/ExportHmiScreen to confirm which screens exist.
@@ -225,6 +336,18 @@
 | `softwarePath` | `string` |  | path in the project structure to the HMI software |
 
 返回：`ResponseStringList`
+
+### `GetHmiTagDetails` <sub>L2</sub>
+
+[L2][HMI] Read the PROPERTIES of HMI tags in one call: datatype, connection, address, PLC binding, acquisition cycle. Read-only. GetHmiTags gives names only; this gives values, for one tag table or (tagTableName empty) every tag table including the ones filed in a tag table group. attributes: comma-separated list to override the default set (Name,DataType,HmiDataType,Connection,Address,PlcTag,PlcName,AcquisitionCycle); an attribute this tag type does not have comes back null instead of failing the call. Requires: Connect + OpenProject. softwarePath from GetProjectTree, e.g. 'HMI_RT_1'.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | HMI software path, e.g. 'HMI_RT_1' |
+| `tagTableName` | `string` | `""` | one tag table, or empty for every tag table of this HMI |
+| `attributes` | `string` | `""` | comma-separated attribute names; empty = the default set |
+
+返回：`ResponseHmiTagDetails`
 
 ### `GetHmiTagTables` <sub>L2</sub>
 
@@ -476,7 +599,7 @@
 ---
 
 <a id="hmi-unified"></a>
-## HMI-Unified（22 个）
+## HMI-Unified（24 个）
 
 ### `ApplyUnifiedHmiLayout` <sub>L2</sub>
 
@@ -492,7 +615,7 @@
 
 ### `ApplyUnifiedHmiScreenDesignJson` <sub>L2</sub>
 
-[L2][HMI-Unified] PREFERRED for natural-language HMI design. Apply a complete JSON layout spec to a screen in one call: screen size + multiple controls (Button/Rectangle/IOField) with positions, text, and properties. Requires: Connect + OpenProject + EnsureUnifiedHmiScreen. Better than calling EnsureUnifiedHmiScreenItem multiple times. Use BuildUnifiedHmiLayoutDesignJson to generate the JSON from a grid description.
+[L2][HMI-Unified] PREFERRED for natural-language HMI design. Apply a complete JSON layout spec to a screen in one call: screen size + multiple controls (Button/Rectangle/IOField/Text) with positions, text, and properties. Use item type "Text" (HmiText) for static text labels/titles/field captions — a Rectangle has no Text property and renders blank if given text. Requires: Connect + OpenProject + EnsureUnifiedHmiScreen. Better than calling EnsureUnifiedHmiScreenItem multiple times: one call places many controls (V21: 100 controls in about 9 s), while one call per control adds a full model round trip per control. Per item, besides name/type/left/top/width/height/text/properties, optional parts: font {Size, Weight, Name} e.g. {"Size": 28, "Weight": "Bold"} (Weight and Name take the TIA enum names, e.g. Normal/Bold, SiemensSans), content {...}, padding {...}. Read a value back with GetObjectProperty(objectKind='HmiScreenItem', objectPath='<hmiSoftware>:<screen>:<item>', propertyPath='Font.Size'). Use BuildUnifiedHmiLayoutDesignJson to generate the JSON from a grid description.
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
@@ -633,7 +756,7 @@
 
 ### `EnsureUnifiedHmiButtonAction` <sub>L2</sub>
 
-[L2][HMI-Unified]Generate and apply a deterministic Unified HMI button action. Only set-bit/reset-bit/toggle-bit are applied; high-risk or TODO recipes are rejected.
+[L2][HMI-Unified]Generate and apply a deterministic Unified HMI button action. Only set-bit/reset-bit/toggle-bit are applied; high-risk or TODO recipes are rejected. SyntaxCheck is OFF by default (issue #36: it can crash TIA V21).
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
@@ -643,6 +766,7 @@
 | `eventType` | `string` |  | HmiButtonEventType value, e.g. Down (press), Up (release), Tapped — NOT Pressed/Released |
 | `actionKind` | `string` |  | set-bit, reset-bit, or toggle-bit |
 | `targetTag` | `string` |  | verified target HMI tag |
+| `syntaxCheck` | `bool` | `false` | run TIA SyntaxCheck after writing the script. Default false - see SetUnifiedHmiButtonEventScriptCode. The applied recipes are generated by this server and already linted offline, so the check adds little and risks a V21 crash. |
 
 返回：`ResponseMessage`
 
@@ -661,7 +785,7 @@
 
 ### `EnsureUnifiedHmiConnection` <sub>L2</sub>
 
-[L2][HMI-Unified] Create or verify the PLC↔HMI communication connection (HMI_Connection_1 by default). Requires: Connect + OpenProject + both PLC and Unified HMI devices. Must exist before PLC-backed HMI tags can exchange data. Call before EnsureUnifiedHmiTag with plcTag binding.
+[L2][HMI-Unified] Create or verify the PLC↔HMI communication connection (HMI_Connection_1 by default). Requires: Connect + OpenProject + both PLC and Unified HMI devices. Must exist before PLC-backed HMI tags can exchange data. TIA V21: a new connection is created through the hardware connection API — on Unified panels it is INTEGRATED (PLC partner set, symbolic plcTag binding works), and it also works on Classic/Comfort/Basic panels (KTP Basic, TP/KTP Comfort; classic tags then need absolute addresses). Both devices' Ethernet interfaces must be on the same subnet (ConnectDeviceNodesToProfinetSubnet), and an existing connection between the same HMI and PLC blocks a second one. If the hardware-level create fails on a Unified panel it falls back to a NON-integrated connection and says why. TIA V20: Unified only, NON-integrated (bind HMI tags with an absolute `address`, non-optimized DB); classic panels need the connection made in the TIA GUI. Also sets DisabledAtStartup=false and the PLC/HMI IPs from the hardware configuration (non-integrated), and fails if either cannot be applied.
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
@@ -670,6 +794,22 @@
 | `plcName` | `string` | `"PLC_1"` | PLC software/device symbolic name |
 
 返回：`ResponseObjectDescribe`
+
+### `EnsureUnifiedHmiDiscreteAlarm` <sub>L2</sub>
+
+[L2][HMI-Unified]Create or update ONE WinCC Unified discrete alarm (HmiSoftware.DiscreteAlarms) and bind it to a bit of an existing HMI tag. Without this, a generated project ends up with an HmiAlarmControl on screen and Alm* bits in the tag table but an EMPTY alarm list - every step reports success and the alarm screen simply never shows anything at runtime. triggerTag must be an EXISTING HMI tag: a name that does not exist is REFUSED up front (with a sample of the real tag names) instead of being written as a dangling reference that only fails at compile or runtime. Also REFUSED before anything is written (meta.success=false, project untouched), because Openness accepts them and only the HMI compile fails: an alarmClass that does not exist, a trigger tag whose type is not Bool or a bit string (TIA V21 only accepts Bool / Byte / Word / DWord / LWord here: every integer type, signed or unsigned, and Real/String fail the HMI compile), a bit number outside the tag's width, and a tag+bit already used by another discrete alarm. Every property written is read back and compared; any item that cannot be read back, or reads back different, fails the call and says which one - the project may then be half-changed, which is reported rather than hidden. triggerMode accepts only the enum names this TIA version defines (typically OnRisingEdge / OnFallingEdge); an unknown value is rejected with the list of valid ones, never coerced. Requires: Connect + OpenProject; run CompileAndDiagnoseHmi and SaveProject afterwards.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `hmiSoftwarePath` | `string` |  | Unified HMI software path, e.g. 'HMI_RT_1' |
+| `alarmName` | `string` |  | alarm name. An existing alarm with this name is updated, not duplicated. |
+| `eventText` | `string` | `""` | the alarm text shown in the alarm control. Empty = leave unchanged. |
+| `triggerTag` | `string` | `""` | name of an EXISTING HMI tag that carries the trigger bit; its data type must be Bool, Byte, Word, DWord or LWord (integer types such as Int/UInt/DInt are refused by the TIA compile). |
+| `bitNumber` | `int` | `-1` | which bit of triggerTag raises the alarm (0-based). Bool tag: 0 only; Byte 0..7, Word 0..15, DWord 0..31, LWord 0..63. -1 (default) = leave unchanged (a new alarm gets bit 0). |
+| `alarmClass` | `string` | `""` | name of an EXISTING HMI alarm class, e.g. 'Alarm' / 'Warning' (GetUnifiedHmiDiscreteAlarms lists them). Empty = leave the default. |
+| `triggerMode` | `string` | `""` | OnRisingEdge or OnFallingEdge. Empty = leave the default. |
+
+返回：`ResponseMessage`
 
 ### `EnsureUnifiedHmiDynamization` <sub>L2</sub>
 
@@ -700,7 +840,7 @@
 
 ### `EnsureUnifiedHmiScreenItem` <sub>L2</sub>
 
-[L2][HMI-Unified] Create or verify a single Unified HMI control (button, lamp, IO field, etc.) on a screen. Requires: Connect + OpenProject + EnsureUnifiedHmiScreen. itemType: Button, Rectangle (lamp/indicator), IOField (value display/entry), or full CLR type name. For a complete screen layout use ApplyUnifiedHmiScreenDesignJson instead.
+[L2][HMI-Unified] Create or verify a single Unified HMI control (button, lamp, IO field, etc.) on a screen. Requires: Connect + OpenProject + EnsureUnifiedHmiScreen. itemType: Button, Rectangle (lamp/indicator/background — has NO text), Text (static text label = HmiText), IOField (value display/entry), or full CLR type name. For a text caption/label ALWAYS use Text, never Rectangle (a Rectangle has no Text property and renders blank if given text). For a complete screen layout use ApplyUnifiedHmiScreenDesignJson instead.
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
@@ -745,6 +885,16 @@
 
 返回：`ResponseMessage`
 
+### `GetUnifiedHmiDiscreteAlarms` <sub>L2</sub>
+
+[L2][HMI-Unified]READ-ONLY. List every WinCC Unified discrete alarm with its trigger tag (RaisedStateTag), trigger bit (RaisedStateTagBitNumber), the absolute TriggerBitAddress TIA derived from them, alarm class, trigger mode, priority and the event text per language, plus the names of the alarm classes that actually exist in this HMI. Use it to read back what EnsureUnifiedHmiDiscreteAlarm wrote, and before adding alarms to see which tag/bit combinations are already taken (TIA refuses two alarms on the same tag+bit at compile time). A property that cannot be read is reported as '<read threw: ...>' and makes meta.success false, never an empty value. Nothing is written.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `hmiSoftwarePath` | `string` |  | Unified HMI software path, e.g. 'HMI_RT_1' |
+
+返回：`ResponseMessage`
+
 ### `ListUnifiedHmiApiTypes` <sub>L2</sub>
 
 [L2][HMI-Unified]List loaded WinCC Unified HMI API types/enums by name filter, useful for discovering event and dynamization types.
@@ -758,7 +908,7 @@
 
 ### `SetUnifiedHmiButtonEventScriptCode` <sub>L2</sub>
 
-[L2][HMI-Unified]Set ScriptCode on a Unified HMI button event ScriptDynamization and run SyntaxCheck.
+[L2][HMI-Unified]Set ScriptCode on a Unified HMI button event ScriptDynamization. SyntaxCheck is OFF by default because on TIA V21 it can crash the Portal process and lose the script (issue #36); pass syntaxCheck=true only when you need that evidence.
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
@@ -769,13 +919,14 @@
 | `scriptCode` | `string` |  | JavaScript code for the event |
 | `globalDefinitionAreaScriptCode` | `string` | `""` | optional global definitions for the script |
 | `async` | `bool` | `false` | whether the script is async |
+| `syntaxCheck` | `bool` | `false` | run TIA SyntaxCheck after writing. Default false - on TIA V21 this call can crash the Portal process (NonRecoverableException) and lose the just-written script. When false, no syntaxErrorCount is reported: absence means NOT CHECKED, never zero errors. |
 
 返回：`ResponseMessage`
 
 ---
 
 <a id="hardware"></a>
-## Hardware（19 个）
+## Hardware（31 个）
 
 ### `AddDevice` <sub>L2</sub>
 
@@ -839,6 +990,16 @@
 
 返回：`ResponseMessage`
 
+### `CompileHardware` <sub>L2</sub>
+
+[L2][Hardware] Compile the HARDWARE configuration of one device (modules, addresses, network, firmware) and return TIA's errors/warnings - CompileSoftware / CompileAndDiagnosePlc do not cover this; use after PlugDeviceItem, IO-address or network changes. Requires: Connect + OpenProject, and the PLC offline (GoOffline first).
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `devicePath` | `string` |  | device (station) name as listed by GetDevices, e.g. 'PLC_1' |
+
+返回：`ResponseJsonReport`
+
 ### `ConnectDeviceNodesToProfinetSubnet` <sub>L1</sub>
 
 [L1][Hardware] PREFERRED for PROFINET network setup. Finds the first IE/PROFINET node under two devices, creates/reuses a subnet on the first, connects the second, and returns readback evidence. Requires: Connect + OpenProject + both devices added. Typical: firstRootPath='PLC_1', secondRootPath='HMI_KTP700_1/HMI_KTP700_1.IE_CP_1'. Verified for S7-1200 + KTP700 Basic PN.
@@ -850,6 +1011,28 @@
 | `subnetName` | `string` | `"PN_IE_1"` | subnet name to create when the first node is not already connected, e.g. 'PN_IE_1' |
 
 返回：`ResponseMessage`
+
+### `DeleteDevice` <sub>L2</sub>
+
+[L2][Hardware][Destructive] Preview or delete ONE device / station (PLC, HMI, IO device, drive). Defaults to dryRun=true = lists the device, its modules and software (block count), deletes nothing. Give the device name or its CPU/head-module name; a module name is refused. DANGER: deleting a PLC deletes its whole program; network, IO-system, S7 and HMI connections to it are cut. Verified after delete; then SaveProject.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `devicePath` | `string` |  | device (station) name as listed by GetDevices, or its CPU name, e.g. 'PLC_1' |
+| `dryRun` | `bool` | `true` | true (default) only previews; false deletes and verifies |
+
+返回：`ResponseJsonReport`
+
+### `DumpDeviceAttributes` <sub>L2</sub>
+
+[L2][Category:Hardware][PreCondition:Connect+OpenProject]
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `devicePath` | `string` |  | device name, CPU/program name, or full name (e.g. 'S7-1200 station_3', '安全PLC', 'S7-1500/ET200MP station_1'). |
+| `nameFilter` | `string?` | `null` | optional case-insensitive substring to narrow attribute names (e.g. 'protection'). Empty = all. |
+
+返回：`ResponseJsonReport`
 
 ### `EnsureSubnet` <sub>L2</sub>
 
@@ -863,6 +1046,17 @@
 
 返回：`ResponseMessage`
 
+### `ExportDeviceAml` <sub>L2</sub>
+
+[L2][Hardware] Read-only: export a device's hardware configuration to an AutomationML (CAx) .aml file. The file contains the configured IP address, subnet/mask, PROFINET device name and topology — info GetDeviceItemNetworkInfo omits. devicePath is the station/device path from GetProjectTree (e.g. 'S7-1200 station_3'). exportPath may be a folder (file named <device>.aml) or a full .aml path. Does NOT modify the project or go online.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `devicePath` | `string` |  | station/device path from GetProjectTree, e.g. 'S7-1200 station_3' |
+| `exportPath` | `string` |  | target folder or full .aml file path |
+
+返回：`ResponseExportDeviceAml`
+
 ### `GetDeviceInfo` <sub>L2</sub>
 
 [L2][Hardware]Get info from a device from the current project/session
@@ -873,6 +1067,16 @@
 
 返回：`ResponseDeviceInfo`
 
+### `GetDeviceIpAddress` <sub>L1</sub>
+
+[L1][Category:Hardware][PreCondition:Connect+OpenProject]
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `devicePath` | `string` |  | device name from GetProjectTree, e.g. 'PLC_1'. |
+
+返回：`ResponseJsonReport`
+
 ### `GetDeviceItemInfo` <sub>L2</sub>
 
 [L2][Hardware]Get info from a device item from the current project/session
@@ -882,6 +1086,16 @@
 | `deviceItemPath` | `string` |  | defines the path in the project structure to the device item |
 
 返回：`ResponseDeviceItemInfo`
+
+### `GetDeviceItemIoAddresses` <sub>L2</sub>
+
+[L2][Hardware] READ-ONLY. List the I/O addresses of one device item (signal module, signal board,
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `deviceItemPath` | `string` |  | path in the project structure to the device item |
+
+返回：`ResponseMessage`
 
 ### `GetDeviceItemNetworkInfo` <sub>L2</sub>
 
@@ -904,11 +1118,37 @@
 
 返回：`ResponseTree`
 
+### `GetDevicePlugLocations` <sub>L2</sub>
+
+[L2][Hardware] READ-ONLY. List the plug slots of one device item: which slot numbers are FREE
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `deviceItemPath` | `string` |  | path to the host device item, e.g. 'PLC_1' for a CPU |
+
+返回：`ResponseMessage`
+
 ### `GetDevices` <sub>L1</sub>
 
 [L1][Hardware] List all hardware devices (PLCs, HMI panels, drives) in the project with their attributes. Requires: Connect + OpenProject. Prefer GetProjectTree for a visual overview; use this when you need the exact device Name and attribute values for subsequent operations like AddDevice or SetDeviceItemAttribute.
 
 返回：`ResponseDevices`
+
+### `GetProjectTopology` <sub>L1</sub>
+
+[L1][Category:Hardware][PreCondition:Connect+OpenProject]
+
+返回：`ResponseJsonReport`
+
+### `GetPutGetAccess` <sub>L2</sub>
+
+[L2][Category:Hardware][PreCondition:Connect+OpenProject]
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `devicePath` | `string` |  | device name from GetProjectTree, e.g. 'PLC_1'. |
+
+返回：`ResponseJsonReport`
 
 ### `PlanHardwareNetworkConfiguration` <sub>L2</sub>
 
@@ -919,6 +1159,21 @@
 | `planJson` | `string` |  | JSON with operations[]. Supported operation types: EnsureSubnet, AttachDeviceNodeToSubnet, SetCpuCommonSettings. This is offline-only and performs validation only. |
 
 返回：`ResponseJsonReport`
+
+### `PlugDeviceItem` <sub>L2</sub>
+
+[L2][Hardware][Destructive] Insert a SUBMODULE into an existing device: signal board (SB, e.g. SB 1221
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `deviceItemPath` | `string` |  | host device item. A signal board plugs into the CPU itself, e.g. 'PLC_1' |
+| `orderNumber` | `string` |  | MLFB of the module, e.g. '6ES7221-3BD30-0XB0' (with or without the space). A full 'OrderNumber:.../V1.1' type identifier is also accepted |
+| `version` | `string` | `""` | module/firmware version, e.g. 'V1.1'. Leave empty to let TIA pick the default |
+| `positionNumber` | `int` | `-1` | target slot. -1 (default) = pick the first free slot TIA accepts |
+| `name` | `string` | `""` | name for the new module. Empty = auto-generated and de-duplicated against siblings |
+| `dryRun` | `bool` | `true` | true (default) only runs the CanPlugNew feasibility check; set false to actually plug |
+
+返回：`ResponseMessage`
 
 ### `ProbeHardwareHmiConnectionOwnerCandidates` <sub>L2</sub>
 
@@ -988,6 +1243,60 @@
 | `value` | `string` |  | new value as string; converted based on current attribute type |
 
 返回：`ResponseMessage`
+
+### `SetDeviceItemIoAddress` <sub>L2</sub>
+
+[L2][Hardware][Destructive] Preview or change the I/O START ADDRESS of one device item
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `deviceItemPath` | `string` |  | path in the project structure to the device item, e.g. 'PLC_1/DI 8x24VDC_1' |
+| `ioType` | `string` |  | Input, Output, Diagnosis or Substitute |
+| `startAddress` | `int` |  | new start address as engine raw byte offset (%I2.0 -> 2) |
+| `dryRun` | `bool` | `true` | true (default) only previews the change; set false to actually write it |
+
+返回：`ResponseMessage`
+
+### `SetPutGetAccess` <sub>L2</sub>
+
+[L2][Category:Hardware][CONFIG-WRITE][PreCondition:Connect+OpenProject]
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `devicePath` | `string` |  | device name from GetProjectTree, e.g. 'PLC_1'. |
+| `enable` | `bool` | `true` | true to permit remote PUT/GET access, false to forbid it. |
+
+返回：`ResponseJsonReport`
+
+---
+
+<a id="meta"></a>
+## Meta（2 个）
+
+### `CallTool` <sub>L0</sub>
+
+[L0][Meta] Invoke a tool from the full roster by name, including ones not listed in this session.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `server` | `IMcpServer` |  |  |
+| `context` | `RequestContext<CallToolRequestParams>` |  |  |
+| `name` | `string` |  | exact tool name from FindTools, e.g. 'ExportPlcWatchTable'. |
+| `argumentsJson` | `string` | `""` | JSON object of the tool's arguments, e.g. '{"softwarePath":"PLC_1"}'. Omit or '{}' for a no-argument tool. |
+| `cancellationToken` | `CancellationToken` | `default` |  |
+
+返回：`async Task<object?>`
+
+### `FindTools` <sub>L0</sub>
+
+[L0][Meta] Search the FULL tool roster, including tools not listed in this session.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `query` | `string` | `""` | space-separated words matched against tool names and descriptions, e.g. 'export watch table'. Empty lists the whole roster. |
+| `limit` | `int` | `12` | max tools to return (default 12). Raise it for a broad survey. |
+
+返回：`ResponseStringList`
 
 ---
 
@@ -1093,6 +1402,7 @@
 | `rack` | `int` | `0` | hardware rack. S7-1200/1500 = 0. |
 | `slot` | `int` | `1` | hardware slot. S7-1200/1500 = 1. |
 | `expectModuleContains` | `string` | `""` | optional identity guard. If set (e.g. '1211C'), the read aborts unless the CPU module type contains this substring. |
+| `devicePath` | `string` | `""` | optional device name (e.g. 'PLC_1') for a PUT/GET precheck. When set, the read is skipped with a clear, actionable message if the CPU has remote PUT/GET access disabled, instead of failing with a TCP timeout. |
 
 返回：`ResponseJsonReport`
 
@@ -1315,7 +1625,7 @@
 ---
 
 <a id="plc-online"></a>
-## PLC-Online（8 个）
+## PLC-Online（9 个）
 
 ### `CheckDownloadReadiness` <sub>L1</sub>
 
@@ -1351,6 +1661,9 @@
 | `startAfterDownload` | `bool` | `true` | true=automatically set CPU to RUN after download (default), false=leave CPU in STOP |
 | `stopBeforeDownload` | `bool` | `true` | true=automatically stop CPU before download (required for most downloads), false=attempt online download without stopping |
 | `password` | `string` | `""` | optional CPU access password. Required when the CPU has download protection configured. Leave empty for unprotected CPUs. |
+| `pgPcInterface` | `string` | `""` | optional PG/PC interface name (substring, case-insensitive), e.g. 'PLCSIM' or 'Realtek'. Leave empty to auto-pick the adapter that shares a subnet with the CPU. Run CheckDownloadReadiness to see the available names. |
+| `targetIpAddress` | `string` | `""` | optional CPU IP to download to, e.g. '192.168.0.1'. Disambiguates which route to use when the project has several CPU interfaces. Leave empty to auto-pick. |
+| `abortActiveTests` | `bool` | `false` | DEFAULT false. When test/commissioning functions are active on the CPU, TIA asks whether to cancel them; false answers 'no action' and the download stops. true cancels them - ask the user first, somebody may be commissioning the machine. |
 
 返回：`ResponseDownload`
 
@@ -1384,6 +1697,12 @@
 
 返回：`ResponseMessage`
 
+### `GoOfflineAll` <sub>L1</sub>
+
+[L1][Category:PLC-Online][PreCondition:Connect+OpenProject]
+
+返回：`ResponseJsonReport`
+
 ### `GoOnline` <sub>L1</sub>
 
 [L1][Category:PLC-Online][ONLINE-CONNECT][PreCondition:Connect+OpenProject]
@@ -1391,7 +1710,7 @@
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | `softwarePath` | `string` |  | path to the PLC software, e.g. 'PLC_1' |
-| `ipAddress` | `string` | `""` | optional IP address override, e.g. '192.168.1.10'. Leave empty to use the project's configured IP. |
+| `ipAddress` | `string` | `""` | optional target IP address, e.g. '192.168.1.10', used to pick the matching configured route. Must be one of the addresses the project configures. Leave empty to use the default route. |
 | `password` | `string` | `""` | optional CPU access password. Required when the CPU has read/write protection configured. Leave empty for unprotected CPUs. |
 
 返回：`ResponseOnlineState`
@@ -1466,7 +1785,7 @@
 ---
 
 <a id="plc-software"></a>
-## PLC-Software（39 个）
+## PLC-Software（54 个）
 
 ### `CompileAndDiagnosePlc` <sub>L1</sub>
 
@@ -1490,6 +1809,67 @@
 
 返回：`ResponseCompile`
 
+### `CreateInstanceDB` <sub>L2</sub>
+
+[L2][PLC-Software] Create a single-instance DB (背景 DB) for an existing FB directly - no XML, no dummy call. dbName defaults to '<FB>_DB'; dbNumber 0 = auto; groupPath = existing block group. Read back incl. InstanceOfName (Data.verified). Then call the FB with it, CompileAndDiagnosePlc and SaveProject.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | PLC software path, e.g. 'PLC_1' |
+| `fbName` | `string` |  | the FB (name or group path), e.g. 'FB_Motor' |
+| `dbName` | `string` | `""` | new instance DB name (empty = '<FB>_DB') |
+| `dbNumber` | `int` | `0` | DB number, 0 = automatic |
+| `groupPath` | `string` | `""` | existing block group (empty = root) |
+
+返回：`ResponseJsonReport`
+
+### `CreatePlcBlockGroup` <sub>L2</sub>
+
+[L2][PLC-Software] Create a (nested) program-block group/folder, creating any missing parent groups along the path. Idempotent — returns ok if the group already exists. groupPath uses '/' separators relative to 'Program blocks' root, e.g. '01_手动控制/手动意图'. Requires: Connect + OpenProject. Use this to set up the 手动/手自动接口/自动 layer folders, then MoveBlockToGroup to organize blocks into them.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | PLC software path, e.g. 'PLC_1' |
+| `groupPath` | `string` |  | '/'-separated group path under Program blocks, e.g. '01_手动控制/手动意图' |
+
+返回：`ResponseMessage`
+
+### `CreatePlcTagTable` <sub>L2</sub>
+
+[L2][PLC-Software] Create one EMPTY PLC tag table (变量表), optionally inside an existing tag-table group. Names are unique per PLC; a clash is refused.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | PLC software path, e.g. 'PLC_1' |
+| `tagTableName` | `string` |  | name of the new tag table |
+| `groupPath` | `string` | `""` | existing tag-table group, e.g. 'IO' (empty = root) |
+
+返回：`ResponseJsonReport`
+
+### `CreatePlcWatchTable` <sub>L2</sub>
+
+[L2][PLC-Software] Create one EMPTY watch table (监控表), optionally inside an existing watch-table group. A name clash is refused.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | PLC software path, e.g. 'PLC_1' |
+| `watchTableName` | `string` |  | name of the new watch table |
+| `groupPath` | `string` | `""` | existing watch-table group (empty = root) |
+
+返回：`ResponseJsonReport`
+
+### `DeletePlcBlock` <sub>L2</sub>
+
+[L2][PLC-Software][Destructive] Preview or delete exactly one PLC block by its exact path, including
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | path in the project structure to the PLC software, e.g. 'PLC_1' |
+| `blockPath` | `string` |  | exact block path, e.g. 'DB_Test' or 'GroupA/FB_Motor'. Regex and wildcards are rejected. |
+| `dryRun` | `bool` | `true` | true (default) only resolves and reports the target; false performs Delete() and verifies the block is absent |
+
+返回：`ResponseJsonReport`
+
 ### `DeletePlcExternalSource` <sub>L2</sub>
 
 [L2][PLC-Software]Delete a PLC external source by name so ImportPlcExternalSource can replace it (idempotent). Name may include or omit .scl.
@@ -1500,6 +1880,66 @@
 | `externalSourceName` | `string` |  | name from GetPlcExternalSources (e.g. MCPVerify_FC_SCL_v3.scl) |
 
 返回：`ResponseMessage`
+
+### `DeletePlcTag` <sub>L2</sub>
+
+[L2][PLC-Software][Destructive] Preview or delete ONE PLC tag. Defaults to dryRun=true (shows name/type/address/comment). DANGER: code using the symbol falls back to the absolute address or stops compiling, HMI bindings by name break silently, the comment is lost. Verified after delete; then CompileAndDiagnosePlc + SaveProject.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | PLC software path, e.g. 'PLC_1' |
+| `tagName` | `string` |  | exact tag name |
+| `tagTableName` | `string` | `""` | optional table to disambiguate |
+| `dryRun` | `bool` | `true` | true (default) previews; false deletes and verifies |
+
+返回：`ResponseJsonReport`
+
+### `DeletePlcTagTable` <sub>L2</sub>
+
+[L2][PLC-Software][Destructive] Preview or delete ONE PLC tag table (variable table / tag list)
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | path in the project structure to the PLC software, e.g. 'PLC_1' |
+| `tagTableName` | `string` |  | bare table name, or the group-qualified path from GetPlcTagTables (e.g. 'Drives/VFD tags'). Regex and wildcards are rejected. |
+| `dryRun` | `bool` | `true` | true (default) only resolves the table and lists its contents; false performs Delete() and verifies the table is absent |
+
+返回：`ResponseJsonReport`
+
+### `DeletePlcType` <sub>L2</sub>
+
+[L2][PLC-Software][Destructive] Preview or delete ONE PLC user data type (UDT / PlcType) by its exact
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | path in the project structure to the PLC software, e.g. 'PLC_1' |
+| `typePath` | `string` |  | exact UDT path, e.g. 'UDT_Motor' or 'GroupA/UDT_Motor'. Regex and wildcards are rejected. |
+| `dryRun` | `bool` | `true` | true (default) only resolves the type and reports its cross references; false performs Delete() and verifies the type is absent |
+
+返回：`ResponseJsonReport`
+
+### `DeletePlcWatchTable` <sub>L2</sub>
+
+[L2][PLC-Software][Destructive] Preview or delete ONE watch table. Defaults to dryRun=true (path and entry count). Affects commissioning only, not the program - but entries, modify values and comments are lost (ExportPlcWatchTable first). Verified after delete; then SaveProject.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | PLC software path, e.g. 'PLC_1' |
+| `watchTableName` | `string` |  | bare name or group-qualified path |
+| `dryRun` | `bool` | `true` | true (default) only previews; false deletes and verifies |
+
+返回：`ResponseJsonReport`
+
+### `DescribeBlockLogic` <sub>L1</sub>
+
+[L1][PLC-Software] Read a block's LOGIC as READABLE TEXT — the fast, accurate way to analyze LADDER (LAD) without hand-parsing FlgNet XML. For each LAD network it reconstructs the power flow as a boolean-ish expression (series = ' · ', parallel = ' + '), shows coils ( )/(S)/(R), MOVE/compare/timer boxes with their operands, and — critically — FLAGS any contact whose operand is a LITERAL CONSTANT with '⟨常量⟩' (a normally-open contact wired to FALSE silently disables its whole rung; this is nearly impossible to spot by eye). SCL/STL networks are rendered inline as code. Use this to understand or review LAD logic before editing. Requires: Connect + OpenProject + the block consistent (compile first if IsConsistent=false; export does not work in online mode — GoOffline first). blockPath must be fully qualified 'Group/Subgroup/Name' from GetSoftwareTree.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | PLC software path, e.g. '5T车' or 'PLC_1' (from GetProjectTree) |
+| `blockPath` | `string` |  | fully qualified 'Group/Subgroup/Name' from GetSoftwareTree |
+
+返回：`ResponseBlockLogic`
 
 ### `ExportAsDocuments` <sub>L2</sub>
 
@@ -1697,6 +2137,21 @@
 
 返回：`ResponseStringList`
 
+### `GetPlcTags` <sub>L1</sub>
+
+[L1][PLC-Software][READ-ONLY] List PLC tags (name, type, address, comment, HMI flags) without an XML export. Filter by table, name substring and/or address prefix ('%Q' = every output). includeConstants adds user constants. Use to find what sits on an address or which addresses are free. Capped by maxTags (default 300, Meta.truncated). Requires: Connect + OpenProject (or AttachToOpenProject).
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | PLC software path, e.g. 'PLC_1' |
+| `tagTableName` | `string` | `""` | one table (bare or group-qualified); empty = all |
+| `nameFilter` | `string` | `""` | case-insensitive name substring; empty = all |
+| `addressFilter` | `string` | `""` | address prefix, e.g. '%Q', '%I0.', '%MW'; empty = all |
+| `includeConstants` | `bool` | `false` | also list user constants |
+| `maxTags` | `int` | `300` | cap (default 300, max 5000) |
+
+返回：`ResponseJsonReport`
+
 ### `GetPlcWatchTables` <sub>L2</sub>
 
 [L2][PLC-Software]List PLC watch/monitor table names (PlcWatchTable). Read-only.
@@ -1726,6 +2181,17 @@
 | `softwarePath` | `string` |  | defines the path in the project structure to the plc software |
 
 返回：`ResponseSoftwareTree`
+
+### `GetSoftwareUnits` <sub>L1</sub>
+
+[L1][PLC-Software] Read-only. List the PLC software units (Software units, S7-1500) of a PLC software and the blocks inside each unit. Openness reaches units only through PlcUnitProvider, so they are not children of the PLC software and GetSoftwareTree / InvokeService alone cannot enumerate them. Every block comes with a blockPath of the form 'Software units/<unit>/<group>/<block>' that ExportBlock, GetBlockInfo, DescribeBlockLogic and the other block tools accept as-is. Requires: Connect + OpenProject. softwarePath from GetProjectTree.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | PLC software name from GetProjectTree, e.g. 'PLC_1' |
+| `includeBlocks` | `bool` | `true` | true lists every block in every unit (name, type, number, language, blockPath); false returns unit names and block counts only |
+
+返回：`ResponseMessage`
 
 ### `GetTypeInfo` <sub>L2</sub>
 
@@ -1900,6 +2366,19 @@
 
 返回：`ResponseImportType`
 
+### `MoveBlockToGroup` <sub>L2</sub>
+
+[L2][PLC-Software] Move/organize an existing block into a program-block group (found anywhere by exact name). Openness cannot reparent a block, so this exports the block, deletes it, and re-imports it into the target group (SIMATIC SD .s7dcl preferred, SimaticML XML fallback for STL/mixed-language). The block number and references are preserved. autoCreateGroup creates the target group path if missing. Requires: Connect + OpenProject + block consistent (compile first). After moving, call CompileAndDiagnosePlc to confirm 0 errors. Note: avoid moving OBs with event bindings via this round-trip.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | PLC software path, e.g. 'PLC_1' |
+| `blockName` | `string` |  | exact block name to move (searched across all groups) |
+| `targetGroupPath` | `string` |  | '/'-separated destination group under Program blocks, e.g. '02_手自动接口' |
+| `autoCreateGroup` | `bool` | `true` | create the target group path if it does not exist (default true) |
+
+返回：`ResponseMessage`
+
 ### `PlcBuildAndImport` <sub>L1</sub>
 
 [L1][PLC-Software] MAIN tool for creating new PLC blocks from natural language. Build one PLC artifact (UDT/tag table/GlobalDB/FC/FB) from structured JSON, then optionally import and compile. Use dryRun=true first to validate. Workflow: describe block in JSON → dryRun → review → dryRun=false to import. Replaces the multi-step Build*Xml + ImportBlock sequence.
@@ -1916,6 +2395,20 @@
 | `dryRun` | `bool` | `true` | true builds XML and returns the import plan without importing/compiling. |
 
 返回：`ResponsePlcProgramImport`
+
+### `RenamePlcObject` <sub>L2</sub>
+
+[L2][PLC-Software] Rename a PLC block (and/or renumber), a UDT, a tag table, a watch table or a device; kind = block | type | tagtable | watchtable | device. Clashes refused first; read back (Data.verified). TIA updates calls in the project; exported files, HMI scripts and hard-coded DB numbers do not follow. V20 cannot rename watch tables. Then CompileAndDiagnosePlc + SaveProject.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `kind` | `string` |  | block \| type \| tagtable \| watchtable \| device |
+| `objectPath` | `string` |  | current name or path (tables: group-qualified allowed; device: name) |
+| `newName` | `string` | `""` | new name (empty = keep, e.g. when only renumbering) |
+| `newNumber` | `int` | `0` | new block number (blocks only, 0 = keep) |
+| `softwarePath` | `string` | `""` | PLC software path, e.g. 'PLC_1' (not for kind=device) |
+
+返回：`ResponseJsonReport`
 
 ### `RepairAndReimportBlock` <sub>L2</sub>
 
@@ -1942,6 +2435,23 @@
 | `placeholders` | `JsonObject?` | `null` | JsonObject key-values for replacement in XML, e.g. {"PLC_NAME":"PLC_1"} |
 
 返回：`ResponseSeed`
+
+### `SetPlcTag` <sub>L2</sub>
+
+[L2][PLC-Software] Create or modify ONE PLC tag in place. Existing tag (any table): change newName / dataType / address / comment; omitted fields stay. Missing tag: created in tagTableName with dataType + address. Tag names are unique per PLC; a clash is refused. Read back (Data.verified); warns when the address is shared. Requires: Connect + OpenProject (or AttachToOpenProject). Then CompileAndDiagnosePlc + SaveProject.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | PLC software path, e.g. 'PLC_1' |
+| `tagName` | `string` |  | tag to modify, or name of the tag to create |
+| `tagTableName` | `string` | `""` | table for a NEW tag (bare or group-qualified); optional for an existing tag |
+| `newName` | `string` | `""` | rename an existing tag (empty = keep) |
+| `dataType` | `string` | `""` | e.g. 'Bool', 'Int', 'Real' (empty = keep; required to create) |
+| `address` | `string` | `""` | e.g. '%I0.0', '%Q4.2', '%MW100' (empty = keep; required to create) |
+| `comment` | `string` | `""` | comment text (empty = keep) |
+| `commentLanguage` | `string` | `""` | culture, e.g. 'zh-CN' (empty = zh-CN, else first project language) |
+
+返回：`ResponseJsonReport`
 
 ### `WritePlcSclSourceFile` <sub>L1</sub>
 
@@ -1996,11 +2506,17 @@
 ---
 
 <a id="portal"></a>
-## Portal（5 个）
+## Portal（6 个）
 
 ### `Connect` <sub>L1</sub>
 
 [L1][Portal] Connect to a running TIA Portal instance or start a new one. MUST be the first tool called in every session. On success, state becomes Connected=true. If TIA Portal is not installed or the user is not in the 'Siemens TIA Openness' Windows group, this will fail — run EnsureOpennessUserGroup first.
+
+返回：`ResponseConnect`
+
+### `ConnectIsolated` <sub>L1</sub>
+
+[L1][Portal] Start a BRAND-NEW headless TIA Portal instance instead of attaching to a running one.
 
 返回：`ResponseConnect`
 
@@ -2031,7 +2547,19 @@
 ---
 
 <a id="project"></a>
-## Project（9 个）
+## Project（10 个）
+
+### `ArchiveProject` <sub>L1</sub>
+
+[L1][Project] Archive the open project into one file (.zap20/.zap21, TIA 'Archive...') for backup or hand-over; the project itself is unchanged. Must be saved first (unsaved changes are refused - SaveProject; the engine never saves on its own). mode: compressed (default) | none | discard | discardcompressed. Existing archives are never overwritten.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `targetDirectory` | `string` |  | folder for the archive (created if missing) |
+| `archiveName` | `string` | `""` | file name without extension (empty = '<project>_yyyyMMdd_HHmm') |
+| `mode` | `string` | `"compressed"` | compressed (default) \| none \| discard \| discardcompressed |
+
+返回：`ResponseJsonReport`
 
 ### `AttachToOpenProject` <sub>L1</sub>
 
@@ -2045,7 +2573,11 @@
 
 ### `CloseProject` <sub>L1</sub>
 
-[L1][Project] Close the currently open project or multi-user session. Requires: Connect + OpenProject. Any unsaved changes are lost — call SaveProject first. After closing, the connection remains active but no project is open.
+[L1][Project] Close the currently open project or multi-user session. Requires: Connect + OpenProject. Any unsaved changes are lost — call SaveProject first. After closing, the connection remains active but no project is open. A project this session did not open (the user's own, attached from a running TIA Portal) is NOT closed unless closeForeignProject=true.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `closeForeignProject` | `bool` | `false` | DEFAULT false. If the open project belongs to the user (this session did not open it), the call is REFUSED rather than closing their work. Only pass true after the user has agreed to close it. |
 
 返回：`ResponseCloseProject`
 
@@ -2057,6 +2589,7 @@
 |---|---|---|---|
 | `directoryPath` | `string` |  | folder where project will be created |
 | `projectName` | `string` |  | project name |
+| `closeForeignProject` | `bool` | `false` | DEFAULT false. If TIA already has a project open that this session did not open, the call is REFUSED rather than closing the user's work. Only pass true after the user has agreed to close it. |
 
 返回：`ResponseMessage`
 
@@ -2079,6 +2612,7 @@
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | `path` | `string` |  | defines the path where to the project/session |
+| `closeForeignProject` | `bool` | `false` | DEFAULT false. If TIA already has a project open that this session did not open, the call is REFUSED rather than closing the user's work. Only pass true after the user has agreed to close it. |
 
 返回：`ResponseOpenProject`
 
@@ -2100,12 +2634,12 @@
 
 ### `ScaffoldProject` <sub>L1</sub>
 
-[L1][Project] One-shot project generator: from a single JSON spec it creates the project, adds PLC (and optional Unified HMI) hardware, builds UDTs/global DBs/PLC tag tables, imports SCL external sources and LAD S7DCL documents, compiles, sets up the HMI connection/screens/tags, and saves — collapsing the ~20-step runbook into one call. Auto-connects if needed. Critical-step failures (connect/createProject/PLC device) abort; per-element failures are collected and reported. Spec keys: projectName(required); directoryPath?(default %TEMP%); plcName?(PLC_1); plcFamily?(S7-1500); plcMlfb?; hmiName?(omit to skip all HMI); hmiFamily?(WinCCUnifiedPC); hmiSoftwarePath?(HMI_RT_1); connectionName?(HMI_Connection_1); udt?/globalDb?/tagTable? = arrays of the same json objects PlcBuildAndImport accepts; sclSourceFiles? = array of .scl file paths; ladDocs? = array of {importPath,name}; hmiScreens? = array of {screenName,width,height,designJson(object)}; hmiTags? = array of {tagTableName?,tagName,hmiDataType?,plcTag?,address?}; compile?(true); save?(true). Returns a per-step report with compile error/warning counts. Pass dryRun=true to validate the spec offline (PLC block JSON shapes, SCL/LAD file paths, designJson) WITHOUT connecting to TIA or creating anything.
+[L1][Project] One-shot project generator: from a single JSON spec it creates the project, adds PLC (and optional Unified HMI) hardware, builds UDTs/global DBs/PLC tag tables, imports SCL external sources and LAD S7DCL documents, compiles, sets up the HMI connection/screens/tags, and saves — collapsing the ~20-step runbook into one call. Auto-connects if needed. Critical-step failures (connect/createProject/PLC device) abort; per-element failures are collected and reported. Spec keys: projectName(required); directoryPath?(default %TEMP%); plcName?(PLC_1); plcFamily?(S7-1500); plcMlfb?; hmiName?(omit to skip all HMI); hmiFamily?(WinCCUnifiedPC); hmiSoftwarePath?(HMI_RT_1); connectionName?(HMI_Connection_1); udt?/globalDb?/tagTable? = arrays of the same json objects PlcBuildAndImport accepts; sclSourceFiles? = array of .scl file paths; ladDocs? = array of {importPath,name}; hmiScreens? = array of {screenName,width,height,designJson(object)}; hmiTags? = array of {tagTableName?,tagName,hmiDataType?,plcTag?,address?}; compile?(true); save?(true). Returns a per-step report with compile error/warning counts. dryRun DEFAULTS TO TRUE (safety): the default call only validates the spec offline (PLC block JSON shapes, SCL/LAD file paths, designJson) WITHOUT connecting to TIA or creating anything; after a clean dry run, call again with dryRun=false to actually create the project.
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | `spec` | `string` |  | JSON object describing the project to generate. See tool description for keys. |
-| `dryRun` | `bool` | `false` | true validates the spec offline (no TIA connection, nothing created). Use to pre-flight a spec before the real run. |
+| `dryRun` | `bool` | `true` | DEFAULT true — validates the spec offline (no TIA connection, nothing created). Pass dryRun=false explicitly to actually create the project (after a clean dry run). |
 
 返回：`ResponseScaffold`
 
@@ -2148,7 +2682,7 @@
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | `objectKind` | `string` |  | Target object kind: Project\|Portal\|Device\|DeviceItem\|Software\|Block\|Type |
-| `objectPath` | `string` |  | Target object path |
+| `objectPath` | `string` |  | Target object path. For Device/DeviceItem/Software: path in project tree. For Block/Type: blockPath/typePath. |
 | `serviceTypeSuffix` | `string` |  | Service type suffix, e.g. CrossReferenceService or ICompilable |
 | `softwarePath` | `string` | `""` | softwarePath required for Block/Type |
 | `maxMembers` | `int` | `200` | Max member count to return |
@@ -2162,7 +2696,7 @@
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | `objectKind` | `string` |  | Object kind: Project\|Portal\|Device\|DeviceItem\|Software\|Block\|Type\|HmiScreen\|HmiTag\|HmiScreenItem |
-| `objectPath` | `string` |  | Object path |
+| `objectPath` | `string` |  | Object path. For Device/DeviceItem/Software: path in project tree. For Block/Type: blockPath/typePath. |
 | `propertyPath` | `string` |  | Property path, e.g. Name or BlockGroup.Groups |
 | `softwarePath` | `string` | `""` | softwarePath required for Block/Type |
 
@@ -2175,9 +2709,9 @@
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | `objectKind` | `string` |  | Object kind: Project\|Portal\|Device\|DeviceItem\|Software\|Block\|Type\|HmiScreen\|HmiTag\|HmiScreenItem |
-| `objectPath` | `string` |  | Object path |
+| `objectPath` | `string` |  | Object path. For Device/DeviceItem/Software: path in project tree. For Block/Type: blockPath/typePath. |
 | `methodName` | `string` |  | Method name (case-insensitive) |
-| `args` | `JsonArray?` | `null` | JSON array of args, e.g. ["AttrName"]. Empty for no args. |
+| `args` | `System.Text.Json.JsonElement[]?` | `null` | JSON array of args, e.g. ["AttrName"]. Empty for no args. |
 | `softwarePath` | `string` | `""` | softwarePath required for Block/Type |
 | `allowWrite` | `bool` | `false` | Allow write/dangerous methods. Default false. |
 
@@ -2190,10 +2724,10 @@
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | `objectKind` | `string` |  | Target object kind: Project\|Portal\|Device\|DeviceItem\|Software\|Block\|Type |
-| `objectPath` | `string` |  | Target object path |
+| `objectPath` | `string` |  | Target object path. For Device/DeviceItem/Software: path in project tree. For Block/Type: blockPath/typePath. |
 | `serviceTypeSuffix` | `string` |  | Service type suffix, e.g. CrossReferenceService or ICompilable |
 | `methodName` | `string` |  | Method name (case-insensitive) |
-| `args` | `JsonArray?` | `null` | JSON array of args, empty for no args |
+| `args` | `System.Text.Json.JsonElement[]?` | `null` | JSON array of args, empty for no args |
 | `softwarePath` | `string` | `""` | softwarePath required for Block/Type |
 | `allowWrite` | `bool` | `false` | Allow write/dangerous methods. Default false. |
 
@@ -2206,7 +2740,7 @@
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | `objectKind` | `string` |  | Object kind: Project\|Portal\|Device\|DeviceItem\|Software\|Block\|Type\|HmiScreen\|HmiTag\|HmiScreenItem |
-| `objectPath` | `string` |  | Object path |
+| `objectPath` | `string` |  | Object path. For Device/DeviceItem/Software: path in project tree. For Block/Type: blockPath/typePath. |
 | `collectionProperty` | `string` |  | Enumerable property name/path, e.g. Devices, DeviceItems, BlockGroup.Blocks |
 | `softwarePath` | `string` | `""` | softwarePath required for Block/Type |
 | `limit` | `int` | `200` | Max child items to return |

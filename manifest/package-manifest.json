@@ -1,16 +1,21 @@
 ﻿{
   "schemaVersion": "2026-05-25",
-  "bundleVersion": "2.2.1",
-  "packageName": "TIA_MCP_交付包_20260525_V20S7DCL_184330",
+  "bundleVersion": "2.7.8",
+  "packageName": "TIA_MCP_V19_2.7.8_20261026",
   "packageType": "tia-portal-mcp-complete-offline-delivery-bundle",
   "generatedAt": "2026-05-31T20:30:00+08:00",
-  "refreshedAt": "2026-05-31T20:30:00+08:00",
+  "refreshedAt": "2026-10-26T00:50:00+08:00",
   "target": {
-    "tiaPortalMajorVersion": [20, 21],
-    "publicApiPathExample": "D:\\app\\TIA21\\Portal V21\\PublicAPI or D:\\app\\TIA20\\Portal V20\\PublicAPI",
+    "tiaPortalMajorVersion": [
+      19
+    ],
+    "publicApiPathExample": "D:\\app\\TIA19\\Portal V19\\PublicAPI\\V19",
     "runtimeRequirement": ".NET Framework 4.8",
     "windowsGroupRequirement": "Siemens TIA Openness",
-    "newCliFlags": ["--tia-portal-location <path>", "--tia-major-version {20|21}"]
+    "newCliFlags": [
+      "--tia-portal-location <path>",
+      "--tia-major-version {19}"
+    ]
   },
   "selfContainedScope": {
     "description": "The bundle contains runtime, skill, manuals, templates and blueprints required for PLC + WinCC Unified project generation.",
@@ -34,7 +39,7 @@
   "entrypoints": {
     "readme": "README.md",
     "skill": "tools/tiaportal-mcp/skill/SKILL.md",
-    "mcpServerExe": "tools/tiaportal-mcp/src/TiaMcpServer/bin/Release/net48/TiaMcpServer.exe",
+    "mcpServerExe": "tools/tiaportal-mcp/src/TiaMcpServer/bin-v19/Release/net48/TiaMcpServer.exe",
     "cursorExample": "cursor-mcp.example.json",
     "toolRoster": "manifest/tools-list.json",
     "toolMatrix": "docs/tool-capability-matrix.md",
@@ -52,23 +57,39 @@
   },
   "cli": {
     "description": "Same exe also runs as a declarative CLI: `tia <verb>`. Any AI can emit a YAML/JSON spec; any engineer runs one command. No MCP client required.",
-    "exe": "tools/tiaportal-mcp/src/TiaMcpServer/bin/Release/net48/TiaMcpServer.exe",
-    "verbs": ["gen", "patch", "compile", "export", "import", "describe", "prewarm", "schema", "version", "help"],
-    "specFormats": ["json", "yaml"],
-    "exitCodes": { "0": "success", "1": "completed with failed steps", "2": "error" }
+    "exe": "tools/tiaportal-mcp/src/TiaMcpServer/bin-v19/Release/net48/TiaMcpServer.exe",
+    "verbs": [
+      "gen",
+      "patch",
+      "compile",
+      "export",
+      "import",
+      "describe",
+      "prewarm",
+      "config",
+      "doctor",
+      "schema",
+      "version",
+      "help"
+    ],
+    "specFormats": [
+      "json",
+      "yaml"
+    ],
+    "exitCodes": {
+      "0": "success",
+      "1": "completed with failed steps",
+      "2": "error"
+    }
   },
   "capabilities": {
-    "mcpToolCount": 189,
+    "mcpToolCount": 233,
     "mcpToolLayers": {
-      "L0": 6,
-      "L1": 31,
-      "L2": 152
+      "L0": 9,
+      "L1": 38,
+      "L2": 164
     },
-    "newToolsThisRelease": [
-      "SamplePlcLiveValuesS7",
-      "TraceTagCauseLive",
-      "GetPlcRunStateS7"
-    ],
+    "newToolsThisRelease": [],
     "removedToolsThisRelease": [],
     "hmiTemplateJsonCount": 8,
     "plcTemplateJsonCount": 9,
@@ -86,7 +107,14 @@
       "button Down/Up actions and tag dynamization",
       "read-only online live-value monitoring over S7 (port 102) and OPC UA (port 4840): single read, trend sampling (PID step-response capture), watch-table live read, CPU RUN/STOP state, and offline+live tag causal trace",
       "reflection-based API discovery for uncovered Openness shapes"
-    ]
+    ],
+    "liteProfile": {
+      "toolCount": 52,
+      "isDefault": true,
+      "scope": "L0+L1 essentials + FindTools/CallTool; covers the full golden path",
+      "optOut": "--profile full  (or TIA_MCP_PROFILE=full, or `tia config --full`)",
+      "note": "The other 166 tools stay reachable on demand via FindTools + CallTool; nothing is removed."
+    }
   },
   "validationSnapshot": {
     "performedAt": "2026-05-26T19:10:00+08:00",
@@ -105,5 +133,18 @@
       "PLC templates are general-purpose instruction and structure examples.",
       "Run scripts/Validate-Bundle.ps1 from bundle root for offline file/JSON checks; tools/list when server runs is authoritative for tool roster."
     ]
+  },
+  "v19": {
+    "baseMaster": "2.7.8",
+    "excludedTools": [
+      "GetVersionControlWorkspaces",
+      "CreateVersionControlWorkspace",
+      "GetVersionControlStatus",
+      "SyncVersionControlWorkspace",
+      "ConnectProjectToWorkspace"
+    ],
+    "documentTools": "ExportAsDocuments/ExportBlocksAsDocuments/ImportFromDocuments/ImportBlocksFromDocuments return NotSupportedOnVersion",
+    "defaultProfile": "lite",
+    "fullProfileFlag": "--profile full or TIA_MCP_PROFILE=full"
   }
 }

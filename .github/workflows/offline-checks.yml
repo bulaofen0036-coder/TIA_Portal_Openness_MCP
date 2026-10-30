@@ -1,0 +1,38 @@
+name: offline-checks
+
+# 这个仓库的引擎本体编译需要 Siemens.Engineering.dll（要装 TIA Portal），
+# GitHub 托管的 runner 上没有，所以**编译类 CI 在这里不可能有**。
+# 这里跑的是不需要 TIA 的那两类检查：零依赖回归用例，和面向调用方的文案一致性。
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-tests:
+    # 回归套件是**控制台 Exe**，不是 VSTest 工程：
+    # `dotnet test` 在它上面只会还原、一个用例都不跑、然后退 0 ——
+    # 一个和「全部通过」长得一模一样的假绿灯。所以这里写死 `dotnet run`。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Offline regression suite
+        run: dotnet run --project tools/tiaportal-mcp/tests/TiaMcpServer.Tests/TiaMcpServer.Tests.csproj -c Release --nologo
+
+  dead-tool-references:
+    # 工具描述里点名的工具必须真的注册过。踩过的形状：某个能力被刻意下线了，
+    # 但两条描述还写着 "use <那个工具>" —— AI 客户端照做只会撞 tool-not-found，
+    # 然后自己去找别的路子绕。纯源码对拍，不需要装 TIA。
+    # 脚本自带必错哨兵：闸门本身坏了会报 FAIL，而不是假 PASS。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Descriptions must not name unregistered tools
+        run: python3 scripts/Check-DeadToolReferences.py

@@ -119,6 +119,11 @@ namespace TiaMcpServer.ModelContextProtocol
         public BootstrapPortal? Portal { get; set; }
         public string? RecommendedNextTool { get; set; }
         public string? RecommendedReason { get; set; }
+        /// <summary>
+        /// Compact operating rules returned on the very first call so even hosts that never load
+        /// SKILL.md still steer a less-capable model away from the common ordering/parameter mistakes.
+        /// </summary>
+        public IEnumerable<string>? OperatingRules { get; set; }
         public IEnumerable<string>? KnownLimitations { get; set; }
         public BootstrapToolLayers? ToolLayers { get; set; }
         public string? SkillFile { get; set; }
@@ -148,6 +153,22 @@ namespace TiaMcpServer.ModelContextProtocol
         public IEnumerable<string>? L0 { get; set; }
         public IEnumerable<string>? L1 { get; set; }
         public int? L2Count { get; set; }
+    }
+
+    public class ResponseDoctor : ResponseMessage
+    {
+        public bool? Ready { get; set; }
+        public IEnumerable<DoctorCheck>? Checks { get; set; }
+        public string? RecommendedNextTool { get; set; }
+        public string? Summary { get; set; }
+    }
+
+    public class DoctorCheck
+    {
+        public string? Name { get; set; }
+        public bool Ok { get; set; }
+        public string? Detail { get; set; }
+        public string? Fix { get; set; }
     }
 
     public class ResponseSafetySelfTest : ResponseMessage
@@ -227,6 +248,30 @@ namespace TiaMcpServer.ModelContextProtocol
     public class ResponseStringList : ResponseMessage
     {
         public IEnumerable<string>? Items { get; set; }
+    }
+
+    /// <summary>Size of the screen an item sits on; a position means nothing without it.</summary>
+    public class HmiScreenGeometry
+    {
+        public string? Name { get; set; }
+        public object? Width { get; set; }
+        public object? Height { get; set; }
+    }
+
+    // GetHmiTagDetails / GetHmiScreenItemDetails. Failed is never null and never silently empty:
+    // an object that could not be read is listed there with a reason, and Meta.success follows the
+    // failure count — a caller that trusts success must not file a partial inventory as complete.
+    public class ResponseHmiTagDetails : ResponseMessage
+    {
+        public IEnumerable<HmiDetailItem>? Items { get; set; }
+        public IEnumerable<HmiDetailFailure>? Failed { get; set; }
+    }
+
+    public class ResponseHmiScreenItemDetails : ResponseMessage
+    {
+        public HmiScreenGeometry? Screen { get; set; }
+        public IEnumerable<HmiDetailItem>? Items { get; set; }
+        public IEnumerable<HmiDetailFailure>? Failed { get; set; }
     }
 
     public class ResponseExportFile : ResponseMessage
@@ -496,6 +541,17 @@ namespace TiaMcpServer.ModelContextProtocol
 
     public class ResponseExportBlock : ResponseMessage
     {
+    }
+
+    public class ResponseExportDeviceAml : ResponseMessage
+    {
+        public string? DeviceName { get; set; }
+        public string? FilePath { get; set; }
+        public bool Success { get; set; }
+        public string? State { get; set; }
+        public int ErrorCount { get; set; }
+        public int WarningCount { get; set; }
+        public IEnumerable<string>? Messages { get; set; }
     }
 
     public class ResponseImportBlock : ResponseMessage
