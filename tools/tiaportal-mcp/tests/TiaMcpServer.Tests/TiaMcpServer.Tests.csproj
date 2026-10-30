@@ -57,6 +57,9 @@
     <!-- HTTP 传输：按 id 路由响应（超时后孤儿读线程吞掉下一条响应的那个 bug）+ 安全判定。 -->
     <Compile Include="..\..\src\TiaMcpServer\JsonRpcResponseRouter.cs" Link="JsonRpcResponseRouter.cs" />
     <Compile Include="..\..\src\TiaMcpServer\HttpSecurity.cs" Link="HttpSecurity.cs" />
+    <!-- HTTP 请求体解码：Content-Type 无 charset 时曾退回 Encoding.Default（中文系统 GBK），
+         UTF-8 入参被解坏（U+00A0 → 聽），全 ASCII 路径正常所以一直没被发现。 -->
+    <Compile Include="..\..\src\TiaMcpServer\HttpBodyEncoding.cs" Link="HttpBodyEncoding.cs" />
     <!-- 下载对话框的应答表：答案必须是手册里该提示枚举的成员，否则设不进去、下载无声失败；
          「取消正在进行的测试/调试功能」必须是显式选择。 -->
     <Compile Include="..\..\src\TiaMcpServer\Siemens\DownloadPromptPolicy.cs" Link="DownloadPromptPolicy.cs" />

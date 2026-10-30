@@ -240,7 +240,7 @@ namespace TiaMcpServer
                     if (ms.Length > MaxBodyBytes) { res.StatusCode = 413; res.Close(); return; }
                     if (declared >= 0 && ms.Length >= declared) break;
                 }
-                body = (req.ContentEncoding ?? Encoding.UTF8).GetString(ms.ToArray());
+                body = HttpBodyEncoding.Resolve(req.ContentType).GetString(ms.ToArray());
             }
 
             if (string.IsNullOrWhiteSpace(body)) { res.StatusCode = 400; res.Close(); return; }

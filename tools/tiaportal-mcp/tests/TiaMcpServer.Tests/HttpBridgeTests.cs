@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 
@@ -17,6 +18,7 @@ namespace TiaMcpServer.Tests
         {
             RunRouter(check);
             RunSecurity(check);
+            RunBodyEncoding(check);
         }
 
         private static void RunRouter(Action<bool, string> check)
@@ -115,6 +117,27 @@ namespace TiaMcpServer.Tests
             check(HttpSecurity.ResolveApiKey(null, _ => "fromEnv") == "fromEnv", "the key can come from the environment");
             check(HttpSecurity.ResolveApiKey("cli", _ => "fromEnv") == "cli", "the command line wins over the environment");
             check(HttpSecurity.ResolveApiKey(null, _ => "") == null, "an empty environment variable means no key");
+        }
+
+        private static void RunBodyEncoding(Action<bool, string> check)
+        {
+            // MCP 消息体是 UTF-8。缺省 Content-Type 无 charset 时 HttpListener 报的是
+            // Encoding.Default（中文 Windows = GBK），旧的 `?? Encoding.UTF8` 永远不触发。
+            check(HttpBodyEncoding.Resolve(null).CodePage == 65001, "no Content-Type decodes as UTF-8");
+            check(HttpBodyEncoding.Resolve("application/json").CodePage == 65001, "Content-Type without charset decodes as UTF-8");
+            check(HttpBodyEncoding.Resolve("application/json; charset=utf-8").CodePage == 65001, "an explicit utf-8 charset is honoured");
+            check(HttpBodyEncoding.Resolve("application/json; charset=\"UTF-8\"").CodePage == 65001, "a quoted charset is honoured");
+            check(HttpBodyEncoding.Resolve("application/json; charset=no-such-encoding").CodePage == 65001, "an unknown charset falls back to UTF-8");
+
+            // 现场故障：组名里的 U+00A0 被按 GBK 解成「聽」，该组下所有块都变成 Block not found。
+            string blockPath = "Program blocks/6_\u00A0FunctionBlocks/FB1020_modbustcp_Client";
+            string decoded = HttpBodyEncoding.Resolve("application/json").GetString(Encoding.UTF8.GetBytes(blockPath));
+            check(decoded == blockPath && decoded.IndexOf('\u807D') < 0,
+                "UTF-8 request bytes keep U+00A0 instead of turning into 聽");
+
+            string chinese = "程序块/中文组/FB_测试";
+            check(HttpBodyEncoding.Resolve("application/json").GetString(Encoding.UTF8.GetBytes(chinese)) == chinese,
+                "Chinese group/block names survive the request decode");
         }
     }
 }
