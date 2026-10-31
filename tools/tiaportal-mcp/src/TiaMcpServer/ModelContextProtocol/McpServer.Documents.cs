@@ -620,6 +620,11 @@ namespace TiaMcpServer.ModelContextProtocol
         {
             try
             {
+                // V19 FB/FC/PlcType have no Interface CLR property; serve Interface* from the
+                // XML interface reader instead of returning an empty list.
+                if (IsInterfaceCollection(objectKind, collectionProperty))
+                    return GetInterfaceChildren(objectKind, objectPath, collectionProperty, softwarePath, limit);
+
                 return Portal.ListObjectChildren(objectKind, objectPath, collectionProperty, softwarePath, limit);
             }
             catch (PortalException pex)

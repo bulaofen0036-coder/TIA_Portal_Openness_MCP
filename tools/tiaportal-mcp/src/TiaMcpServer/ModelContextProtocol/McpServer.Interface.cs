@@ -205,6 +205,79 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
+        /// <summary>True when ListObjectChildren is being asked for the block/type interface.</summary>
+        internal static bool IsInterfaceCollection(string objectKind, string collectionProperty)
+        {
+            if (!string.Equals(objectKind, "Block", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(objectKind, "Type", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var p = (collectionProperty ?? string.Empty).Trim();
+            return p.Equals("Interface", StringComparison.OrdinalIgnoreCase)
+                || p.Equals("Interface.Sections", StringComparison.OrdinalIgnoreCase)
+                || p.Equals("Interface.Members", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Compatibility route for the old reflection tool: it used to return an empty list for
+        /// Interface.Members because FB/FC in V19 have no Interface CLR property. Serve the same
+        /// request from the interface reader instead of lying.
+        /// </summary>
+        internal static ResponseObjectChildren GetInterfaceChildren(
+            string objectKind,
+            string objectPath,
+            string collectionProperty,
+            string softwarePath,
+            int limit)
+        {
+            var isType = string.Equals(objectKind, "Type", StringComparison.OrdinalIgnoreCase);
+            var iface = isType
+                ? GetTypeStructure(softwarePath, objectPath, includeComments: false, maxMembers: limit)
+                : GetBlockInterface(softwarePath, objectPath, includeComments: false, maxMembers: limit);
+
+            var sections = iface.Sections ?? Enumerable.Empty<InterfaceSection>();
+            var items = new List<string>();
+            var take = Math.Max(1, Math.Min(2000, limit));
+
+            if (collectionProperty.Equals("Interface", StringComparison.OrdinalIgnoreCase)
+                || collectionProperty.Equals("Interface.Sections", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var section in sections)
+                {
+                    items.Add(section.Name);
+                    if (items.Count >= take) break;
+                }
+            }
+            else
+            {
+                foreach (var section in sections)
+                {
+                    foreach (var member in section.Members)
+                    {
+                        items.Add(section.Name + "/" + member.Name);
+                        if (items.Count >= take) break;
+                    }
+                    if (items.Count >= take) break;
+                }
+            }
+
+            return new ResponseObjectChildren
+            {
+                Message = "OK",
+                ObjectKind = objectKind,
+                ObjectPath = objectPath,
+                Collection = collectionProperty,
+                Items = items,
+                Meta = new JsonObject
+                {
+                    ["timestamp"] = DateTime.Now,
+                    ["count"] = items.Count,
+                    ["empty"] = items.Count == 0,
+                    ["source"] = isType ? "type-xml-export" : "block-xml-export"
+                }
+            };
+        }
+
         private static McpException MapInterfaceFailure(string tool, string objectPath, Exception ex)
         {
             if (ex is PortalException pex)
