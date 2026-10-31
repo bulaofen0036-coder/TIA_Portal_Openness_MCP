@@ -48,6 +48,9 @@
          参数整形错了是「方法签名不匹配」，两者都不会崩。 -->
     <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ReflectionInvokeSafety.cs" Link="ReflectionInvokeSafety.cs" />
     <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\SimaticMlText.cs" Link="SimaticMlText.cs" />
+    <!-- 块/UDT 接口读取：V19 的 FB/FC/PlcType 没有 Interface 属性，只能解析 XML；
+         段或成员被静默丢掉时，调用方会拿到一份"少几个变量"的假结构。 -->
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\InterfaceXmlReader.cs" Link="InterfaceXmlReader.cs" />
     <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\LadTextRenderer.cs" Link="LadTextRenderer.cs" />
     <!-- 工具安全表：annotations、Openness 串行闸、CallTool 拒绝名单都从这一张表来。
          判错了什么都不会崩 —— 宿主只是不再在下载前问一句，或者两个调用在博途句柄上交错。 -->

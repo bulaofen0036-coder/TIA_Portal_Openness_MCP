@@ -1,5 +1,30 @@
 ﻿# Change Log
 
+## [Unreleased] - 2026-10-31 - V19 块接口 / UDT 结构读取
+
+工具数 233 → 235（V19）。
+
+### 新增
+
+- **`GetBlockInterface`**：读 FB/FC/OB/DB 的接口声明（Input / Output / InOut / Static / Temp / Constant），
+  每个成员返回类型、初值、注释、数组边界和嵌套结构。DB 的结构就是它的 Static 段。
+- **`GetTypeStructure`**：读 UDT / `PlcType` 结构，字段同上。
+
+  两个工具都在引擎侧把对象导出成临时 XML、解析后删除，宿主机只收 JSON。V19 的 Openness 只给
+  `DataBlock.Interface`；FB/FC/OB 和 `PlcType` 没有 `Interface` CLR 属性，XML 是 V19 上唯一通用路径。
+  前置条件：块/类型一致（先编译）、PLC 离线（先 `GoOffline`）。
+
+### 修复
+
+- **反射桥不再把「读不到」说成 OK。** `GetObjectProperty` 对不存在的属性、`ListObjectChildren`
+  对不存在/为 null/不是集合的属性，以前都返回 `Message=OK` + 空数据，调用方会把它当成
+  「这个对象确实没有成员」。现在返回结构化 `InvalidParams`，并在消息里指向 `GetBlockInterface`。
+  属性查找同时补上了实现接口上的显式成员。
+
+### 离线回归
+
+- `TiaMcpServer.Tests` 514 passed / 0 failed（新增 42 条接口解析用例）。
+
 ## [2.7.8.1] - 2026-10-30 - HTTP 请求体一律按 UTF-8 解码
 
 工具数不变（V19 233）。
