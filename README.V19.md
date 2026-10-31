@@ -1,6 +1,6 @@
 ﻿# TIA Portal V19 引擎（master 2.7.8 全量合并）
 
-> 状态：**V19 构建 0 errors / 既有 warnings；离线测试 514 passed；真机验收 48 PASS / 2 FAIL / 1 BLOCKED / 7 N/A**（2026-10-30）。
+> 状态：**V19 构建 0 errors / 既有 warnings；离线测试 517 passed；真机验收 48 PASS / 2 FAIL / 1 BLOCKED / 7 N/A**（2026-10-30）。
 > 核心链、块读取与导出、HTTP 编码、V19 边界、编译、生成、日常编辑（除改名）、HTTP 安全已真机验证；HMI 未测（测试工程无 HMI）。
 > 已知问题：`ExportDeviceAml` 在 V19 上可能让 TIA 实例崩溃；`SetPlcTag` 改名在 V19 不受支持（`PlcTag.Name` 只读）。
 >
@@ -62,7 +62,7 @@
 - **为什么 V19 要走 XML**：V19 的 Openness 只给 `DataBlock.Interface`；FB/FC/OB 和 `PlcType` 没有 `Interface` CLR 属性。这两个工具在引擎侧把对象导出成临时 XML、解析完删除，宿主机只收 JSON——不依赖共享目录，也不会把文件写到错误的一侧。
 - **前置条件**：块/类型必须一致（先编译）、PLC 必须离线（先 `GoOffline`）。在线调用会明确拒绝并给出恢复提示。
 - **反射桥修复**：`GetObjectProperty` / `ListObjectChildren` 以前对「属性不存在」「路径中段为 null」「不是集合」都回 `OK` + 空数据；现在返回结构化 `InvalidParams`，并提示改用 `GetBlockInterface`。这是报告里 `Interface` 静默成功那一类的根因。
-- **离线回归**：514 passed / 0 failed（新增 42 条接口解析用例）。
+- **离线回归**：517 passed / 0 failed（新增 45 条接口解析用例）。
 
 ## 默认工具档位
 

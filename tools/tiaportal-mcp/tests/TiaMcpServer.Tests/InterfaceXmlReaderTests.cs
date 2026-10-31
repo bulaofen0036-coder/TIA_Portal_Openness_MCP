@@ -211,6 +211,23 @@ namespace TiaMcpServer.Tests
             {
                 skip?.Invoke("real V19 FB export fixture", "not running from the repo tree");
             }
+
+            var realDbPath = Path.GetFullPath(Path.Combine(
+                AppContext.BaseDirectory,
+                "../../../../../../../templates/plc/block-xml/DB_HMI_Interface.xml"));
+            if (File.Exists(realDbPath))
+            {
+                var realDb = InterfaceXmlReader.ReadFile(realDbPath);
+                check(realDb.Sections.Count == 1 && realDb.Sections[0].Name == "Static",
+                    "real DB export: one Static section");
+                check(realDb.Sections[0].Members.Count == 19, "real DB export: member count");
+                check(realDb.Sections[0].Members.First(m => m.Name == "OutputMax").StartValue == "100.0",
+                    "real DB export: StartValue preserved");
+            }
+            else
+            {
+                skip?.Invoke("real V19 DB export fixture", "not running from the repo tree");
+            }
         }
     }
 }
