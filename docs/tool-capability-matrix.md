@@ -2,7 +2,7 @@
 
 本文件由源码中的 `[McpServerTool]` 静态抽取生成，运行时仍以 `tools/list` 为准。
 
-- 生成时间：2026-10-26 00:50:46
+- 生成时间：2026-11-07 10:44:32
 - 工具数量：238
 
 ## L0
@@ -211,7 +211,7 @@
 | Tool | Description |
 |---|---|
 | BuildClassicHmiScreenXml | [L2][HMI-Classic]Offline-only helper: build a Classic/Basic WinCC HMI screen XML document from structured JSON. It does not connect to TIA Portal, import screens, or modify projects. Validate in a temporary Classic HMI project before using on a real project. |
-| BuildClassicHmiTagTableXml | [L2][HMI-Classic]Offline-only helper: build a Classic/Basic WinCC HMI tag table XML document from structured JSON. Supports plain HMI tags and symbolic PLC bindings through Connection + ControllerTag/PlcTag. It does not connect to TIA Portal, import tags, or modify projects. |
+| BuildClassicHmiTagTableXml | [L2][HMI-Classic]Offline-only helper: build a Classic/Basic WinCC HMI tag table XML document from structured JSON. Supports plain HMI tags, symbolic PLC bindings (Connection + ControllerTag/PlcTag) and absolute PLC addresses (Connection + LogicalAddress, e.g. %M10.0; Classic/Basic panel imports on V21 only accept absolute). Unknown fields are rejected. It does not connect to TIA Portal, import tags, or modify projects. |
 | BuildClassicHmiMinimalPackage | [L2][HMI-Classic]Offline-only helper: build a minimal Classic/Basic HMI package from structured JSON. It returns tag-table XML, screen XML, import order, and readiness checks that screen item tag references are declared in the tag table. It does not connect to TIA Portal, import files, or modify projects. |
 | WriteClassicHmiMinimalPackageFiles | [L2][HMI-Classic]Offline-only helper: build a minimal Classic/Basic HMI package and write tag-table XML, screen XML, and manifest JSON to an output directory. It does not connect to TIA Portal, import files, or modify projects. |
 | ValidateClassicHmiMinimalPackageFiles | [L2][HMI-Classic]Offline-only helper: validate an already written Classic/Basic HMI minimal package folder or manifest. It reads manifest/XML, checks parseability and HMI tag references, and does not connect to TIA Portal or modify projects. |

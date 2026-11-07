@@ -1,6 +1,6 @@
 {
-  "package": "TIA_MCP_Delivery_v2.7.8",
-  "generatedAt": "2026-10-25T23:50:45.968379+08:00",
+  "package": "TIA_MCP_Delivery_v2.7.9",
+  "generatedAt": "2026-11-07T09:44:31.941965+08:00",
   "source": "live MCP tools/list of TiaMcpServer.exe",
   "toolCount": 238,
   "note": "Full roster (--profile full). The default lite profile lists only the core tools; the rest stay reachable via FindTools + CallTool. Runtime tools/list remains authoritative.",
@@ -243,7 +243,7 @@
       "parameters": [
         "tableJson"
       ],
-      "description": "[L2][HMI-Classic]Offline-only helper: build a Classic/Basic WinCC HMI tag table XML document from structured JSON. Supports plain HMI tags and symbolic PLC bindings through Connection + ControllerTag/PlcTag. It does not connect to TIA Portal, import tags, or modify projects."
+      "description": "[L2][HMI-Classic]Offline-only helper: build a Classic/Basic WinCC HMI tag table XML document from structured JSON. Supports plain HMI tags, symbolic PLC bindings (Connection + ControllerTag/PlcTag) and absolute PLC addresses (Connection + LogicalAddress, e.g. %M10.0; Classic/Basic panel imports on V21 only accept absolute). Unknown fields are rejected. It does not connect to TIA Portal, import tags, or modify projects."
     },
     {
       "name": "BuildFlgNetCallXml",
