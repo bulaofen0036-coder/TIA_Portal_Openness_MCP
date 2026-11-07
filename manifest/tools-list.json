@@ -1,6 +1,6 @@
 {
-  "package": "TIA_MCP_Delivery_v2.7.10",
-  "generatedAt": "2026-11-07T10:32:10.693729+08:00",
+  "package": "TIA_MCP_Delivery_v2.7.11",
+  "generatedAt": "2026-11-07T18:06:22.897488+08:00",
   "source": "live MCP tools/list of TiaMcpServer.exe",
   "toolCount": 238,
   "note": "Full roster (--profile full). The default lite profile lists only the core tools; the rest stay reachable via FindTools + CallTool. Runtime tools/list remains authoritative.",
@@ -1212,9 +1212,10 @@
         "softwarePath",
         "exportPath",
         "regexName",
-        "preservePath"
+        "preservePath",
+        "softwareUnit"
       ],
-      "description": "[L2][PLC-Software] Export all (or regexName-filtered) blocks to a directory as SimaticML XML. Pick the right tool: readable SCL/.s7dcl text → ExportBlocksAsDocuments; a single block → ExportBlock."
+      "description": "[L2][PLC-Software] Export all (or regexName-filtered) blocks of the PLC root to a directory as SimaticML XML; softwareUnit exports exactly one software unit's blocks instead (nothing from the root or other units). Per-block failures are listed in Meta.failures. Pick the right tool: readable SCL/.s7dcl text → ExportBlocksAsDocuments; a single block → ExportBlock."
     },
     {
       "name": "ExportBlocksAsDocuments",
@@ -1226,7 +1227,8 @@
         "softwarePath",
         "exportPath",
         "regexName",
-        "preservePath"
+        "preservePath",
+        "softwareUnit"
       ],
       "description": "[L2][PLC-Software] PREFERRED on V21+ for batch export. Exports multiple program blocks to SIMATIC SD textual / SCL document format (.s7dcl + .s7res) — far more readable/diff-friendly than SimaticML XML. Requires TIA Portal V20 or newer."
     },
@@ -1320,7 +1322,7 @@
         "tagTableName",
         "exportPath"
       ],
-      "description": "[L2][PLC-Software]Export one PLC tag table (PlcTagTable) to XML file"
+      "description": "[L2][PLC-Software]Export one PLC tag table (PlcTagTable) to XML file. A software unit's table: 'Software units/<unit>/<table>' as listed by GetPlcTagTables."
     },
     {
       "name": "ExportPlcWatchTable",
@@ -1784,9 +1786,10 @@
         "nameFilter",
         "addressFilter",
         "includeConstants",
-        "maxTags"
+        "maxTags",
+        "softwareUnit"
       ],
-      "description": "[L1][PLC-Software][READ-ONLY] List PLC tags (name, type, address, comment, HMI flags) without an XML export. Filter by table, name substring and/or address prefix ('%Q' = every output). includeConstants adds user constants. Use to find what sits on an address or which addresses are free. Capped by maxTags (default 300, Meta.truncated). Requires: Connect + OpenProject (or AttachToOpenProject)."
+      "description": "[L1][PLC-Software][READ-ONLY] List PLC tags (name, type, address, comment in every project language, HMI flags) without an XML export, from the PLC root AND every software unit (unit tables are listed as 'Software units/<unit>/<table>'; softwareUnit limits the read to one unit). Filter by table, name substring and/or address prefix ('%Q' = every output). includeConstants adds user constants (value = the definition text as written, not evaluated). Use to find what sits on an address or which addresses are free. Capped by maxTags (default 300, Meta.truncated). Requires: Connect + OpenProject (or AttachToOpenProject)."
     },
     {
       "name": "GetPlcTagTables",
@@ -1797,7 +1800,7 @@
       "parameters": [
         "softwarePath"
       ],
-      "description": "[L2][PLC-Software] List all PLC tag table names. Requires: Connect + OpenProject. softwarePath from GetProjectTree (e.g. 'PLC_1'). Use before ExportPlcTagTable to get exact table names, or before ImportPlcTagTable to check for conflicts."
+      "description": "[L2][PLC-Software] List all PLC tag table names, including the software units' tables as 'Software units/<unit>/<table>' (pass that path to ExportPlcTagTable; GetPlcTags softwareUnit reads one unit's tags). Requires: Connect + OpenProject. softwarePath from GetProjectTree (e.g. 'PLC_1'). Use before ExportPlcTagTable to get exact table names, or before ImportPlcTagTable to check for conflicts."
     },
     {
       "name": "GetPlcWatchTables",
