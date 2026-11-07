@@ -14,8 +14,8 @@ v2.0 起，交付包里的 **同一个 exe** 既是 MCP 服务，也是命令行
 1. **直接用全名**：在交付包根目录下 `tia gen spec.yaml`（V20 用户 `tia-v20 gen spec.yaml`）。
 2. **加进 PATH 后随处可用**（推荐）：把交付包根目录加入系统环境变量 `PATH`，之后任意目录都能 `tia gen ...`。
 
-> 下文一律写 `tia`；V20 用户把它换成 `tia-v20`。两个 `.cmd` 只是把参数透传给深层的
-> `…\bin\Release\net48\TiaMcpServer.exe`（V21）/ `…\bin-v20\…`（V20），退出码原样返回。
+> 下文一律写 `tia`；V20 用户把它换成 `tia-v20`。两个 `.cmd` 只是把参数透传给引擎 exe
+> （zip 布局 `…\bin\Release\net48\`、`…\bin-v20\…`；git clone 布局 `runtime\v21\`，脚本自动找），退出码原样返回。
 > 不想配也行——直接调那个 exe 全路径效果完全一样。
 
 ---
@@ -34,6 +34,8 @@ tia patch 改动.yaml             # 把 spec 增量合并进已有工程（spec 
 tia compile  D:\proj\X.ap21 --plc PLC_1
 tia describe D:\proj\X.ap21 --plc PLC_1
 tia prewarm                     # 常驻 headless 实例，后续命令 ~1s 连上
+tia doctor                      # 一键体检：TIA 安装/exe 版本匹配/Openness 组/宿主注册（--fix 自动修用户组）
+tia config                      # 一键把 MCP 注册进 Claude Desktop/Claude Code/Cursor/VS Code（--lite=精简 42 工具档）
 tia schema                      # 打印 spec 所有字段说明
 ```
 退出码：**0=成功，1=有失败步骤，2=错误**（方便脚本/CI 判读）。
@@ -80,7 +82,7 @@ save: true
 
 - **慢？** 第一次连接冷启动 headless TIA 约 10–28s；先 `tia prewarm` 之后约 1s。再快不了——`CreateProject/AddDevice/Save` 是 Openness 固有耗时。
 - **中文乱码？** 输出已强制 UTF-8；`.scl` 文件请存 UTF-8 BOM。
-- **V20 还是 V21？** 用与你 TIA 大版本匹配的那个 exe（`bin\Release`=V21，`bin-v20\Release`=V20）。可加 `--tia-major-version 20|21` 或 `--tia-portal-location <安装根>` 覆盖。
+- **V20 还是 V21？** 用与你 TIA 大版本匹配的那个 exe（zip 里 `bin\Release`=V21、`bin-v20\Release`=V20；git clone 只带 V21 的 `runtime\v21`）。可加 `--tia-major-version 20|21` 或 `--tia-portal-location <安装根>` 覆盖。
 - **要看 GUI？** 加 `--with-ui` 用完整界面启动（较慢）。
 - **工程路径可以写相对的吗？** 可以——`tia describe/compile/export/import` 和 `tia patch` 的工程路径
   现在按你当前所在目录解析（v2.0 修复，之前只认 exe 目录会报 `Projects.Open failed`）。

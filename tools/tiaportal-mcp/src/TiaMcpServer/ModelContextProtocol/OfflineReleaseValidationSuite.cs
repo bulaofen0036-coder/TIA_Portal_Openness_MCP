@@ -35,7 +35,8 @@ namespace TiaMcpServer.ModelContextProtocol
             var classicSuite = ClassicHmiOfflineValidationSuite.Run(Path.Combine(suiteDir, "classic_hmi"));
             var classicImportPreflight = ClassicHmiTemporaryImportPreflightSuite.Run(workspaceRoot, Path.Combine(suiteDir, "classic_hmi_temporary_import_preflight"));
             var plcSymbolProbe = PlcSymbolManifestBuilder.RunProbe(Path.Combine(suiteDir, "plc_symbol_manifest"));
-            var hmiLayout = HmiTemplateLayoutAnalyzer.AnalyzeDirectory(hmiTemplateDir);
+            // 发布闸必须跑真的执行 JSON 构建检查：以前这里不传委托，等于把「没报错」当成「验过了」，对外发版从没验过这条路径。
+            var hmiLayout = HmiTemplateLayoutAnalyzer.AnalyzeDirectory(hmiTemplateDir, HmiTemplateLayoutAnalyzer.ExecutionJsonBuilds);
             WriteJsonAndMarkdown(
                 hmiLayout,
                 Path.Combine(suiteDir, "hmi_template_layout", "hmi_template_layout_release_" + stamp + ".json"),

@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question / 使用提问
+    url: https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP/discussions/categories/q-a
+    about: How to install, configure an MCP client, or whether something is supported — ask in Discussions. 安装、配置客户端、「支不支持」类问题请到讨论区提问。
+  - name: Show your project / 分享你的用法
+    url: https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP/discussions/categories/show-and-tell
+    about: Built something with it? Share the workflow (no customer projects, please). 用它做成了什么，欢迎分享（请勿贴客户工程）。
+  - name: Documentation / 使用文档
+    url: https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP/tree/master/docs
+    about: Guides, tool matrix, instruction libraries and Openness limits. 使用说明、工具清单、指令库与 Openness 限制说明。

@@ -15,6 +15,9 @@ SRC = os.path.join(os.path.dirname(__file__), "..", "tools", "tiaportal-mcp", "s
 OUT_MD = os.path.join(os.path.dirname(__file__), "..", "docs", "TOOLS_REFERENCE.md")
 OUT_CSV = os.path.join(os.path.dirname(__file__), "..", "docs", "tools-index.csv")
 
+# V19 build excludes this whole file (#if !TIA_V19): TIA V19 has no VCI / MappedObject.
+V19_EXCLUDED_FILES = {"McpServer.VersionControl.cs"}
+
 
 def parse_string_literal(s, i):
     """Parse a C# string literal starting at s[i]. Returns (text, end_index)."""
@@ -116,7 +119,8 @@ def clean(text):
 
 
 def main():
-    files = [f for f in glob.glob(os.path.join(SRC, "**", "*.cs"), recursive=True) if f"{os.sep}obj" not in f]
+    files = [f for f in glob.glob(os.path.join(SRC, "**", "*.cs"), recursive=True)
+             if f"{os.sep}obj" not in f and os.path.basename(f) not in V19_EXCLUDED_FILES]
     tools = []
     for f in files:
         s = open(f, encoding="utf-8-sig", errors="ignore").read()
@@ -178,7 +182,8 @@ def main():
     lines.append("> 分层：**L0** 只读引导/诊断 · **L1** 高频主力 · **L2** 专用/离线构建器。")
     lines.append(">")
     lines.append("> **V19 注意**：`ExportAsDocuments`、`ExportBlocksAsDocuments`、`ImportFromDocuments`、"
-                 "`ImportBlocksFromDocuments` 在 V19 上返回 `NotSupportedOnVersion`（V19 没有 SIMATIC SD 文档 API）。")
+                 "`ImportBlocksFromDocuments` 在 V19 上返回 `NotSupportedOnVersion`（V19 没有 SIMATIC SD 文档 API）；"
+                 "5 个 VCI 工具不编译；默认 lite 档，全量工具用 `--profile full` 或 `TIA_MCP_PROFILE=full`。")
     lines.append("")
     lines.append("## 索引")
     lines.append("")

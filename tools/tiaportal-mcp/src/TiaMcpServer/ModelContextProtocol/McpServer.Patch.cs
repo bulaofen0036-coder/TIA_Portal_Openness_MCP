@@ -86,10 +86,10 @@ namespace TiaMcpServer.ModelContextProtocol
                 if (!Portal.IsConnected()) { Connect(); Step("connect", "ok"); }
                 else Step("connect", "skipped", "already connected");
             }
-            catch (Exception ex) { Step("connect", "failed", ex.Message); resp.Ok = false; throw new McpException($"PatchProject aborted at connect: {ex.Message}", ex, McpErrorCode.InternalError); }
+            catch (Exception ex) { Step("connect", "failed", ex.Message); resp.Ok = false; throw new McpException($"PatchProject aborted at connect: {ex.Message}{McpHints.Recovery(ex)}", ex, McpErrorCode.InternalError); }
 
             try { OpenProject(projectPath); Step("openProject", "ok", projectPath); }
-            catch (Exception ex) { Step("openProject", "failed", ex.Message); resp.Ok = false; throw new McpException($"PatchProject aborted at openProject: {ex.Message}", ex, McpErrorCode.InternalError); }
+            catch (Exception ex) { Step("openProject", "failed", ex.Message); resp.Ok = false; throw new McpException($"PatchProject aborted at openProject: {ex.Message}{McpHints.Recovery(ex)}", ex, McpErrorCode.InternalError); }
 
             // ---- PLC elements (per-item collect; re-import = upsert) ----
             void BuildList(string key, string kind)

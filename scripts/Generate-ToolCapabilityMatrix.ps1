@@ -36,13 +36,18 @@ if (-not $SourceFile) {
 $blockRx = [regex]::new(
     '\[McpServerTool\(Name\s*=\s*"(?<name>[^"]+)"\)\s*,\s*Description\((?<body>.*?)\)\]',
     [System.Text.RegularExpressions.RegexOptions]::Singleline)
-$segRx = [regex]'"(?<seg>[^"]*)"'
+# A segment is a C# string literal: escaped quotes (\") must not end it. The old pattern
+# "[^"]*" stopped at the first \" and garbled every description that shows a JSON example
+# (CallTool rendered as argumentsJson='{\:\,\:\}').
+$segRx = [regex]'"(?<seg>(?:[^"\\]|\\.)*)"'
 
 $tools = New-Object System.Collections.Generic.List[object]
 foreach ($m in $blockRx.Matches($text)) {
     $name = $m.Groups['name'].Value
     # Rebuild the description by concatenating every quoted segment in the body.
     $desc = (($segRx.Matches($m.Groups['body'].Value) | ForEach-Object { $_.Groups['seg'].Value }) -join '').Trim()
+    # Undo the C# escapes so the matrix shows the text the model actually sees.
+    $desc = [regex]::Replace($desc, '\\(["\\])', '$1')
     $layer = "L?"; $domain = "Misc"
     $tag = ([regex]'^\[(?<layer>L[0-9])\]\[(?:Category:)?(?<domain>[^\]]+)\]').Match($desc)
     if ($tag.Success) { $layer = $tag.Groups['layer'].Value; $domain = $tag.Groups['domain'].Value }

@@ -1,7 +1,8 @@
 # Agent 编程与工具使用手册（TIA Portal V19）
 
 > 给 AI agent 看的操作手册。目标：**用最少的 token 把事做对**。
-> 只读这一份 + 需要时查 `docs/tools-index.csv`（189 个工具的一行索引），**不要**一次拉全部 189 个工具的描述。
+> 只读这一份 + 需要时查 `docs/tools-index.csv`（233 个工具的一行索引），**不要**一次拉全部 233 个工具的描述。
+> 默认 **lite** 档；要看/调用全部 233 个工具，用 `--profile full` 或 `TIA_MCP_PROFILE=full`。
 
 ---
 
@@ -33,6 +34,9 @@
 | 编译 + 看错误 | `CompileAndDiagnosePlc`（首选） |
 | 读工程结构 | `GetProjectTree`（设备级） |
 | 读块列表 | `GetBlocks`（扁平） / `GetBlocksWithHierarchy`（要分组路径时） |
+| 读块逻辑（LAD/SCL） | `DescribeBlockLogic`（大响应用 `GetExport` 分页或 `SaveExport` 落盘） |
+| 看大响应 / 分页 | `GetExport`（`exportId` + `nextOffset`） / `SaveExport` |
+| 找不到工具 | `FindTools` → `CallTool` |
 | 下载到 PLC | `CheckDownloadReadiness` → `DownloadToPlc`（**在线写，先确认安全**） |
 | 读运行值 | `ReadPlcWatchTableCurrentValuesReadOnly` |
 | 保存 | `SaveProject` |
@@ -78,19 +82,20 @@ Bootstrap → Connect → GetState → GetDevices → GetSoftwareInfo → Discon
 
 ## 3. 工具地图（按域，不按字母）
 
-**L0 只读（6 个）**：`Bootstrap` `GetState` `RunCapabilitySelfTest` `RunOnlineMonitoringSafetySelfTest` `GenerateAcceptanceReport` `GenerateErrorReport`
+**L0 只读（10 个）**：`Bootstrap` `Doctor` `GetState` `RunCapabilitySelfTest` `RunOnlineMonitoringSafetySelfTest` `GetAuthoringGuide` `CallTool` `FindTools` `GenerateAcceptanceReport` `GenerateErrorReport`
 
-**L1 主力（30 个，按域）**
+**L1 主力（45 个，按域）**
 
 | 域 | 工具 |
 |---|---|
 | Portal | `Connect` `Disconnect` `EnsureOpennessUserGroup` `ListPortalProcessProjects` |
 | 工程 | `CreateProject` `OpenProject` `AttachToOpenProject` `CloseProject` `SaveProject` `GetProject` `GetProjectTree` `GetState` |
 | 硬件 | `AddDeviceWithFallback` `GetDevices` `SearchHardwareCatalog` `ConnectDeviceNodesToProfinetSubnet` |
-| PLC 软件 | `PlcBuildAndImport` `ImportBlock` `ImportType` `ImportPlcTagTable` `CompileAndDiagnosePlc` `CompileSoftware` `GetSoftwareInfo` `GetSoftwareTree` `WritePlcSclSourceFile` `ValidateAutomationContext` |
+| PLC 软件 | `PlcBuildAndImport` `ImportBlock` `ImportType` `ImportPlcTagTable` `CompileAndDiagnosePlc` `CompileSoftware` `GetSoftwareInfo` `GetSoftwareTree` `WritePlcSclSourceFile` `DescribeBlockLogic` `ValidateAutomationContext` |
 | 在线 | `GoOnline` `GoOffline` `GetOnlineState` `CheckDownloadReadiness` `DownloadToPlc` |
+| 大响应 | `GetExport` `ListExports` `SaveExport` `DeleteExport` `ClearExports` |
 
-**L2（153 个）**：构建器、HMI、导出、报表、诊断。用之前先在 `docs/tools-index.csv` 里搜名字（或查 `docs/TOOLS_REFERENCE.md` 的完整说明），**不要凭记忆猜**。
+**L2（178 个）**：构建器、HMI、导出、报表、诊断、日常编辑、VCI（V19 不编译）。用之前先在 `docs/tools-index.csv` 里搜名字（或查 `docs/TOOLS_REFERENCE.md` 的完整说明），**不要凭记忆猜**。
 高频 L2：`BuildPlcUdtXml` `BuildPlcGlobalDbXml` `BuildPlcTagTableXml` `BuildFlgNetCallXml` `ImportPlcExternalSource` `GenerateBlocksFromExternalSource` `GetBlocks` `GetBlocksWithHierarchy` `GetBlockInfo` `ExportBlock` `GetPlcTagTables` `GetTypes` `GetHmiScreens` `ApplyUnifiedHmiScreenDesignJson`。
 
 ---
@@ -131,10 +136,14 @@ Bootstrap → Connect → GetState → GetDevices → GetSoftwareInfo → Discon
 |---|---|---|
 | SIMATIC SD / S7DCL 文档导入导出 | ❌ 无 API | 用 `.scl` 外部源导入 |
 | `ExportAsDocuments` / `ImportBlocksFromDocuments` 等 4 个工具 | ❌ 返回 `NotSupportedOnVersion` | 同上 |
-| 硬件级 HMI 连接创建（V21+） | ❌ | 走经典 HMI 连接路径 |
-| SCL 外部源 FC/FB | ✅（未真机验证） | — |
+| VCI（版本控制接口，5 个工具） | ❌ 不编译 | 用 Git + 手工导出/导入 |
+| 硬件级 HMI 连接创建（V21+） | ⚠️ 降级 | 走软件层；经典面板可能建不出 |
+| HMI 读属性 / HMI 编译 / 离散报警 | ⬜（编译通过，未真机） | 先小规模试 |
+| Cax/AML 设备导出、软件单元、日常编辑 | ⬜（编译通过，未真机） | 先小规模试 |
+| SCL 外部源 FC/FB | ✅（2.2.1 未真机验证） | — |
 | 经典 / Unified HMI | ⬜（未验证） | 先小规模试 |
-| 编译 / DB / 变量表 / UDT | ✅（已实测） | — |
+| 编译 / DB / 变量表 / UDT | ✅（2.2.1 已实测；合并后待重跑） | — |
+| 读块逻辑（LAD/SCL） | ✅（编译 + 离线测试） | `DescribeBlockLogic`；大响应 `GetExport`/`SaveExport` |
 
 ---
 

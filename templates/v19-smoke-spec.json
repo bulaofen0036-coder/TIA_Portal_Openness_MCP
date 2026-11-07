@@ -1,0 +1,9 @@
+{
+  "_comment": "Minimal offline smoke spec for the V19 branch. No external SCL/LAD/HMI files; used by smoke-v19.cmd step 3.",
+  "projectName": "V19_Smoke",
+  "plcName": "PLC_1",
+  "plcFamily": "S7-1200",
+  "plcMlfb": "6ES7211-1BE40-0XB0",
+  "compile": false,
+  "save": false
+}

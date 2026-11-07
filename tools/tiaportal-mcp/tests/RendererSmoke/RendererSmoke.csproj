@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RollForward>LatestMajor</RollForward>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <DefineConstants>$(DefineConstants);TIA_V19</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/TiaMcpServer/ModelContextProtocol/LadTextRenderer.cs" Link="LadTextRenderer.cs" />
+    <Compile Include="../../src/TiaMcpServer/ModelContextProtocol/SimaticMlText.cs" Link="SimaticMlText.cs" />
+    <Compile Include="../../src/TiaMcpServer/Siemens/EngineRouter.cs" Link="EngineRouter.cs" />
+  </ItemGroup>
+</Project>

@@ -44,4 +44,15 @@ namespace TiaMcpServer.ModelContextProtocol
         public string? Type { get; set; }
         public string? Signature { get; set; }
     }
+
+    public class CaxExportResult
+    {
+        public string? DeviceName { get; set; }
+        public string? FilePath { get; set; }
+        public bool Success { get; set; }
+        public string? State { get; set; }
+        public int ErrorCount { get; set; }
+        public int WarningCount { get; set; }
+        public List<string>? Messages { get; set; }
+    }
 }

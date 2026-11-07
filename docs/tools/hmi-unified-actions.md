@@ -1,4 +1,4 @@
-# Unified HMI Action Recipes
+﻿# Unified HMI Action Recipes
 
 Document id: `hmi-unified-actions`
 
@@ -12,7 +12,7 @@ It is intentionally conservative: only deterministic bit commands are directly a
 | `BuildUnifiedHmiButtonActionScript` | Offline recipe generation and linting | No |
 | `RunHmiActionScriptRecipeSafetySelfTest` | Offline proof of action safety boundaries | No |
 | `EnsureUnifiedHmiButtonAction` | Apply a deterministic safe bit recipe to a real HMI button event | Yes |
-| `SetUnifiedHmiButtonEventScriptCode` | Low-level ScriptCode setter with TIA SyntaxCheck | Yes |
+| `SetUnifiedHmiButtonEventScriptCode` | Low-level ScriptCode setter. SyntaxCheck is opt-in | Yes |
 | `BindUnifiedHmiTagDynamization` | Bind an HMI item property to an HMI tag | Yes |
 
 ## Directly Applicable Recipes
@@ -32,7 +32,7 @@ Before applying:
 3. Verify the target HMI tag exists.
 4. Verify the HMI tag maps to a real PLC tag or DB member; never bind to guessed M bits.
 5. Apply through `EnsureUnifiedHmiButtonAction`.
-6. Check `SetUnifiedHmiButtonEventScriptCode` SyntaxCheck/readback metadata.
+6. Check `SetUnifiedHmiButtonEventScriptCode` readback metadata.
 
 ## Blocked Or Placeholder Recipes
 
@@ -96,8 +96,37 @@ Use this checklist before calling `EnsureUnifiedHmiButtonAction`:
 6. Verify the target HMI tag and PLC symbol mapping.
 7. Run `BuildUnifiedHmiButtonActionScript` and inspect `Meta.errors`, `Meta.warnings`, `Meta.applyBlocked`.
 8. Call `EnsureUnifiedHmiButtonAction` only for `set-bit`, `reset-bit`, or `toggle-bit`.
-9. Confirm SyntaxCheck/readback metadata from `SetUnifiedHmiButtonEventScriptCode`.
+9. Confirm readback metadata from `SetUnifiedHmiButtonEventScriptCode`.
 10. Save only after readback succeeds.
+
+## SyntaxCheck Is Opt-In (issue #36)
+
+Writing ScriptCode used to always call the Openness `SyntaxCheck()` on the script object.
+On TIA V21 that call can throw `NonRecoverableException` and take the whole Portal process
+with it, so the script that was just written is lost together with the session. The check was
+never the point of the call - writing the script was - so it no longer runs by default.
+
+| | `syntaxCheck=false` (default) | `syntaxCheck=true` |
+|---|---|---|
+| Writes ScriptCode | Yes | Yes |
+| Calls Openness `SyntaxCheck()` | No | Yes |
+| `meta.syntaxCheckStatus` | `skipped` | `ran`, `unavailable`, or `faulted` |
+| `meta.syntaxErrorCount` | **absent** | present |
+| Risk of crashing TIA V21 | None from this call | Real, intermittent |
+
+Two rules for reading the result:
+
+- **A missing `syntaxErrorCount` means NOT CHECKED, never zero errors.** The default path
+  deliberately omits the key rather than reporting `0`, so no caller can mistake
+  "we did not look" for "we looked and it was clean".
+- **If the check kills the Portal process, the tool no longer reports success.** That
+  outcome is not "this step failed and can be retried" - every handle is dead and the
+  unsaved script is gone. The tool now says so and tells you to reconnect, re-apply with
+  `syntaxCheck=false`, and save.
+
+Lint the script offline with `BuildUnifiedHmiButtonActionScript` instead; it needs no TIA
+connection and cannot crash anything. Reserve `syntaxCheck=true` for the case where you
+specifically need TIA's own verdict on a hand-written script and can afford to lose the session.
 
 ## Temporary Project Validation
 

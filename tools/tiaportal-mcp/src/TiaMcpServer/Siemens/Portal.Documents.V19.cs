@@ -1,4 +1,4 @@
-#if TIA_V19
+﻿#if TIA_V19
 using System.Collections.Generic;
 using Siemens.Engineering.SW.Blocks;
 
@@ -13,6 +13,10 @@ namespace TiaMcpServer.Siemens
     /// </summary>
     public partial class Portal
     {
+        public IReadOnlyList<string> LastExportAsDocumentsFailures { get; private set; } = new List<string>();
+        public IReadOnlyList<string> LastImportFromDocumentsFailures { get; private set; } = new List<string>();
+        public int LastImportFromDocumentsScanned { get; private set; }
+
         public bool ExportAsDocuments(string softwarePath, string blockPath, string exportPath, bool preservePath = false)
         {
             Capability.RequireSupported(TiaFeature.DocumentExport);

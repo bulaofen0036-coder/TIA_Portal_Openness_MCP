@@ -21,6 +21,12 @@ namespace TiaMcpServer.Siemens
             Api.Global.Openness().Initialize(tiaMajorVersion: tiaMajorVersion);
         }
 
+        // Pure check — does NOT add the user or prompt UAC. Use for read-only diagnosis.
+        public static bool IsUserInGroupNoFix()
+        {
+            return Api.Global.Openness().IsUserInGroup();
+        }
+
         public static async Task<bool> IsUserInGroup()
         {
             if (Api.Global.Openness().IsUserInGroup())

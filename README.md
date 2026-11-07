@@ -1,198 +1,297 @@
-# TIA Portal MCP 完整交付包（**v2.2.1** / V20+V21 + S7DCL + CLI + 在线只读监控）
+﻿# TIA Portal MCP Server (V20 + V21 · S7DCL · CLI · read-only online monitoring · one-click config · Doctor)
 
-[English](README.en.md) · **中文**
+> Current version: see the Release badge below and [CHANGELOG.md](CHANGELOG.md) (this README no longer hardcodes a version).
+
+**English** · [中文](README.zh-CN.md)
+
+> **v2.0 — the same exe is also a declarative CLI (`tia`).** Any AI emits a
+> YAML/JSON spec, any engineer runs one command (`tia gen spec.yaml`) — no MCP
+> client required. Verbs: `gen` / `patch` / `compile` / `describe` / `export` /
+> `import` / `prewarm` / `schema` / `version`. Exit code 0/1/2. See
+> `docs/CLI_quickstart.md`. The MCP server behaviour is unchanged.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Release](https://img.shields.io/github/v/release/bulaofen0036-coder/TIA_Portal_Openness_MCP)](https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP/releases) [![validate-bundle](https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP/actions/workflows/validate.yml/badge.svg)](https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP/actions/workflows/validate.yml)
 
-> **免费开源（MIT）**：服务器**无需任何 license key** 即可运行，**不含任何授权校验代码**。
+> **Free & open (MIT).** The server runs with **no license key** — there is no
+> license-enforcement code at all.
 
-![架构图](docs/assets/architecture.svg)
+> 🖥️ **Don't want to wire up an MCP client yourself?** Try **[TIA 助手 (TIA Assist)](https://aeenhance.com/)** —
+> the desktop edition built on this engine: unzip and run, built-in AI assistant, and every write to your
+> project waits for your approval first.
+> 👉 [aeenhance.com](https://aeenhance.com/) · [1-minute demo](https://aeenhance.com/#demo) · Trial: **bulaofen0036@gmail.com** · [Comparison ↓](#tia-助手-tia-assist--the-desktop-edition)
 
-在 **Windows + TIA Portal V20 或 V21** 下，通过 **MCP（stdio 或 HTTP）** 驱动博途：建项目、加硬件、生成 PLC（Tag/UDT/DB/SCL/LAD）、生成 **WinCC Unified** 画面与事件、编译诊断、保存。  
-包内含 **已编译运行时**、Skill、静态工具清单、能力矩阵、PLC/HMI 模板、**一键可读的项目蓝图**与手册。**不要求**另行克隆源码仓库。
+![Architecture](docs/assets/architecture.svg)
 
-## ⚡ 最快上手（3 步，零编程·CLI 路线）
+Drive **Siemens TIA Portal V20 or V21** from any **MCP** client (stdio or HTTP):
+create projects, add hardware, generate PLC objects (Tag / UDT / DB / SCL / LAD),
+build **WinCC Unified** screens and events, compile-and-diagnose, and save —
+all through natural-language tool calls. The bundle ships **prebuilt runtimes**,
+a Skill spec, a static tool list, a capability matrix, PLC/HMI templates,
+one-shot project blueprints, and a manual. **No separate source clone required**
+to run.
 
-> 第一次用？**不需要 MCP 客户端、不需要写代码。** 装好 TIA 后照这 3 步，几分钟内生成第一个工程。
-> （想接 Cursor / Claude Desktop 等 AI 客户端走 MCP？跳到下方 [上手步骤](#上手步骤)。）
+> Works with any MCP-capable client — Cursor, VS Code, Claude Desktop, or your
+> own HTTP client — using the same `TiaMcpServer.exe`.
 
-1. **准备**：装好 **TIA Portal V20 或 V21** + **.NET Framework 4.8**；把当前 Windows 用户加入本地组 **`Siemens TIA Openness`**，注销重登一次。**装的是哪个版本就用哪个**——交付包根目录已备好 `tia.cmd`（V21）/ `tia-v20.cmd`（V20），其余路径自动选。
-2. **预热（可选但强烈推荐）**：双击 `scripts\预热.bat`，留着这个窗口。它常驻一个无界面 TIA，让之后每条命令 **~1 秒**连上（不预热则每次冷启动约 3 分钟）。用完按 `Ctrl+C` 关闭。
-3. **生成工程**：把现成模板 `templates\project-blueprints\scaffold_spec_motor.json`（或 `scaffold_spec_start_stop.json`）**拖到 `scripts\生成工程.bat` 图标上**——一条龙建项目→加 PLC/HMI→写块→编译→存盘。退出码 `0` 即成功。
-   - 想改成自己的需求：让任意 AI 照 [`docs/AI_spec_prompt.md`](docs/AI_spec_prompt.md) 产出一份 spec（YAML/JSON 都行），再拖给 `生成工程.bat`。
-   - 命令行等价写法：把根目录加进 PATH 后，`tia gen <spec>`（先 `--dry-run` 离线校验更稳）。
+## 🆕 v2.5.0 — put a TIA Portal project under Git (Version Control Interface)
 
----
+TIA Portal projects are binary, so Git cannot diff them — which is why "version
+control" in this field has long meant a pile of dated *Save As* folders.
+The V21 **Version Control Interface** maps a project onto an ordinary folder,
+**one text file per block**, so it can be diffed, committed and reviewed.
+This release wraps the whole round-trip into a few commands — **you never have to
+click anything inside the TIA Portal UI**.
 
-## v2.0.0 新功能 —— `tia` 命令行（门槛最低、任意 AI 可用）
+One sentence to your AI client is enough:
 
-> **同一个 exe 既是 MCP 服务，也是命令行。** 任意 AI 产出一份 YAML/JSON spec，任意工程师跑一条命令即可从零建/改工程——**不需要 MCP 客户端、不需要安装**。底层完全复用现有引擎。详见 [`docs/CLI_quickstart.md`](docs/CLI_quickstart.md)。
+```
+Put the current project under Git, use D:\repos\my-plc as the workspace
+```
 
-- **`tia gen <spec.yaml|json>`**：一条命令从 spec 建完整工程（= `ScaffoldProject`）。`--dry-run` 离线校验、`--json` 机器可读。
-- **`tia patch <spec>`**：把 spec **增量 upsert 进已有工程**（spec 内 `projectPath` 指向 `.apXX`），未提及的元素不动；`--no-overwrite` 保护手改的 LAD 代码块。
-- 还有 `tia compile / describe / export / import / prewarm / schema / version`。退出码 **0=成功 / 1=有失败步骤 / 2=错误**。
-- **`tia` 命令入口**：交付包根目录的 `tia.cmd`（V21）/ `tia-v20.cmd`（V20）——把根目录加进 PATH 即可随处 `tia gen ...`，不必记忆深层 exe 路径。
-- **零编程上手**：把 spec 拖到 `scripts\生成工程.bat` 上即可（V21 缺失自动回退 V20）；`scripts\预热.bat` 常驻 headless 实例让后续命令 ~1s 连上。
-- **现成模板开箱即用**：`templates/project-blueprints/` 的启停/电机 spec 直接 `tia gen` 即可，`tia` 自动解析其中 `__BUNDLE__` 为交付包根目录，无需手改路径。
-- **让任意 AI 生成 spec**：见 [`docs/AI_spec_prompt.md`](docs/AI_spec_prompt.md) —— 通用契约「产出一份 spec」，不要求 AI 支持 MCP。
-- **YAML + JSON 双解析**：JSON 首选（零歧义），YAML 便于人读写；同一 spec 两者产出一致。
+It creates the workspace → **maps the whole project automatically** (hundreds of
+blocks in one command, no manual ticking) → exports the text, and you `git commit`.
+Later, to see what changed:
 
-> 仍是双 V20/V21 binary、仍是完整 MCP 服务（`tia` verb 之外行为不变）。CLI 与 MCP 共享同一引擎。
+```
+GetVersionControlStatus(changedOnly=true)
+→ A3_4_Hoist | Unequal        ← per block, not per file
+```
 
-## v1.0.0 新功能（快、好用、不出错）
+- **Covered**: FC / FB / OB / DB, PLC tag tables, UDTs — the whole software side.
+  Hardware configuration and know-how-protected blocks are **not** covered by the
+  VCI; the tool reports them explicitly instead of skipping them silently.
+- A block **must compile before it can be exported** (a TIA limitation); change
+  *detection* is unaffected and works even on unsaved edits.
+- Companion `tools/vci-watch/`: after each successful compile it auto-exports,
+  writes the CHANGELOG and runs `git commit` — the engineer does nothing.
 
-- **默认 headless 启动，连接快 ~10×**：连 TIA 默认无界面（`WithoutUserInterface`），冷启动从约 200–340s 降到约 10–28s。要肉眼看博途时，启动 exe 加 `--with-ui`（或生成完直接打开 `.ap21`）。
-- **`ScaffoldProject` —— 一句话生成完整工程**：传一个 JSON `spec`，一次调用完成「建项目 → 加 PLC/HMI 硬件 → UDT/DB/标签表 → SCL/LAD 块 → 编译 → HMI 连接/画面/变量 → 保存」，返回逐步报告。把约 20 步的 runbook 收成一次调用。`dryRun=true` 可离线校验 spec 再真跑。现成模板见 `templates/project-blueprints/scaffold_spec_start_stop.json`（启停）、`scaffold_spec_motor.json`（电机）。
-- **常驻实例，会话秒连（可选）**：开一个终端跑 `python scripts/prewarm_tia.py` 挂着，之后每个会话 `Connect` 约 0.8–1s。
-- **更不易出错**：HMI 软件路径自动探测（不再写死 `HMI_RT_1`）；连接对挂死/孤儿 TIA 实例加超时跳过；单块导入（`ImportFromDocuments`/`ImportBlock`）导入后回读确认并返回 `Meta.verified`。
-- 工具收敛至 **180**（下线 4 个 `Export*ToTemp` 变体，并为易混的 Export/Import 工具补消歧描述）。
+📖 Full usage and the three behaviours you must know →
+**[docs/version-control-git.md](docs/version-control-git.md)**
 
-**本次更新（相对 20260512 包）**
+## ⚡ Fastest start (3 steps, no coding — CLI path)
 
-- **稳定生成硬门槛（v0.0.39）**：基于 v0.0.38，`PlcBuildAndImport` 会返回 `CapabilityDecision` / `CapabilityWarnings` / `RecommendedNextActions`；`ApplyUnifiedHmiScreenDesignJson(strict=true)` 默认遇到 HMI 属性写入失败即报错；`EnsureUnifiedHmiTag(requireVerifiedBinding=true)` 默认要求读回 `SymbolicVerified` 或 `AbsoluteVerified`，避免“生成成功但变量未真实链接”的公开版体验问题。
-- **双版本支持（V20 + V21）**：包内含两个 exe — `bin/Release/net48/TiaMcpServer.exe`（V21 编译）与 `bin-v20/Release/net48/TiaMcpServer.exe`（V20 编译）。
-  - 二者**必须分别使用**，不能互换：V21 用 split DLL（`Siemens.Engineering.Base/Step7/...`），V20 用单体 `Siemens.Engineering.dll`，IL 层面绑定不同。
-  - 两份 exe 都接受新 CLI 参数 `--tia-portal-location <path>`，配合 `--tia-major-version <20|21>` 用于非标准安装位置。
-- **S7DCL/SCL 文本格式工具**：`ExportAsDocuments` / `ExportBlocksAsDocuments` / `ImportFromDocuments` / `ImportBlocksFromDocuments` 在 V20+ 项目里以 SIMATIC SD 文本格式（`.s7dcl + .s7res`）导入导出程序块，比 SimaticML XML 更易读、diff 友好；描述里标注「PREFERRED on V21+」引导 AI 优先选用。
-- **V21 端到端验证**（DemoProjects/MCP_Demo_Rich_20260523）：8 块导出 + 8 块导入回环 14.7s。
-- **V20 端到端验证**（江夏测试5T车_V20）：CompileSoftware → ExportBlocksAsDocuments，51 个 `.s7dcl` + 33 个 `.s7res` 全量导出成功。LAD 块以 `RUNG / I_Contact / Coil / TON{...}` 文本表达，diff 友好。
+> First time? **No MCP client, no code.** Once TIA is installed, these 3 steps
+> generate your first project in minutes.
+> (Wiring an AI client like Cursor / Claude Desktop over MCP instead? See
+> [Quick Start](#quick-start) below.)
 
-**与 IDE 无关**：凡支持 MCP 的客户端（Cursor、VS Code、Claude Desktop、自研 HTTP 客户端等）均可使用同一 `TiaMcpServer.exe`。若某 IDE 中「看不到某个工具」，属于 **客户端工具描述符/缓存** 问题，不是交付包裁剪能力；见 `docs/mcp-ide-and-tool-visibility.md`。
+1. **Prepare**: install **TIA Portal V20 or V21** + **.NET Framework 4.8**; add your
+   Windows user to the local **`Siemens TIA Openness`** group and **log off/on once**
+   (the group is not effective until re-login — the single most common blocker).
+   **Use the exe matching your installed version** — the bundle root ships
+   `tia.cmd` (V21) / `tia-v20.cmd` (V20); all other paths are auto-resolved.
+   - **Health-check first**: run `tia.cmd doctor` (V20: `tia-v20.cmd doctor`) once after
+     install — it checks TIA install / exe-version match / Openness group / host
+     registration and prints the exact fix per problem (`--fix` auto-adds the group).
+2. **Prewarm (optional, recommended)**: double-click `scripts\预热.bat` and leave the
+   window open. It keeps one headless TIA resident so every later command connects in
+   **~1s** (without it, each run cold-starts ~3 min). Press `Ctrl+C` to close.
+3. **Generate a project**: drag a ready-made template
+   `templates\project-blueprints\scaffold_spec_motor.json` (or
+   `scaffold_spec_start_stop.json`) **onto `scripts\生成工程.bat`** — it creates the
+   project → adds PLC/HMI → builds blocks → compiles → saves in one shot. Exit code
+   `0` means success.
+   - To customize: have any AI emit a spec per [`docs/AI_spec_prompt.md`](docs/AI_spec_prompt.md)
+     (YAML or JSON), then drag it onto `生成工程.bat`.
+   - CLI equivalent: add the bundle root to PATH, then `tia gen <spec>` (start with
+     `--dry-run` for an offline check).
 
-**与源码仓库无关**：接收方只需解压本包；在 MCP 配置里把 `command` 指到本包内的 `tools\tiaportal-mcp\src\TiaMcpServer\bin\Release\net48\TiaMcpServer.exe`（见 `cursor-mcp.example.json`，将 `REPLACE_ME` 换成本包根目录）。其它文档若出现 `…\PID博途块\…` 等开发机路径，仅为作者构建位置，**不要求**克隆该仓库。
+## TIA 助手 (TIA Assist) — the desktop edition
 
----
+[![TIA Assist — talk to it, it drives TIA Portal](https://aeenhance.com/img/og-cover.jpg)](https://aeenhance.com/)
 
-## 多版本分支与社区贡献
+This repository is the **engine**: you bring your own AI client (Cursor, Claude, VS Code…) and mount it.
+If you'd rather **open an app and start working** — or hand it to colleagues and commissioning engineers
+who have never heard of MCP — the author also ships **[TIA 助手 (TIA Assist)](https://aeenhance.com/)**:
+the same engine inside a Windows desktop app, with the AI assistant, online monitoring and trend
+recording built into the UI. *(The UI and website are currently Chinese-only.)*
 
-`master` 始终是 **TIA Portal V20 / V21** 稳定主线，默认行为不随旧版本改动。对更早的 TIA Portal / Openness 版本，我们按版本开设独立分支，欢迎社区在对应分支上贡献与维护：
+![TIA Assist demo: while writing an SCL block, destructive operations get their own confirmation dialog](https://aeenhance.com/video/demo-write.jpg)
 
-| 分支 | 目标版本 | 维护方式 |
-|------|----------|----------|
-| `master` | TIA Portal V20 / V21 | 官方主线 |
-| `v19` | TIA Portal V19 / Openness V19 | 社区贡献 |
-| `v18` | TIA Portal V18 / Openness V18 | 社区贡献 |
-| `v17` | TIA Portal V17 / Openness V17 | 社区贡献 |
-| `v16` | TIA Portal V16 / Openness V16 | 社区贡献 |
+<sub>↑ Real screen capture (demo project): asked to write a duty/standby rotation FB for two pumps, it hit
+4 compile warnings on the first build and fixed them itself down to 0 errors / 0 warnings — pausing for a
+human "Yes" before every write. [Watch the full recording →](https://aeenhance.com/#demo)</sub>
 
-**怎么贡献**
+| | Open-source MCP (this repo) | TIA 助手 (desktop edition) |
+|---|---|---|
+| Form | MCP server + `tia` CLI, driven by your own AI client | Windows desktop app, **no install — unzip and run**; V20 / V21 engines bundled and picked automatically |
+| AI | Bring your own (Cursor / Claude Desktop / VS Code …) | **Built-in AI assistant**; DeepSeek, Qwen, Kimi, Zhipu or any OpenAI-compatible API — or a local **Ollama** model, fully offline, project data never leaves the plant |
+| Write safety | Up to your client | **Every write waits for your approval**; irreversible operations (e.g. deleting blocks) are confirmed separately; hash-chained audit log |
+| Online values | Read-only (S7 absolute addresses / OPC UA) | **No TIA Portal needed** — symbolic read/write over S7CommPlus; writes off by default, forced read-back when enabled |
+| Trend recording | — | Record, overlay/split, export and replay CSV |
+| Environment check | `tia.cmd doctor` (CLI) | Graphical per-item check of runtimes / Openness allow-list / user group with the fix for each, one-click diagnostic bundle |
+| License | MIT, free | Commercial — **free trial available** |
 
-- 针对某个旧版本的适配 / 修复，请把 PR 提到**对应的版本分支**（如 V17 的改动 → `v17`），不要直接进 `master`。
-- 旧版本的 Openness API 与块 XML 差异较大，分支化可以让各版本独立验证、互不影响主线用户。
-- 若某项修复足够通用且稳定，欢迎再单独拆一个小 PR 回 `master`。
-- 提 PR 时请**不要提交**：TIA 工程文件（`.apXX`）、`bin` / `obj`、日志、截图、备份、本机绝对路径产物、临时验证工程。
+**Try it**: email **bulaofen0036@gmail.com** with your TIA Portal version (V20 / V21) and what you want to
+try → get the trial package, run it, send back the machine code and receive a license key.
+The safest first run: let it explain your own project **read-only** and check whether it got it right.
+More: [AI assistant](https://aeenhance.com/assistant) · [Online debugging](https://aeenhance.com/online) · [Safety boundaries](https://aeenhance.com/security) · [Manual](https://aeenhance.com/manual) · [Get started](https://aeenhance.com/start)
 
-> 想认领某个版本的维护？在 Issues 里说一声即可。
+> Both run the same engine: bugs fixed here are fixed there too, and issues reported here help both.
 
----
+## Highlights
 
-## 上手步骤
+- **Stability-first public generation (v0.0.39).** `PlcBuildAndImport` now returns
+  `CapabilityDecision`, `CapabilityWarnings`, and `RecommendedNextActions`;
+  `ApplyUnifiedHmiScreenDesignJson(strict=true)` fails when any HMI property write
+  fails; `EnsureUnifiedHmiTag(requireVerifiedBinding=true)` requires readback as
+  `SymbolicVerified` or `AbsoluteVerified`.
+- **Dual-version support (V20 + V21).** Two separate executables, not
+  interchangeable: V21 binds the split DLLs (`Siemens.Engineering.Base/Step7/…`),
+  V20 binds the monolithic `Siemens.Engineering.dll`.
+  - V21 → `tools/tiaportal-mcp/src/TiaMcpServer/bin/Release/net48/TiaMcpServer.exe`
+  - V20 → `tools/tiaportal-mcp/src/TiaMcpServer/bin-v20/Release/net48/TiaMcpServer.exe`
+- **Version-safe imports.** Generated Openness XML is normalized to the connected
+  portal version on import, so a V20 portal no longer rejects blocks with
+  *"engineering version 'V21' is not supported"*.
+- **S7DCL textual format.** `ExportAsDocuments` / `ExportBlocksAsDocuments` /
+  `ImportFromDocuments` / `ImportBlocksFromDocuments` read/write the diff-friendly
+  SIMATIC SD text format (`.s7dcl` + `.s7res`) on V20+ and are flagged *PREFERRED on
+  V21+*. The SimaticML XML chain remains for backward compatibility.
+- **235 tools** across project, hardware, PLC, HMI, and online operations,
+  layered `[L0]`/`[L1]`/`[L2]` so a normal session only needs L0 + L1.
 
-1. **环境准备**  
-   - .NET Framework **4.8**、**TIA Portal V20 或 V21** 已安装；  
-   - 当前用户加入 **`Siemens TIA Openness`** 本地组，注销重登；  
-   - 三选一定位博途安装根：  
-     a) 启动 exe 时传 `--tia-portal-location "D:\app\TIA20\Portal V20"`（推荐，非标准安装位置必用）；  
-     b) 用户环境变量 `TiaPortalLocation` 指向博途安装根；  
-     c) 让程序自动从注册表 `HKLM\SOFTWARE\Siemens\Automation\_InstalledSW\TIAP{20|21}\TIA_Opns\Path` 读取。  
-   - 当机器装了多个版本时显式传 `--tia-major-version 20`（或 21）以免自动选最高版；  
-   - 首次连接时在 TIA 弹窗中授权 **Openness**。
+## Requirements
 
-2. **挂载 MCP**  
-   - 复制 `cursor-mcp.example.json` 片段到任意支持 MCP 的客户端（Cursor / VS Code / Claude Desktop / 自研 HTTP 客户端均可）；  
-   - 将路径中的 **`REPLACE_ME`** 替换为 **本包根目录**；
-   - **按 TIA 版本选 exe 路径**：  
-     - V21 → `…\tools\tiaportal-mcp\src\TiaMcpServer\bin\Release\net48\TiaMcpServer.exe`  
-     - V20 → `…\tools\tiaportal-mcp\src\TiaMcpServer\bin-v20\Release\net48\TiaMcpServer.exe`  
-   - 非标准安装位置必须在客户端 `args` 里加 `--tia-portal-location "<安装根>" --tia-major-version <20|21>`，例如 `"--tia-portal-location","D:\\app\\TIA20\\Portal V20","--tia-major-version","20"`。
+- Windows + **.NET Framework 4.8**
+- **TIA Portal V20 or V21** installed
+- Current user added to the **`Siemens TIA Openness`** local group (re-login after)
 
-3. **首次调用顺序**  
-   - `Bootstrap` → `Connect` → `OpenProject`（或 `CreateProject`）→ `GetProjectTree`，从树中读取真实的 `PLC_xxx` / `HMI_RT_xxx` 路径再继续。
+## Quick Start
 
----
+1. **Locate the portal install root** (one of):
+   - pass `--tia-portal-location "D:\app\TIA20\Portal V20"` when launching (recommended for non-default installs);
+   - set the `TiaPortalLocation` user environment variable;
+   - let it auto-read `HKLM\SOFTWARE\Siemens\Automation\_InstalledSW\TIAP{20|21}\TIA_Opns\Path`.
+   With multiple versions installed, pass `--tia-major-version 20` (or `21`) explicitly.
+2. **Mount the MCP — one command, fully automatic.**
+   Double-click `配置MCP.bat` in the bundle root (V20: `配置MCP-v20.bat`), or run `tia.cmd config`.
 
-## 脱机校验（不启动博途）
+   > Engine exe locations by distribution: Release zip →
+   > `tools\tiaportal-mcp\src\TiaMcpServer\bin\Release\net48\` (V21) /
+   > `...\bin-v20\Release\net48\` (V20); git clone → `runtime\v21\`
+   > (V20 runtime is not shipped in git — download the Release zip).
+   > All launcher scripts resolve both layouts automatically.
 
-在项目根执行：
+   It self-discovers everything: its own absolute path, the installed TIA Portal
+   (registry) and version, and the version-matching exe (V20/V21 picked for you) —
+   then writes the `tia-portal` entry into every AI host detected on this machine:
+   **Claude Desktop / Claude Code / Cursor / VS Code** (existing config backed up
+   as `.bak`, other servers preserved). Restart the AI client to load it.
+   Options: `config --host vscode` (or `claude|claude-code|cursor`), `config --print`
+   to copy a snippet manually. The server lists **65 core tools of 235 by default**
+   (about 57 KB instead of 196 KB of tool schema per turn) so weaker models are not drowned
+   and VS Code/Copilot's 128-tool cap and Windsurf's 100 never trip. Nothing is lost: the
+   model reaches every other tool on demand with `FindTools("plain words")` +
+   `CallTool(name, argumentsJson)`, and the handshake instructions tell it so. Pass
+   `config --full` to list the whole tool surface instead.
+   If anything fails to connect, run `tia.cmd doctor` (v2.2.8): a one-shot environment
+   check (TIA install, exe/version match, Openness group, host registration) with the
+   exact fix per problem; `--fix` auto-adds the Openness group. Since v2.2.7 the exe also **self-routes**: if it was
+   built for a different TIA major version than the machine has, it transparently
+   re-execs the matching sibling exe — grabbing the "wrong" exe no longer crashes.
+   Manual fallback: copy the snippet from `cursor-mcp.example.json`, replace
+   `REPLACE_ME` with this bundle's root, pick the exe path by TIA version; for
+   non-default installs add `"--tia-portal-location","<root>","--tia-major-version","<20|21>"` to `args`.
+3. **First call sequence:** `Bootstrap` → `Connect` → `OpenProject` (or
+   `CreateProject`) → `GetProjectTree`, then read the real `PLC_*` / `HMI_RT_*`
+   paths from the tree before continuing.
+
+### Offline validation (no TIA needed)
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Validate-Bundle.ps1
 ```
 
-校验：运行时存在、蓝图列出的文件齐全、`manifest/tools-list.json` 与清单工具数一致、各 PLC/HMI JSON 可解析。  
-加 `-Strict` 时对清单与矩阵有更严比对（可选）。
+Checks runtime presence, blueprint file completeness, tool-count consistency, and
+that PLC/HMI JSON parse. Add `-Strict` for tighter manifest/matrix comparison.
 
----
+## Build from source
 
-## 两条工作路径
+The full source lives under `tools/tiaportal-mcp/src/TiaMcpServer` (51 `.cs`).
 
-| 目标 | 读什么 | MCP 顺序概要 |
-|------|--------|----------------|
-| **从零生成 PLC + Unified HMI 全套** | `templates/project-blueprints/full_plc_hmi_project.json` + `docs/full-project-generation-runbook.md` | `Bootstrap` → `CreateProject` → 硬件与网络 → **PLC：`PlcBuildAndImport` 每项先 `dryRun=true`** → `CompileAndDiagnosePlc` → **HMI：`EnsureUnified*` + `ApplyUnifiedHmiScreenDesignJson` + `BindUnifiedHmiTagDynamization` + `EnsureUnifiedHmiButtonAction`** → `SaveProject` |
-| **只验证 MCP/LAD/SCL 导入链路** | `templates/mcp-full-e2e-verify/README.md` | 在已有工程中按说明导入块与标签，再编译 |
+```powershell
+# V21 (split DLLs)
+dotnet build tools/tiaportal-mcp/src/TiaMcpServer/TiaMcpServer.csproj -c Release
+# V20 (monolithic DLL) — clean intermediates first if you just built the other target
+dotnet build tools/tiaportal-mcp/src/TiaMcpServer/TiaMcpServer.V20.csproj -c Release
+```
 
----
+## Capabilities & boundaries
 
-## 文档地图
+**Can do:** projects & hardware, PROFINET, declarative PLC import, LAD XML import,
+WinCC Unified connections / tags (absolute addressing) / screens / button
+Down·Up / dynamization, compile-and-diagnose, save.
 
-| 路径 | 说明 |
+**Not bundled:** Siemens install media, field projects, business-specific
+technology. `reference/` is style/instruction reference only. See `notBundled` in
+`manifest/package-manifest.json`. For what Openness **cannot** do, see
+`手册/openness-limitations.md`.
+
+## Version branches & contributing
+
+`master` is always the stable line for **TIA Portal V20 / V21**; its default
+behaviour never changes to accommodate older releases. Earlier TIA Portal /
+Openness versions live on their own branches, and contributions there are welcome:
+
+| Branch | Target version | Maintenance |
+|--------|----------------|-------------|
+| `master` | TIA Portal V20 / V21 | Official main line (day-to-day work lands here) |
+| `v21` | TIA Portal V21 / Openness V21 | Official; forked from master, V21-only adaptations |
+| `v20` | TIA Portal V20 / Openness V20 | Official; forked from master, V20-only adaptations |
+| `v19` | TIA Portal V19 / Openness V19 | Community |
+| `v18` | TIA Portal V18 / Openness V18 | Community |
+| `v17` | TIA Portal V17 / Openness V17 | Community |
+| `v16` | TIA Portal V16 / Openness V16 | Community |
+
+**How to contribute**
+
+- Send a fix or adaptation for an older release to **its own branch** (a V17 change
+  goes to `v17`), not to `master`.
+- `v21` / `v20` are official lines: **anything that applies to both versions still
+  goes to `master`.** Only use a version branch when a fix would change the other
+  version's behaviour or depends on an API that exists in one version only — that
+  way shared code stays in one place.
+- Older Openness APIs and block XML differ substantially, so branching lets each
+  version be validated independently without destabilising main-line users.
+- If a fix turns out to be general and stable, a small follow-up PR back to
+  `master` is very welcome.
+- Please **do not commit**: TIA project files (`.apXX`), `bin` / `obj`, logs,
+  screenshots, backups, machine-specific absolute paths, or scratch test projects.
+
+> Want to adopt one of the version branches? Just say so in an Issue.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow, and
+[SECURITY.md](SECURITY.md) for reporting vulnerabilities.
+
+## Documentation map
+
+| Path | What |
 |------|------|
-| `tools/tiaportal-mcp/skill/SKILL.md` | **主规范**：工具分层、参数陷阱、Unified HMI schema、LAD/SCL 边界 |
-| `manifest/tools-list.json` | 静态工具名与层级；**运行时权威列表**以连上服务器后的 `tools/list` 为准 |
-| `docs/tool-capability-matrix.md` | 能力矩阵（静态索引） |
-| `docs/full-project-generation-runbook.md` | 完整项目生成步骤 |
-| `docs/basic-plc-template-library.md` | PLC 指令与模板说明 |
-| `docs/scl-instruction-library.md` | **SCL 指令库**（控制流、缩放、定时计数、PID、斜坡、UDT 等中性模板） |
-| `docs/lad-instruction-library.md` | **LAD 指令库**（触点/线圈/比较/算术/定时/计数与 XML 注意点） |
-| `docs/hmi-plc-tag-binding-and-addressing.md` | **HMI↔PLC**：默认绝对地址、`DB200` 字节排布、红字排障 |
-| `docs/hmi-connection-driver-matrix.md` | **通讯驱动选择**（按 CPU 系列匹配 CommunicationDriver） |
-| `docs/mcp-ide-and-tool-visibility.md` | IDE 无关与工具列表权威来源（`tools/list`） |
-| `docs/optional-reference-materials.md` | 与仓库 `reference` 目录配合的样板工程说明 |
-| `docs/plc-network-patterns-expanded.md` | PLC 网络/指令扩展模式（加长程序段的写法） |
-| `docs/tools/*.md` | 分主题：PLC 构建、硬件、HMI 动作等 |
-| `手册/quickstart.md` | 英语速启 + 与本 README 对照 |
-| `手册/openness-limitations.md` | Openness **不能做** 的事项 |
-| `手册/error-model.md` | 错误形态说明 |
-| `手册/TIA_NL_INTENT_RECIPES.md` | 自然语言 → 工具序列索引 |
-| `templates/plc/README.md` / `templates/hmi/README.md` | 模板索引 |
+| `tools/tiaportal-mcp/skill/SKILL.md` | **Primary spec**: tool layers, parameter traps, Unified HMI schema, LAD/SCL boundaries |
+| `manifest/tools-list.json` | Static tool names/layers (runtime authority is `tools/list` after connect) |
+| `docs/tool-capability-matrix.md` | Capability matrix |
+| `docs/full-project-generation-runbook.md` | End-to-end project generation |
+| `docs/scl-instruction-library.md` / `docs/lad-instruction-library.md` | SCL / LAD instruction libraries |
+| `docs/hmi-connection-driver-matrix.md` | Communication-driver selection by CPU family |
+| `手册/quickstart.md` | English quick start |
+| `手册/TIA_NL_INTENT_RECIPES.md` | Natural-language → tool-sequence recipes |
 
----
-
-## 标准闭环（缩写）
+## Standard loop (abbreviated)
 
 ```text
 Bootstrap → Connect → CreateProject → AddDeviceWithFallback → AddHardwareCatalogDeviceWithProbe
 → ConnectDeviceNodesToProfinetSubnet → GetProjectTree → ValidateAutomationContext
-→ PlcBuildAndImport(dryRun=true 逐项) → PlcBuildAndImport(dryRun=false 按导入顺序)
+→ PlcBuildAndImport(dryRun=true per item) → PlcBuildAndImport(dryRun=false in import order)
 → CompileAndDiagnosePlc → EnsureUnifiedHmiConnection → EnsureUnifiedHmiTagTable → EnsureUnifiedHmiTag
 → EnsureUnifiedHmiScreen → ApplyUnifiedHmiScreenDesignJson → BindUnifiedHmiTagDynamization
 → EnsureUnifiedHmiButtonAction → SaveProject → Disconnect
 ```
 
----
+## Contact
 
-## 能力范围与边界
+- **Bugs / feature requests**: please open an [Issue](https://github.com/bulaofen0036-coder/TIA_Portal_Openness_MCP/issues) so others hitting the same problem can find it.
+- **TIA 助手 trial, custom development, partnerships**: **bulaofen0036@gmail.com**
+- Desktop edition: **[aeenhance.com](https://aeenhance.com/)**
 
-**可做**：项目与硬件、PROFINET、PLC 声明式导入、LAD XML 导入、Unified HMI 连接/变量（默认绝对地址）/画面/按钮 Down·Up/动态化、编译诊断、保存。  
-
-**包内不含**：西门子安装介质、现场导出工程、业务专用工艺。`reference/` 仅作为风格与指令参考，不参与自动化生成；详见 `manifest/package-manifest.json` 中 `notBundled`。
-
-## HMI 绑定策略
-
-- **统一采用绝对地址**：HMI 接口 DB `DB_HMI_Interface` 使用 **非优化（Standard）** 访问，字节偏移见 `templates/plc/plcbuild-json/db_hmi_interface.json` 的 `absoluteLayout`。  
-- **变量调用必须传地址**：调用 `EnsureUnifiedHmiTag` 时，按蓝图 `tags[]` 同时传 `plcTag` 和 `address`。例如 `plcTag="DB_HMI_Interface.CmdEnable"`、`address="%DB200.DBX0.0"`；读回时应看到 `Connection=HMI_Connection_1` 且 `Address/LogicalAddress` 为 `%DB200...`。  
-- **通讯驱动按实际 PLC 设备选**：`EnsureUnifiedHmiConnection` 的 `plcName` 使用 `GetProjectTree` 的 PLC 软件节点；工具会解析实际 PLC 设备、站点、PN 节点和 CPU 系列，写入 Partner/Station/Node 与对应驱动。详见 `docs/hmi-connection-driver-matrix.md`。  
-- **导入顺序**：先 PLC 编译通过 → 建 HMI 连接 → 建变量表 → 建画面 → `BindUnifiedHmiTagDynamization` → `EnsureUnifiedHmiButtonAction`。
-
----
-
-## 内容索引（路径）
-
-| 路径 | 说明 |
-|------|------|
-| `tools/tiaportal-mcp/src/TiaMcpServer/bin/Release/net48/` | `TiaMcpServer.exe` 与依赖 |
-| `scripts/Validate-Bundle.ps1` | 交付包完整性校验 |
-| `templates/project-blueprints/full_plc_hmi_project.json` | 完整项目蓝图 |
-| `templates/plc/` | Tag、UDT、DB、FC、FB、LAD 配方、SCL 示例 |
-| `templates/hmi/` | Unified 多页 `designJson` |
-| `templates/mcp-full-e2e-verify/` | E2E 验证用导入素材 |
+> Siemens, TIA Portal, SIMATIC, STEP 7 and WinCC are trademarks of Siemens AG. This project and TIA 助手 are independently developed third-party tools with no affiliation with, agency for, or authorization from Siemens AG.

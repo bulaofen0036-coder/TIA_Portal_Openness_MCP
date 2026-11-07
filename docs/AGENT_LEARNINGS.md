@@ -13,6 +13,9 @@
 - [2026-10-25] `Siemens TIA Openness` 加组后必须注销重登，`whoami /groups` 里看得到才算生效。
 - [2026-10-25] 跨机 MCP 用 HTTP 时，`--http-prefix` 绑具体网卡 IP（不是 127.0.0.1），并配 URL ACL + 防火墙。
 - [2026-10-25] VM 的唯一网卡专用于 PLC 调试时，不要动它的桥接/网关；加第二块 host-only 网卡专供 MCP，网关和 DNS 留空。
+- [2026-10-26] 全量合并 master 2.7.8 到 v19：真实 merge 只有 `Program.cs` / `Portal.cs` 两个冲突；关键是 V19 运行时版本假设（Openness 门槛 `>=19`、`EngineRouter=19`、`bin-v19`），编译 0 错误不代表运行正确。
+- [2026-10-26] `ExportBlock` 只把 XML 写到引擎机器并返回路径；跨 VM/HTTP 时宿主机读不到。读程序逻辑用 `DescribeBlockLogic`（引擎内导出+解析，只回文本），原始 XML 才需要共享目录。
+- [2026-10-26] 大块逻辑用 `GetExport`/`SaveExport`（master 2.7.x 的 ExportStore）分页；全量合并后不要再自己加 `maxChars` 分页。
 
 ## 待观察（newest first）
 

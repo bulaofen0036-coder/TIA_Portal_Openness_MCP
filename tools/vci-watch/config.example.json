@@ -1,0 +1,15 @@
+{
+  "enginePath": "C:\\path\\to\\TIA_Portal_Openness_MCP\\runtime\\v21\\TiaMcpServer.exe",
+  "tiaMajorVersion": 21,
+  "projectFolder": "C:\\path\\to\\YourProject",
+  "workspaceFolder": "C:\\path\\to\\your-git-worktree",
+  "workspaceName": "git",
+  "gitAuthor": "tia-vci-watch <watch@local>",
+  "autoCompile": false,
+  "compileSoftwarePaths": [],
+  "cycleTimeoutSeconds": 600,
+  "lockTimeoutSeconds": 900,
+  "forceFullCheckMinutes": 60,
+  "minFullCheckMinutes": 10,
+  "pendingCompileCooldownMinutes": 30
+}

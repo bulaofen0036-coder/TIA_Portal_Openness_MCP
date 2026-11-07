@@ -1,8 +1,9 @@
 {
   "mcpServers": {
     "tia-portal": {
-      "command": "C:\\REPLACE_ME\\TIA_MCP_交付包\\tools\\tiaportal-mcp\\src\\TiaMcpServer\\bin\\Release\\net48\\TiaMcpServer.exe",
-      "args": [],
+      "comment": "推荐先试一键配置：双击 配置MCP.bat（V20 用 配置MCP-v20.bat），无需手改本文件。手动配置时：把 command 改成你解压/克隆目录下的 exe 绝对路径——交付 zip 用 tools\\tiaportal-mcp\\src\\TiaMcpServer\\bin\\Release\\net48\\TiaMcpServer.exe（V20 为 bin-v20\\Release\\net48）；git 克隆用 runtime\\v21\\TiaMcpServer.exe。非默认安装位置在 args 里加 --tia-portal-location 与 --tia-major-version。",
+      "command": "C:\\REPLACE_ME\\TIA_Portal_Openness_MCP\\runtime\\v21\\TiaMcpServer.exe",
+      "args": ["--tia-major-version", "21"],
       "env": {}
     }
   }

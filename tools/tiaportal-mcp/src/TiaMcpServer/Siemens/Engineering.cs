@@ -117,6 +117,25 @@ namespace TiaMcpServer.Siemens
             }
             catch { }
 
+            // 2b. Openness registrations: a V21 install may not write TIA_Opns at all
+            //     (see GetTiaPortalInstallPath), but it always registers its PublicAPI assemblies.
+            try
+            {
+                using var regBase = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+                using var openness = regBase.OpenSubKey(@"SOFTWARE\Siemens\Automation\Openness");
+                if (openness != null)
+                {
+                    foreach (var name in openness.GetSubKeyNames())
+                    {
+                        var m = System.Text.RegularExpressions.Regex.Match(name, @"^(\d+)\.\d+$");
+                        if (m.Success && int.TryParse(m.Groups[1].Value, out int ov)
+                            && GetInstallPathFromOpennessRegistry(ov) != null)
+                            candidates.Add(ov);
+                    }
+                }
+            }
+            catch { }
+
             // 3. Filesystem scan
             try
             {
@@ -138,6 +157,53 @@ namespace TiaMcpServer.Siemens
             return candidates.Count > 0 ? candidates.Max() : (int?)null;
         }
 
+        /// <summary>
+        /// Answer "will Resolver() actually find Siemens.Engineering at load time?" by walking the
+        /// exact same install path and search directories it does. A check that only asks the
+        /// registry whether TIA is installed says OK on a machine where Openness was never
+        /// installed — and the engine then dies with FileLoadException / "Could not find
+        /// installation path" on the first real call. Reuses the resolver's own private helpers so
+        /// the two cannot drift apart.
+        /// </summary>
+        public static (bool Ok, string? InstallPath, string? ResolvedDll, string? Problem) ProbeOpennessAssemblies()
+        {
+            string? installPath;
+            try { installPath = GetTiaPortalInstallPath(); }
+            catch (Exception ex) { return (false, null, null, "install path lookup threw: " + ex.Message); }
+
+            if (string.IsNullOrEmpty(installPath))
+            {
+                return (false, null, null,
+                    $"no TIA Portal V{TiaMajorVersion} install path (registry TIAP{TiaMajorVersion}\\TIA_Opns, " +
+                    $"Openness\\{TiaMajorVersion}.0\\PublicAPI, the TiaPortalLocation env var and --tia-portal-location were all checked)");
+            }
+
+            var versionString = TiaMajorVersion.ToString();
+            var searchDirectories = new[]
+            {
+                Path.Combine(installPath, "PublicAPI", $"V{versionString}"),
+                Path.Combine(installPath, "Bin", "PublicAPI")
+            };
+            var excluded = new[] { "V13", "V14", "V15", "V16", "V17", "V18", "V19", "V20" }
+                .Where(v => v != $"V{versionString}");
+
+            // V20 ships the monolithic Siemens.Engineering.dll; V21 splits it into
+            // Siemens.Engineering.Base/Step7/... — either one proves Openness is present.
+            foreach (var dll in new[] { "Siemens.Engineering.dll", "Siemens.Engineering.Base.dll" })
+            {
+                foreach (var dir in searchDirectories)
+                {
+                    string? found;
+                    try { found = FindAssemblyRecursive(dir, dll, excluded); }
+                    catch { continue; }
+                    if (found != null) return (true, installPath, found, null);
+                }
+            }
+
+            return (false, installPath, null,
+                $"found the TIA folder but no Siemens.Engineering(.Base).dll under {string.Join(" or ", searchDirectories)}");
+        }
+
         private static string? GetTiaPortalInstallPath()
         {
             // 1. Explicit CLI override (--tia-portal-location). Highest priority — needed when TIA
@@ -148,20 +214,120 @@ namespace TiaMcpServer.Siemens
                 return TiaPortalLocationOverride;
             }
 
-            // 2. env var (Cursor MCP env or user env): more reliable than registry across versions.
+            // 2. env var (Cursor MCP env or user env) — but it is version-agnostic and on
+            //    multi-version machines it typically points at ONE install (e.g. V21), which
+            //    used to hijack V20 assembly resolution ("Could not find DLL ... for version 20").
+            //    Only trust it when its path names the version we need (or names no version).
             var env = Environment.GetEnvironmentVariable("TiaPortalLocation");
-            if (!string.IsNullOrWhiteSpace(env) && Directory.Exists(env))
+            bool envUsable = !string.IsNullOrWhiteSpace(env) && Directory.Exists(env);
+            if (envUsable && PathMatchesVersion(env!, TiaMajorVersion))
             {
                 return env;
             }
 
+            // 3. Version-specific registry entry — authoritative on multi-version machines.
             var subKeyName = $@"SOFTWARE\Siemens\Automation\_InstalledSW\TIAP{TiaMajorVersion}\TIA_Opns";
 
             using (var regBaseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
             using (var tiaOpnsKey = regBaseKey.OpenSubKey(subKeyName))
             {
-                return tiaOpnsKey?.GetValue("Path")?.ToString();
+                var regPath = tiaOpnsKey?.GetValue("Path")?.ToString();
+                if (!string.IsNullOrWhiteSpace(regPath) && Directory.Exists(regPath))
+                {
+                    return regPath;
+                }
             }
+
+            // 3b. The Openness registration itself. V21 installs do not always write
+            //     _InstalledSW\TIAP21\TIA_Opns\Path (seen on V21 Upd2 installed on a non-C: drive),
+            //     and without another source the engine died at startup with
+            //     "Could not find DLL 'Siemens.Engineering.Base'" - an MCP host only shows
+            //     "Connection closed". This is the key the Openness manual documents for loading
+            //     the assembly, and the one Siemens' own Openness NuGet targets read.
+            var fromOpenness = GetInstallPathFromOpennessRegistry(TiaMajorVersion);
+            if (fromOpenness != null)
+            {
+                return fromOpenness;
+            }
+
+            // 4. Last resort: the env var even when its version looks different — better than nothing.
+            return envUsable ? env : null;
+        }
+
+        /// <summary>
+        /// HKLM\SOFTWARE\Siemens\Automation\Openness\{major}.0\PublicAPI\{assemblyVersion}[\net48]
+        /// holds "Siemens.Engineering.Base" (V21 split assemblies) or "Siemens.Engineering" (V20 and
+        /// older) = the full DLL path. A V20 install registers every compatible assembly version
+        /// (17.0.0.0 ... 20.0.0.0), so the portal's own version is preferred.
+        /// </summary>
+        private static string? GetInstallPathFromOpennessRegistry(int major)
+        {
+            if (major <= 0) return null;
+            try
+            {
+                using var regBase = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+                using var publicApi = regBase.OpenSubKey($@"SOFTWARE\Siemens\Automation\Openness\{major}.0\PublicAPI");
+                if (publicApi == null) return null;
+
+                var versions = publicApi.GetSubKeyNames()
+                    .OrderByDescending(n => n.StartsWith(major + ".", StringComparison.Ordinal))
+                    .ThenByDescending(n => n, StringComparer.Ordinal);
+                foreach (var ver in versions)
+                {
+                    using var verKey = publicApi.OpenSubKey(ver);
+                    if (verKey == null) continue;
+
+                    var found = DllFromOpennessKey(verKey);
+                    if (found == null)
+                    {
+                        foreach (var framework in verKey.GetSubKeyNames())
+                        {
+                            using var fwKey = verKey.OpenSubKey(framework);
+                            if (fwKey == null) continue;
+                            found = DllFromOpennessKey(fwKey);
+                            if (found != null) break;
+                        }
+                    }
+
+                    var root = found == null ? null : InstallRootFromPublicApiDll(found);
+                    if (root != null && Directory.Exists(root)) return root;
+                }
+            }
+            catch
+            {
+                // Registry unreadable: fall through to the remaining sources.
+            }
+            return null;
+        }
+
+        private static string? DllFromOpennessKey(RegistryKey key)
+        {
+            foreach (var valueName in new[] { "Siemens.Engineering.Base", "Siemens.Engineering" })
+            {
+                if (key.GetValue(valueName) is string dll && File.Exists(dll)) return dll;
+            }
+            return null;
+        }
+
+        /// <summary>...\Portal V21\PublicAPI\V21\net48\X.dll or ...\Portal V20\PublicAPI\V20\X.dll
+        /// → ...\Portal V2x (the directory above PublicAPI).</summary>
+        private static string? InstallRootFromPublicApiDll(string dllPath)
+        {
+            var dir = new DirectoryInfo(Path.GetDirectoryName(dllPath) ?? "");
+            while (dir != null && !string.Equals(dir.Name, "PublicAPI", StringComparison.OrdinalIgnoreCase))
+            {
+                dir = dir.Parent;
+            }
+            return dir?.Parent?.FullName;
+        }
+
+        /// <summary>True when the path names no version at all, or names exactly V{version}.</summary>
+        private static bool PathMatchesVersion(string path, int version)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(path, @"[Vv](\d{2})",
+                System.Text.RegularExpressions.RegexOptions.RightToLeft);
+            if (!m.Success) return true;
+            return int.TryParse(m.Groups[1].Value, out int pv) && pv == version;
         }
 
         private static string? FindAssemblyRecursive(string directory, string fileName, IEnumerable<string> excludedTiaMajorVersions)

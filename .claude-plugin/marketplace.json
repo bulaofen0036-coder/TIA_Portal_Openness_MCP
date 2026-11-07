@@ -1,0 +1,11 @@
+{
+  "name": "tia-portal-openness-mcp",
+  "owner": { "name": "bulaofen", "email": "bulaofen0036@gmail.com" },
+  "plugins": [
+    {
+      "name": "tia-portal-openness-mcp",
+      "source": "./",
+      "description": "Siemens TIA Portal Openness automation MCP — bundled V21 server + skill, one-command install."
+    }
+  ]
+}

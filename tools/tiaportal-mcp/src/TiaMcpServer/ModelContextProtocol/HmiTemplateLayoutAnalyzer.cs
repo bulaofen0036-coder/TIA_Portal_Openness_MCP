@@ -9,8 +9,28 @@ namespace TiaMcpServer.ModelContextProtocol
 {
     public static class HmiTemplateLayoutAnalyzer
     {
-        public static JsonObject AnalyzeDirectory(string templateDirectory, Func<string, bool>? executionJsonCheck = null)
+        /// <summary>
+        /// 真实的执行 JSON 构建检查：读模板条目数 → 用本仓的执行 JSON 构建器生成 → 比对 items 数是否一致。
+        /// 之所以要有这个默认实现，是因为过去调用方不传委托时会退化成「前面没报错就算验过」，
+        /// 而那个判据里已经含着 errors.Count == 0，永远不可能新增错误 —— 等于没检查却报 pass。
+        /// </summary>
+        public static bool ExecutionJsonBuilds(string templateFile)
         {
+            var templateRoot = JsonNode.Parse(File.ReadAllText(templateFile)) as JsonObject;
+            var expectedItems = (templateRoot?["Items"] as JsonArray ?? templateRoot?["items"] as JsonArray ?? new JsonArray()).Count;
+            var screen = templateRoot?["Screen"] as JsonObject ?? templateRoot?["screen"] as JsonObject ?? new JsonObject();
+            // 回退宽高与 Program.ReportBuilders 的 TemplateExecutionJsonBuilds 保持一致，避免同一模板两处判定不同。
+            var width = GetJsonInt(screen["Width"] ?? screen["width"], 800);
+            var height = GetJsonInt(screen["Height"] ?? screen["height"], 480);
+            var execution = HmiTemplateDesignJsonBuilder.BuildApplyDesign(templateFile, width, height);
+            return execution["items"] is JsonArray executionItems && executionItems.Count == expectedItems;
+        }
+
+        public static JsonObject AnalyzeDirectory(string templateDirectory, Func<string, bool> executionJsonCheck)
+        {
+            // 必填：不传委托就没有真检查可做，这条路必须在编译期/入口处堵死，不允许悄悄退化成恒真。
+            if (executionJsonCheck == null) throw new ArgumentNullException(nameof(executionJsonCheck));
+
             var files = Directory.Exists(templateDirectory)
                 ? Directory.GetFiles(templateDirectory, "*.json", SearchOption.TopDirectoryOnly)
                     .Where(path => Path.GetFileName(path).StartsWith("unified_", StringComparison.OrdinalIgnoreCase))
@@ -41,8 +61,10 @@ namespace TiaMcpServer.ModelContextProtocol
             };
         }
 
-        public static JsonObject AnalyzeFile(string templateFile, Func<string, bool>? executionJsonCheck = null)
+        public static JsonObject AnalyzeFile(string templateFile, Func<string, bool> executionJsonCheck)
         {
+            if (executionJsonCheck == null) throw new ArgumentNullException(nameof(executionJsonCheck));
+
             var errors = new JsonArray();
             var warnings = new JsonArray();
             var row = new JsonObject
@@ -185,9 +207,7 @@ namespace TiaMcpServer.ModelContextProtocol
 
             try
             {
-                row["executionJsonChecked"] = executionJsonCheck == null
-                    ? items.Length > 0 && errors.Count == 0
-                    : executionJsonCheck(templateFile);
+                row["executionJsonChecked"] = executionJsonCheck(templateFile);
                 if (!string.Equals(row["executionJsonChecked"]?.ToString(), "True", StringComparison.OrdinalIgnoreCase))
                 {
                     errors.Add("execution-json-build-failed: generated execution JSON item count mismatch.");

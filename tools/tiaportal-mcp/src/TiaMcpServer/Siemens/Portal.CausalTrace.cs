@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -37,9 +37,21 @@ namespace TiaMcpServer.Siemens
 
             string normTag = CausalTraceParser.NormalizeOperand(tag);
 
-            List<PlcBlock> blocks;
+            List<PlcBlock>? blocks;
             try { blocks = GetBlocks(softwarePath, blockScope ?? ""); }
             catch (Exception ex) { return new ModelContextProtocol.ResponseJsonReport { Ok = false, Message = $"GetBlocks failed: {ex.Message}", Data = data }; }
+
+            // null = 没连接/没打开项目。以前 GetBlocks 这时返回空列表，于是一路扫出
+            // 「0 个块、没找到任何写点」，报成一份看起来正常的空结果。
+            if (blocks == null)
+            {
+                return new ModelContextProtocol.ResponseJsonReport
+                {
+                    Ok = false,
+                    Message = "No TIA project is open. Call Connect / OpenProject (or AttachToOpenProject) first.",
+                    Data = data
+                };
+            }
 
             var codeBlocks = blocks.Where(b => !(b is DataBlock)).ToList();
             data["scannedBlockCount"] = codeBlocks.Count;
