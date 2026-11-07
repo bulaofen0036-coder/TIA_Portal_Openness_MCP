@@ -2,7 +2,7 @@
 
 本文件由源码中的 `[McpServerTool]` 静态抽取生成，运行时仍以 `tools/list` 为准。
 
-- 生成时间：2026-11-07 10:44:32
+- 生成时间：2026-11-07 11:32:11
 - 工具数量：238
 
 ## L0
@@ -323,7 +323,7 @@
 |---|---|
 | GetBlockInfo | [L2][PLC-Software] Get detailed info for one block (attributes, language, number, modification time). Requires: Connect + OpenProject. blockPath must be fully qualified: 'Group/Subgroup/BlockName' — get it from GetSoftwareTree or GetBlocksWithHierarchy. Returns: IsConsistent (false = must compile before export). |
 | GetBlocks | [L2][PLC-Software] Get a flat list of all blocks in PLC software. Requires: Connect + OpenProject. Use GetBlocksWithHierarchy instead when you need group/folder paths for ExportBlock. Returns: block name, number, type (OB/FC/FB/GlobalDB/InstanceDB), programming language. |
-| GetBlocksWithHierarchy | [L2][PLC-Software]Get a list of all blocks with their group hierarchy from the plc software. |
+| GetBlocksWithHierarchy | [L2][PLC-Software]Get a list of all blocks with their group hierarchy from the plc software, including the blocks inside software units: they appear under a top-level group 'Software units' with one group per unit, so a block path reads 'Software units/<unit>/<group>/<block>' (the form ExportBlock / GetBlockInfo accept). meta.scope says what was covered; meta.complete=false when the software units could not be read. |
 | ExportBlock | [L2][PLC-Software] Export one block to an XML file. Requires: Connect + OpenProject + block must be consistent (compile first if IsConsistent=false). blockPath must be fully qualified 'Group/Subgroup/Name' from GetSoftwareTree — bare names return InvalidParams with suggestions. Pick the right tool: batch → ExportBlocks; readable SCL/.s7dcl text → ExportAsDocuments. |
 | ImportBlocksFromDirectory | [L2][PLC-Software] Batch import PLC block .xml (SimaticML) files from a directory into a block group. Pick the right tool: SCL/.s7dcl text → ImportBlocksFromDocuments; a full mixed program with UDTs+tag tables+blocks auto-ordered → ImportPlcProgramFromDirectory; a single XML file → ImportBlock. |
 | ImportPlcProgramFromDirectory | [L2][PLC-Software] HIGH-LEVEL batch import tool. Recursively scans a directory for PLC XML files, auto-classifies them as UDT/TagTable/Block, imports in correct dependency order (UDTs first, then tag tables, then blocks), and optionally compiles. Requires: Connect + OpenProject. Best for importing a full exported PLC program or a set of generated XML blocks. |
@@ -358,8 +358,8 @@
 | ImportPlcExternalSource | [L2][PLC-Software]Import one PLC external source file into a group (best-effort) |
 | DeletePlcExternalSource | [L2][PLC-Software]Delete a PLC external source by name so ImportPlcExternalSource can replace it (idempotent). Name may include or omit .scl. |
 | GenerateBlocksFromExternalSource | [L2][PLC-Software]Generate blocks from a PLC external source by name (best-effort) |
-| GetTypeInfo | [L2][PLC-Software]Get a type info from the plc software |
-| GetTypes | [L2][PLC-Software]Get a list of types from the plc software |
+| GetTypeInfo | [L2][PLC-Software]Get a type info from the plc software. typePath is a path from GetTypes (TypePath), including types inside software units ('Software units/<unit>/<group>/<type>'). includeMembers=true also returns the declared fields (hierarchical path, data type, explicit start values, comment) read from an export of the type, with complete=false when part of the structure could not be projected - the raw XML (ExportType) stays the source of truth. |
+| GetTypes | [L2][PLC-Software]Get a list of the user types of the plc software, including the types inside software units. Each item carries TypePath (pass it to GetTypeInfo / ExportType) and Owner ('PLC_1' or 'Software units/<unit>'). meta.complete=false when the software units could not be read (the list then covers the PLC root only). |
 | ExportType | [L2][PLC-Software]Export a type from the plc software |
 | SeedProjectFromReference | [L2][PLC-Software]Seed PLC blocks/types and HMI screens/tagtables from a reference directory (manifest.json + {{PLACEHOLDER}} replace) |
 | ExportTypes | [L2][PLC-Software]Export types from the plc software to path |

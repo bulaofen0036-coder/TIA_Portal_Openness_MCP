@@ -1,6 +1,6 @@
 {
-  "package": "TIA_MCP_Delivery_v2.7.9",
-  "generatedAt": "2026-11-07T09:44:31.941965+08:00",
+  "package": "TIA_MCP_Delivery_v2.7.10",
+  "generatedAt": "2026-11-07T10:32:10.693729+08:00",
   "source": "live MCP tools/list of TiaMcpServer.exe",
   "toolCount": 238,
   "note": "Full roster (--profile full). The default lite profile lists only the core tools; the rest stay reachable via FindTools + CallTool. Runtime tools/list remains authoritative.",
@@ -1501,7 +1501,7 @@
       "parameters": [
         "softwarePath"
       ],
-      "description": "[L2][PLC-Software]Get a list of all blocks with their group hierarchy from the plc software."
+      "description": "[L2][PLC-Software]Get a list of all blocks with their group hierarchy from the plc software, including the blocks inside software units: they appear under a top-level group 'Software units' with one group per unit, so a block path reads 'Software units/<unit>/<group>/<block>' (the form ExportBlock / GetBlockInfo accept). meta.scope says what was covered; meta.complete=false when the software units could not be read."
     },
     {
       "name": "GetCrossReferences",
@@ -1910,9 +1910,10 @@
       "returnType": "",
       "parameters": [
         "softwarePath",
-        "typePath"
+        "typePath",
+        "includeMembers"
       ],
-      "description": "[L2][PLC-Software]Get a type info from the plc software"
+      "description": "[L2][PLC-Software]Get a type info from the plc software. typePath is a path from GetTypes (TypePath), including types inside software units ('Software units/<unit>/<group>/<type>'). includeMembers=true also returns the declared fields (hierarchical path, data type, explicit start values, comment) read from an export of the type, with complete=false when part of the structure could not be projected - the raw XML (ExportType) stays the source of truth."
     },
     {
       "name": "GetTypes",
@@ -1924,7 +1925,7 @@
         "softwarePath",
         "regexName"
       ],
-      "description": "[L2][PLC-Software]Get a list of types from the plc software"
+      "description": "[L2][PLC-Software]Get a list of the user types of the plc software, including the types inside software units. Each item carries TypePath (pass it to GetTypeInfo / ExportType) and Owner ('PLC_1' or 'Software units/<unit>'). meta.complete=false when the software units could not be read (the list then covers the PLC root only)."
     },
     {
       "name": "GetUnifiedHmiDiscreteAlarms",
