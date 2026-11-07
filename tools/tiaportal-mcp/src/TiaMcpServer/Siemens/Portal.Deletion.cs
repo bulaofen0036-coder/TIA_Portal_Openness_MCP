@@ -376,6 +376,7 @@ namespace TiaMcpServer.Siemens
                 {
                     ["sourceName"] = r.SourceName,
                     ["sourcePath"] = r.SourcePath,
+                    ["sourceHierarchy"] = r.SourceHierarchy,
                     ["referenceName"] = r.ReferenceName,
                     ["referencePath"] = r.ReferencePath,
                     ["referenceType"] = r.ReferenceType,
@@ -488,7 +489,7 @@ namespace TiaMcpServer.Siemens
             }
 
             reason = null;
-            return CrossReferenceFlattener.Flatten(raw, resolvedPath, out truncation);
+            return CrossReferenceFlattener.Flatten(raw, resolvedPath, out truncation, out _);
         }
 
         /// <summary>

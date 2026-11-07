@@ -138,7 +138,7 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
-        [McpServerTool(Name = "GetBlocksWithHierarchy"), Description("[L2][PLC-Software]Get a list of all blocks with their group hierarchy from the plc software.")]
+        [McpServerTool(Name = "GetBlocksWithHierarchy"), Description("[L2][PLC-Software]Get a list of all blocks with their group hierarchy from the plc software, including the blocks inside software units: they appear under a top-level group 'Software units' with one group per unit, so a block path reads 'Software units/<unit>/<group>/<block>' (the form ExportBlock / GetBlockInfo accept). meta.scope says what was covered; meta.complete=false when the software units could not be read.")]
         public static ResponseBlocksWithHierarchy GetBlocksWithHierarchy(
         [Description("softwarePath: defines the path in the project structure to the plc software")] string softwarePath)
         {
@@ -148,14 +148,37 @@ namespace TiaMcpServer.ModelContextProtocol
                 if (rootGroup != null)
                 {
                     var hierarchy = Helper.BuildBlockHierarchy(rootGroup);
+
+                    // #61: "all blocks" must include the software units, which Openness keeps outside the root group.
+                    var units = Portal.GetSoftwareUnitBlockGroups(softwarePath, out var unitFailure);
+                    if (units.Count > 0)
+                    {
+                        var unitNodes = units.Select(u =>
+                        {
+                            var node = Helper.BuildBlockHierarchy(u.Group);
+                            node.Name = u.Name;
+                            return node;
+                        }).ToList();
+                        hierarchy.Groups = (hierarchy.Groups ?? Enumerable.Empty<BlockGroupInfo>())
+                            .Concat(new[] { new BlockGroupInfo { Name = TiaMcpServer.Siemens.Portal.SoftwareUnitsRoot, Blocks = new List<ResponseBlockInfo>(), Groups = unitNodes } })
+                            .ToList();
+                    }
+
                     return new ResponseBlocksWithHierarchy
                     {
-                        Message = $"Block hierarchy retrieved from '{softwarePath}'",
+                        Message = unitFailure == null
+                            ? $"Block hierarchy retrieved from '{softwarePath}' (PLC root and {units.Count} software unit(s))"
+                            : $"Block hierarchy retrieved from the PLC root of '{softwarePath}' only - the software units could not be read ({unitFailure}); the list is INCOMPLETE",
                         Root = hierarchy,
                         Meta = new JsonObject
                         {
                             ["timestamp"] = DateTime.Now,
-                            ["success"] = true
+                            ["success"] = unitFailure == null,
+                            ["complete"] = unitFailure == null,
+                            ["scope"] = unitFailure == null ? "plcRootAndSoftwareUnits" : "plcRootOnly",
+                            ["softwareUnitCount"] = units.Count,
+                            ["excludedScopes"] = unitFailure == null ? new JsonArray() : new JsonArray(TiaMcpServer.Siemens.Portal.SoftwareUnitsRoot),
+                            ["softwareUnitsFailure"] = unitFailure
                         }
                     };
                 }

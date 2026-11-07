@@ -60,33 +60,31 @@ namespace TiaMcpServer.Tests
 
         private static void RunCrossReferences(Action<bool, string> check)
         {
-            var full = CrossReferenceFlattener.Flatten(new FakeResult { Sources = new[] { new FakeSource(), new FakeSource { Name = "FC_Aux" } } }, "fallback", out var t0);
+            var full = CrossReferenceFlattener.Flatten(new FakeResult { Sources = new[] { new FakeSource(), new FakeSource { Name = "FC_Aux" } } }, "fallback", out var t0, out _);
             check(t0 == null && full.Count == 2, "[反向哨兵] 完整枚举：不标截断，两条都在（实得 " + full.Count + "，截断=" + (t0 ?? "null") + "）");
             check(full[0].LocationName == "NW1" && full[0].ReferenceName == "FB_Pump", "[反向哨兵] 字段照旧填（Location / Reference）");
 
-            var partial = CrossReferenceFlattener.Flatten(new FakeResult { Sources = new[] { new FakeSource(), new FakeSource { Throw = true } } }, "fallback", out var t1);
+            var partial = CrossReferenceFlattener.Flatten(new FakeResult { Sources = new[] { new FakeSource(), new FakeSource { Throw = true } } }, "fallback", out var t1, out _);
             check(partial.Count == 1 && t1 != null, "#60 第二个源抛异常：返回已收集的 1 条，并且必须标截断");
             check(t1 != null && t1.Contains("INCOMPLETE") && t1.Contains("disposed"), "#60 截断原因要带原生异常信息（实得 " + (t1 ?? "null") + "）");
 
-            var none = CrossReferenceFlattener.Flatten(new FakeResult { Sources = new[] { new FakeSource { Throw = true } } }, "fallback", out var t2);
+            var none = CrossReferenceFlattener.Flatten(new FakeResult { Sources = new[] { new FakeSource { Throw = true } } }, "fallback", out var t2, out _);
             check(none.Count == 0 && t2 != null, "#60 第一个源就抛：空表不许冒充「没人引用」");
 
-            CrossReferenceFlattener.Flatten(new NoSourcesResult(), "fallback", out var t3);
+            CrossReferenceFlattener.Flatten(new NoSourcesResult(), "fallback", out var t3, out _);
             check(t3 != null, "#60 结果对象没有 Sources：一条都没枚举，必须标截断");
 
-            var skipped = CrossReferenceFlattener.Flatten(new FakeResult { Sources = new[] { new FakeSource(), new FakeSource { NullRefs = true } } }, "fallback", out var t4);
+            var skipped = CrossReferenceFlattener.Flatten(new FakeResult { Sources = new[] { new FakeSource(), new FakeSource { NullRefs = true } } }, "fallback", out var t4, out _);
             check(skipped.Count == 1 && t4 != null, "#60 某个源的 References 取不到：跳过也要标截断");
 
-            CrossReferenceFlattener.Flatten(new FakeResult { Sources = Array.Empty<FakeSource>() }, "fallback", out var t5);
+            CrossReferenceFlattener.Flatten(new FakeResult { Sources = Array.Empty<FakeSource>() }, "fallback", out var t5, out _);
             check(t5 == null, "[反向哨兵] 真的没有引用（空 Sources）是完整结果，不标截断");
 
-            var withChildren = CrossReferenceFlattener.Flatten(new ChildResult { Sources = new object[] { new FakeSourceWithChildren() } }, "fallback", out var t6);
-            check(withChildren.Count == 1 && t6 != null && t6.Contains("Children"), "#60 有没展开的子分支：不许报完整（子分支里的引用没列出来）");
-            CrossReferenceFlattener.Flatten(new ChildResult { Sources = new object[] { new FakeSourceWithChildren { Children = Array.Empty<object>() } } }, "fallback", out var t7);
+            CrossReferenceFlattener.Flatten(new ChildResult { Sources = new object[] { new FakeSourceWithChildren { Children = Array.Empty<object>() } } }, "fallback", out var t7, out _);
             check(t7 == null, "[反向哨兵] Children 是空集合：照旧算完整");
 
             var rethrown = false;
-            try { CrossReferenceFlattener.Flatten(new ChildResult { Sources = new object[] { new LostSource() } }, "fallback", out _); }
+            try { CrossReferenceFlattener.Flatten(new ChildResult { Sources = new object[] { new LostSource() } }, "fallback", out _, out _); }
             catch (Exception ex) { rethrown = PortalFailureClassifier.IsPortalProcessLost(ex); }
             check(rethrown, "#60 枚举中博途进程没了：直接抛出，不当成「部分结果」让删除预览继续走");
         }

@@ -1117,7 +1117,7 @@ namespace TiaMcpServer.ModelContextProtocol
         [McpServerTool(Name = "ValidateClassicHmiMinimalPackagePlcSync"), Description("[L2][HMI-Classic]Offline-only helper: validate that Classic/Basic HMI tag-table ControllerTag/PlcTag bindings exist in a caller-provided exact PLC symbol list. It does not connect to TIA Portal or modify projects.")]
         public static ResponseJsonReport ValidateClassicHmiMinimalPackagePlcSync(
             [Description("path: package output directory or *_manifest.json path to validate.")] string path,
-            [Description("plcSymbolsJson: JSON array of exact PLC symbols, or object with Symbols[]. Example: [\"DB1_MotorData.Motor.Start\"].")] string plcSymbolsJson)
+            [Description("plcSymbolsJson: JSON array of exact PLC symbols, or object with Symbols[]. Example: [\"DB1_MotorData.Motor.Start\"]. To also check absolute-address HMI tags (%M10.0 ...), pass objects with name + address - the GetPlcTags result can be passed as-is.")] string plcSymbolsJson)
         {
             try
             {
@@ -2359,6 +2359,7 @@ namespace TiaMcpServer.ModelContextProtocol
                             Items = items,
                             Complete = false,
                             Truncation = truncation,
+                            UnreadBranches = Portal.LastCrossReferenceUnreadBranches.Count > 0 ? Portal.LastCrossReferenceUnreadBranches : null,
                             Meta = new JsonObject { ["timestamp"] = DateTime.Now, ["success"] = false, ["complete"] = false }
                         };
                     }

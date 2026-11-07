@@ -6588,9 +6588,13 @@ namespace TiaMcpServer.Siemens
         /// </summary>
         public string? LastCrossReferenceTruncation { get; private set; }
 
+        /// <summary>Hierarchy paths of the branches the last <see cref="GetCrossReferences"/> could not read (empty = none).</summary>
+        public IReadOnlyList<string> LastCrossReferenceUnreadBranches { get; private set; } = Array.Empty<string>();
+
         public List<ModelContextProtocol.CrossReferenceEntry>? GetCrossReferences(string softwarePath, string objectPath, string objectKind = "Block", string filter = "AllObjects")
         {
             LastCrossReferenceTruncation = null;
+            LastCrossReferenceUnreadBranches = Array.Empty<string>();
             if (IsProjectNull()) return null;
 
             object? target = null;
@@ -6611,8 +6615,9 @@ namespace TiaMcpServer.Siemens
             var result = TryInvokeGetCrossReferences(crossReferenceService, filter);
             if (result == null) return null;
 
-            var items = CrossReferenceFlattener.Flatten(result, objectPath, out var truncation);
+            var items = CrossReferenceFlattener.Flatten(result, objectPath, out var truncation, out var unread);
             LastCrossReferenceTruncation = truncation;
+            LastCrossReferenceUnreadBranches = unread;
             return items;
         }
 

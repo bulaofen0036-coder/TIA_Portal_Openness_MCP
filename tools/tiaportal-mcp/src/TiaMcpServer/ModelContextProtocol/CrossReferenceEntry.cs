@@ -5,6 +5,8 @@
     {
         public string? SourceName { get; set; }
         public string? SourcePath { get; set; }
+        /// <summary>Where in the source the reference sits, e.g. "DB_HMI.Motor.Start" for a member of a data block (issue #60).</summary>
+        public string? SourceHierarchy { get; set; }
         public string? ReferenceName { get; set; }
         public string? ReferencePath { get; set; }
         public string? LocationName { get; set; }

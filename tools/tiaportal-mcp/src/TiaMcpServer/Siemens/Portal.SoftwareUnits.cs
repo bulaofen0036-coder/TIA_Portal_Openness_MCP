@@ -1,5 +1,6 @@
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
+using Siemens.Engineering.SW.Types;
 using Siemens.Engineering.SW.Units;
 using System;
 using System.Collections.Generic;
@@ -105,6 +106,79 @@ namespace TiaMcpServer.Siemens
                     ["failure"] = failure,
                 }
             };
+        }
+
+        /// <summary>
+        /// The block group of every software unit (#61), for listings that claim to cover "all blocks".
+        /// failure != null: the units could not be read, so a root-only listing must not be presented as complete.
+        /// A CPU without a unit provider simply has no units (not a failure).
+        /// </summary>
+        public List<(string Name, PlcBlockGroup Group)> GetSoftwareUnitBlockGroups(string softwarePath, out string? failure)
+        {
+            failure = null;
+            if (IsProjectNull() || GetSoftwareContainer(softwarePath)?.Software is not PlcSoftware software)
+                return new List<(string, PlcBlockGroup)>();
+            var units = GetPlcUnitsOrFailure(software, out failure);
+            return units.Where(u => u.BlockGroup != null).Select(u => (u.Name, (PlcBlockGroup)u.BlockGroup)).ToList();
+        }
+
+        /// <summary>
+        /// Every user type of the PLC with its path: root types as "Group/Type", unit types as
+        /// "Software units/&lt;unit&gt;/Group/Type" (#62). The paths are what GetTypeInfo / ExportType accept.
+        /// unitFailure != null: the units could not be read; the list then covers the PLC root only.
+        /// </summary>
+        public List<(string Path, string Owner, PlcType Type)>? GetTypesWithPaths(string softwarePath, string regexName, out string? unitFailure)
+        {
+            unitFailure = null;
+            if (IsProjectNull()) return null;
+            if (GetSoftwareContainer(softwarePath)?.Software is not PlcSoftware software)
+                throw new PortalException(PortalErrorCode.NotFound, $"GetTypes: PLC software not found at '{softwarePath}'." + AvailablePlcPathsSuffix());
+            if (software.TypeGroup == null)
+                throw new PortalException(PortalErrorCode.OpennessError,
+                    $"GetTypes: PLC '{softwarePath}' resolved, but its TypeGroup is not available — the type list could NOT be read. This is not the same as 'the PLC has no types'.");
+
+            var filter = CompileNameFilterOrThrow(regexName);
+            var list = new List<(string, string, PlcType)>();
+            try
+            {
+                CollectTypesWithPaths(software.TypeGroup, "", softwarePath, filter, list);
+                foreach (var unit in GetPlcUnitsOrFailure(software, out unitFailure))
+                    if (unit.TypeGroup != null)
+                        CollectTypesWithPaths(unit.TypeGroup, $"{SoftwareUnitsRoot}/{unit.Name}", $"{SoftwareUnitsRoot}/{unit.Name}", filter, list);
+            }
+            catch (PortalException) { throw; }
+            catch (Exception ex)
+            {
+                throw new PortalException(PortalErrorCode.OpennessError,
+                    $"GetTypes: type enumeration failed after {list.Count} type(s) in '{softwarePath}'; the returned list would have been INCOMPLETE, so it is not returned at all. Root cause: {ex.Message}", null, ex);
+            }
+            return list;
+        }
+
+        private static void CollectTypesWithPaths(PlcTypeGroup group, string groupPath, string owner, System.Text.RegularExpressions.Regex? filter, List<(string, string, PlcType)> list)
+        {
+            foreach (var composition in group.Types)
+                if (composition is PlcType type && (filter == null || filter.IsMatch(type.Name)))
+                    list.Add((groupPath.Length == 0 ? type.Name : $"{groupPath}/{type.Name}", owner, type));
+            foreach (PlcTypeGroup sub in group.Groups)
+                CollectTypesWithPaths(sub, groupPath.Length == 0 ? sub.Name : $"{groupPath}/{sub.Name}", owner, filter, list);
+        }
+
+        /// <summary>Like GetPlcUnits, but a CPU without a unit provider is "no units", not a failure.</summary>
+        private static List<PlcUnit> GetPlcUnitsOrFailure(PlcSoftware software, out string? failure)
+        {
+            failure = null;
+            try
+            {
+                var provider = software.GetService<PlcUnitProvider>();
+                if (provider == null) return new List<PlcUnit>();
+                return provider.UnitGroup?.Units?.ToList() ?? new List<PlcUnit>();
+            }
+            catch (Exception ex) when (!PortalFailureClassifier.IsPortalProcessLost(ex))
+            {
+                failure = $"{ex.GetType().Name}: {ex.Message}";
+                return new List<PlcUnit>();
+            }
         }
 
         private static IEnumerable<(string GroupPath, PlcBlock Block)> EnumerateUnitBlocks(PlcBlockGroup group, string groupPath)

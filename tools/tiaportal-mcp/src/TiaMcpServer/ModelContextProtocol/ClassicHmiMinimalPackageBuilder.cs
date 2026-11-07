@@ -216,7 +216,40 @@ namespace TiaMcpServer.ModelContextProtocol
             foreach (var symbol in missingPlcSymbols)
                 errors.Add("missing-plc-symbol: " + symbol);
 
+            // Absolute-address tags (#57) carry no ControllerTag, so the symbol check above never sees them:
+            // a package of absolute tags used to pass with nothing checked. I/Q/M addresses are checked against the
+            // addresses in the PLC symbol list; DB addresses cannot be checked offline and are listed as unchecked.
+            var absoluteTags = File.Exists(tagPath)
+                ? ExtractAbsoluteTagsFromTagTableXml(File.ReadAllText(tagPath, Encoding.UTF8))
+                : Array.Empty<(string Name, string Address)>();
+            var plcAddresses = ParsePlcAddresses(plcSymbolsJson);
+            var missingPlcAddresses = new List<string>();
+            var uncheckedAbsolute = new List<string>();
             var usedSet = controllerTags.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var (name, address) in absoluteTags)
+            {
+                var key = NormalizeAddress(address);
+                if (!IsTagTableArea(key))
+                {
+                    uncheckedAbsolute.Add(name + " = " + address);
+                    continue;
+                }
+                if (plcAddresses.Count == 0) continue; // reported once below
+                if (plcAddresses.TryGetValue(key, out var symbol)) usedSet.Add(symbol);
+                else missingPlcAddresses.Add(name + " = " + address);
+            }
+            var checkableAbsolute = absoluteTags.Length - uncheckedAbsolute.Count;
+            // Absolute addressing does not need a PLC symbol, so these are findings to look at, not blockers.
+            // What they must never be again is silent.
+            if (checkableAbsolute > 0 && plcAddresses.Count == 0)
+                warnings.Add($"absolute-bindings-unchecked: {checkableAbsolute} HMI tag(s) use absolute I/Q/M addresses, but the PLC symbol list carries no addresses, so none of them was checked. Pass objects with name + address (the GetPlcTags result can be passed as-is; raise its limit so it is not truncated).");
+            foreach (var item in missingPlcAddresses)
+                warnings.Add("no-plc-tag-at-address: " + item + " (no PLC tag with exactly this address; legal for absolute addressing, but check for a typo or an overlapping address)");
+            if (PlcSymbolListTruncated(plcSymbolsJson))
+                warnings.Add("plc-symbol-list-truncated: the PLC symbol list says it is truncated; missing symbols/addresses may just be beyond the cut.");
+            foreach (var item in uncheckedAbsolute)
+                warnings.Add("absolute-address-unchecked: " + item + " (DB / non tag-table address; verify after a temporary import)");
+
             var unusedPlcSymbols = plcSymbols.Where(x => !usedSet.Contains(x)).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray();
             foreach (var symbol in unusedPlcSymbols)
                 warnings.Add("unused-plc-symbol: " + symbol);
@@ -239,6 +272,10 @@ namespace TiaMcpServer.ModelContextProtocol
                 ["referencedHmiTagCount"] = fileValidation["referencedTagCount"]?.GetValue<int>() ?? 0,
                 ["missingHmiTagCount"] = fileValidation["missingTagCount"]?.GetValue<int>() ?? 0,
                 ["controllerTagCount"] = controllerTags.Length,
+                ["absoluteTagCount"] = absoluteTags.Length,
+                ["absoluteCheckedCount"] = plcAddresses.Count == 0 ? 0 : checkableAbsolute,
+                ["noPlcTagAtAddressCount"] = missingPlcAddresses.Count,
+                ["uncheckedAbsoluteCount"] = uncheckedAbsolute.Count,
                 ["plcSymbolCount"] = plcSymbols.Count,
                 ["missingPlcSymbolCount"] = missingPlcSymbols.Length,
                 ["unusedPlcSymbolCount"] = unusedPlcSymbols.Length,
@@ -404,6 +441,43 @@ namespace TiaMcpServer.ModelContextProtocol
                 .ToArray();
         }
 
+        private static (string Name, string Address)[] ExtractAbsoluteTagsFromTagTableXml(string tagXml)
+        {
+            var doc = XDocument.Parse(tagXml, LoadOptions.PreserveWhitespace);
+            return doc.Descendants("Hmi.Tag.Tag")
+                .Where(x => string.Equals(x.Element("AttributeList")?.Element("AddressAccessMode")?.Value, "Absolute", StringComparison.OrdinalIgnoreCase))
+                .Select(x => (x.Element("AttributeList")?.Element("Name")?.Value ?? "", x.Element("AttributeList")?.Element("LogicalAddress")?.Value ?? ""))
+                .Where(x => !string.IsNullOrWhiteSpace(x.Item2))
+                .ToArray();
+        }
+
+        /// <summary>Address -> symbol from symbol objects that carry Address / LogicalAddress (e.g. GetPlcTags output).</summary>
+        private static Dictionary<string, string> ParsePlcAddresses(string plcSymbolsJson)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in SymbolItems(plcSymbolsJson).OfType<JsonObject>())
+            {
+                var address = item["Address"]?.ToString() ?? item["address"]?.ToString() ?? item["LogicalAddress"]?.ToString() ?? item["logicalAddress"]?.ToString();
+                var name = item["Symbol"]?.ToString() ?? item["symbol"]?.ToString() ?? item["Name"]?.ToString() ?? item["name"]?.ToString()
+                    ?? item["Path"]?.ToString() ?? item["path"]?.ToString() ?? "";
+                if (!string.IsNullOrWhiteSpace(address)) result[NormalizeAddress(address!)] = CleanClassicTagName(name);
+            }
+            return result;
+        }
+
+        /// <summary>Uppercase, no blanks, German mnemonics mapped to IEC (%E -> %I, %A -> %Q).</summary>
+        private static string NormalizeAddress(string address)
+        {
+            var s = new string(address.Where(c => !char.IsWhiteSpace(c)).ToArray()).ToUpperInvariant();
+            if (s.StartsWith("%E")) s = "%I" + s.Substring(2);
+            else if (s.StartsWith("%A")) s = "%Q" + s.Substring(2);
+            return s;
+        }
+
+        /// <summary>I / Q / M areas live in PLC tag tables; DB addresses do not.</summary>
+        private static bool IsTagTableArea(string normalized)
+            => normalized.StartsWith("%I") || normalized.StartsWith("%Q") || normalized.StartsWith("%M");
+
         private static string[] ExtractControllerTagsFromTagTableXml(string tagXml)
         {
             var doc = XDocument.Parse(tagXml, LoadOptions.PreserveWhitespace);
@@ -441,27 +515,39 @@ namespace TiaMcpServer.ModelContextProtocol
         private static HashSet<string> ParsePlcSymbols(string plcSymbolsJson)
         {
             var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (string.IsNullOrWhiteSpace(plcSymbolsJson)) return result;
-            var node = JsonNode.Parse(plcSymbolsJson);
-            if (node is JsonArray array)
-            {
-                foreach (var item in array)
-                    AddPlcSymbol(result, item);
-            }
-            else if (node is JsonObject obj)
-            {
-                var symbols = obj["Symbols"] as JsonArray ?? obj["symbols"] as JsonArray ?? obj["PlcSymbols"] as JsonArray ?? obj["plcSymbols"] as JsonArray;
-                if (symbols != null)
-                {
-                    foreach (var item in symbols)
-                        AddPlcSymbol(result, item);
-                }
-                else
-                {
-                    AddPlcSymbol(result, obj);
-                }
-            }
+            foreach (var item in SymbolItems(plcSymbolsJson))
+                AddPlcSymbol(result, item);
             return result;
+        }
+
+        /// <summary>
+        /// The entries of a PLC symbol list, whatever the wrapper: a plain array; an object with
+        /// Symbols / PlcSymbols / tags; the GetPlcTags result as-is ({data:{tags:[...]}}); or one symbol object.
+        /// </summary>
+        private static IEnumerable<JsonNode?> SymbolItems(string plcSymbolsJson)
+        {
+            if (string.IsNullOrWhiteSpace(plcSymbolsJson)) return Array.Empty<JsonNode?>();
+            var node = JsonNode.Parse(plcSymbolsJson);
+            if (node is JsonArray array) return array;
+            if (node is not JsonObject obj) return Array.Empty<JsonNode?>();
+            foreach (var holder in new[] { obj, obj["data"] as JsonObject, obj["Data"] as JsonObject })
+            {
+                if (holder == null) continue;
+                foreach (var key in new[] { "Symbols", "symbols", "PlcSymbols", "plcSymbols", "Tags", "tags" })
+                    if (holder[key] is JsonArray list) return list;
+            }
+            return new JsonNode?[] { obj };
+        }
+
+        private static bool PlcSymbolListTruncated(string plcSymbolsJson)
+        {
+            try
+            {
+                var obj = string.IsNullOrWhiteSpace(plcSymbolsJson) ? null : JsonNode.Parse(plcSymbolsJson) as JsonObject;
+                var holder = obj?["data"] as JsonObject ?? obj?["Data"] as JsonObject ?? obj;
+                return holder?["truncated"] is JsonValue v && v.TryGetValue<bool>(out var b) && b;
+            }
+            catch { return false; }
         }
 
         private static void AddPlcSymbol(HashSet<string> result, JsonNode? node)

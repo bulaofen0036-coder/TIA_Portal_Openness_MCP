@@ -1,5 +1,36 @@
 ﻿# Change Log
 
+## [2.7.10] - 2026-11-07 - 交叉引用读进数据块成员、列块和类型覆盖软件单元、读 UDT 字段
+
+工具数不变（238）。`GetTypeInfo` 多一个可选参数 `includeMembers`。
+
+### 修复
+
+- **交叉引用读进子分支（#60 后半，感谢 @BoykaHe）**：`GetCrossReferences` 现在递归读取 `SourceObject.Children`。
+  V21 上全局 DB 和背景 DB 的引用都挂在成员子分支里，以前顶层读不到就是 0：真机上 `DB_HMI` 从 0 处变成 29 处，
+  一个背景 DB 从 2 处变成 84 处。每条结果新增 `SourceHierarchy`（如 `DB_HMI."DB_HMI".CmdStart`）。
+  某个分支读失败只停这个分支、兄弟分支照读，返回 `UnreadBranches` 列出没读到的分支；设深度和条数上限；
+  只读 Name / Path / References / Children / Locations，不碰 `UnderlyingObject`，不重试；博途进程退出直接报错。
+  删除预览里的引用也带层级路径。
+- **`GetBlocksWithHierarchy` 漏掉软件单元里的块（#61，感谢 @BoykaHe）**：现在在顶层加一个 `Software units` 组、
+  每个单元一个子组，块路径为 `Software units/<单元>/<组>/<块>`，`ExportBlock` / `GetBlockInfo` 等直接认；
+  从根节点 `Program blocks/` 拼出来的路径也能解析。`meta.scope` 标明覆盖范围，单元读不出来时
+  `complete=false`、`excludedScopes` 列出被排除的范围。
+- **绝对地址 HMI 变量的 PLC 同步自检空转**：`ValidateClassicHmiMinimalPackagePlcSync` 原来只核对符号寻址的
+  `ControllerTag`，全是绝对地址的包一个绑定都没核也报通过。现在 I/Q/M 地址按 PLC 清单里的地址逐个核对
+  （`%E`/`%A` 与 `%I`/`%Q` 视为同一地址），PLC 里没有变量的地址、清单不带地址、清单被截断、DB 地址无法离线核对，
+  都会给出警告和计数（绝对寻址本身不要求 PLC 变量，所以不阻断）。`GetPlcTags` 的结果可以原样传入。
+
+### 新增
+
+- **软件单元里的 PLC 数据类型（#62，感谢 @BoykaHe）**：`GetTypes` 同时列出 PLC 根和各软件单元的类型，每项带
+  `TypePath`（如 `Software units/U1/UDT_A`）和 `Owner`；`GetTypeInfo` / `ExportType` / `ImportType` 等按这个路径
+  定位单元里的类型。单元读不出来时 `meta.complete=false`。
+- **`GetTypeInfo(includeMembers=true)` 读 UDT 字段**：从导出结果里列出字段的层级路径、数据类型、显式初值（含数组元素
+  初值）和注释，同时支持 Member 直接嵌套和 Member → Sections → Section → Member 两种形状；文档里只要有没走到的
+  字段就 `complete=false` 并说明，原文仍以 `ExportType` 为准。类型未编译等原因导不出时，基本信息照常返回，字段部分
+  `complete=false` 并写明原因。
+
 ## [2.7.9] - 2026-11-07 - 中文入参不再被 HTTP 解坏、交叉引用残缺不报成功、经典 HMI 变量表支持绝对地址
 
 工具数不变（238）。

@@ -61,7 +61,12 @@ namespace TiaMcpServer.ModelContextProtocol
 
     public class ResponseTypeInfo : ResponseAttributes
     {
-        //public string? Path { get; set; }
+        /// <summary>Path GetTypeInfo / ExportType accept, e.g. "Group/UDT_A" or "Software units/U1/UDT_B" (#62).</summary>
+        public string? TypePath { get; set; }
+        /// <summary>"PLC_1" for root types, "Software units/&lt;unit&gt;" for unit types.</summary>
+        public string? Owner { get; set; }
+        /// <summary>Declared fields when requested (GetTypeInfo includeMembers=true): members[], complete, issues[].</summary>
+        public JsonObject? Members { get; set; }
         public string? Name { get; set; }
         public string? TypeName { get; set; }
         public string? Namespace { get; set; }
@@ -298,6 +303,8 @@ namespace TiaMcpServer.ModelContextProtocol
         public bool Complete { get; set; } = true;
         /// <summary>Why the list is partial; null when Complete.</summary>
         public string? Truncation { get; set; }
+        /// <summary>Hierarchy paths of branches that could not be read (null when Complete).</summary>
+        public IEnumerable<string>? UnreadBranches { get; set; }
     }
 
     public class ResponseNetworkInfo : ResponseMessage

@@ -88,6 +88,9 @@ namespace TiaMcpServer.Tests
             Console.WriteLine("== 2.7.9：交叉引用残缺不许报成功（#60）/ 导出被拒带结构化上下文（#63）/ HMI 变量表绝对地址 + 未知键报错（#57）==");
             Release279Tests.Run(Check, Skip);
 
+            Console.WriteLine("== 2.7.10：交叉引用读子分支（#60）/ 列块含软件单元（#61）/ 软件单元类型与字段（#62）/ 绝对地址的 PLC 同步自检 ==");
+            Release2710Tests.Run(Check, Skip);
+
             Console.WriteLine("== 日常编辑工具：参数校验 / 地址 / 组路径 / 归档文件名 / 整台设备守卫 ==");
             EverydayEditSpecTests.Run(Check);
 

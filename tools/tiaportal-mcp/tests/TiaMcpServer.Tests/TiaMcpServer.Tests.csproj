@@ -77,5 +77,9 @@
     <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\CrossReferenceEntry.cs" Link="CrossReferenceEntry.cs" />
     <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ExportErrorContext.cs" Link="ExportErrorContext.cs" />
     <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ClassicHmiTagTableXmlBuilder.cs" Link="ClassicHmiTagTableXmlBuilder.cs" />
+    <!-- 2.7.10：#62 类型字段投影、绝对地址的 PLC-HMI 同步自检（包构建器 + 画面构建器都零依赖）。 -->
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\TypeMemberReader.cs" Link="TypeMemberReader.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ClassicHmiMinimalPackageBuilder.cs" Link="ClassicHmiMinimalPackageBuilder.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ClassicHmiScreenXmlBuilder.cs" Link="ClassicHmiScreenXmlBuilder.cs" />
   </ItemGroup>
 </Project>

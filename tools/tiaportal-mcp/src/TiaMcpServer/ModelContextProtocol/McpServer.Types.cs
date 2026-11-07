@@ -25,10 +25,11 @@ namespace TiaMcpServer.ModelContextProtocol
     {
         #region types
 
-        [McpServerTool(Name = "GetTypeInfo"), Description("[L2][PLC-Software]Get a type info from the plc software")]
+        [McpServerTool(Name = "GetTypeInfo"), Description("[L2][PLC-Software]Get a type info from the plc software. typePath is a path from GetTypes (TypePath), including types inside software units ('Software units/<unit>/<group>/<type>'). includeMembers=true also returns the declared fields (hierarchical path, data type, explicit start values, comment) read from an export of the type, with complete=false when part of the structure could not be projected - the raw XML (ExportType) stays the source of truth.")]
         public static ResponseTypeInfo GetTypeInfo(
             [Description("softwarePath: defines the path in the project structure to the plc software")] string softwarePath,
-            [Description("typePath: defines the path in the project structure to the type")] string typePath)
+            [Description("typePath: defines the path in the project structure to the type")] string typePath,
+            [Description("includeMembers: true = also export the type and return its declared fields (default false)")] bool includeMembers = false)
         {
             try
             {
@@ -36,10 +37,19 @@ namespace TiaMcpServer.ModelContextProtocol
                 if (type != null)
                 {
                     var attributes = Helper.GetAttributeList(type);
+                    JsonObject? members = null;
+                    if (includeMembers)
+                    {
+                        members = ReadTypeMembers(softwarePath, typePath);
+                    }
 
                     return new ResponseTypeInfo
                     {
-                        Message = $"Type info retrieved from '{typePath}' in '{softwarePath}'",
+                        Message = members != null && members["complete"]?.GetValue<bool>() == false
+                            ? $"Type info retrieved from '{typePath}' in '{softwarePath}'; the field list is INCOMPLETE (see Members.issues)"
+                            : $"Type info retrieved from '{typePath}' in '{softwarePath}'",
+                        TypePath = typePath,
+                        Members = members,
                         Name = type.Name,
                         TypeName = type.GetType().Name,
                         Namespace = type.Namespace,
@@ -66,14 +76,46 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
-        [McpServerTool(Name = "GetTypes"), Description("[L2][PLC-Software]Get a list of types from the plc software")]
+        /// <summary>Export the type to a temp folder and project its fields (#62). Export failures surface as-is.</summary>
+        private static JsonObject ReadTypeMembers(string softwarePath, string typePath)
+        {
+            (string TempDir, List<string> Paths)? exported;
+            try
+            {
+                exported = Portal.ExportTypeToTemp(softwarePath, typePath);
+            }
+            catch (Exception ex) when (!PortalFailureClassifier.IsPortalProcessLost(ex))
+            {
+                // The type info itself is fine; only the field projection is unavailable (e.g. inconsistent type: compile first).
+                var reason = (ex.InnerException?.Message ?? ex.Message).Trim();
+                return new JsonObject { ["members"] = new JsonArray(), ["memberCount"] = 0, ["complete"] = false, ["issues"] = new JsonArray("export-failed: " + reason + McpHints.Recovery(ex)) };
+            }
+            if (exported == null || exported.Value.Paths.Count == 0)
+            {
+                return new JsonObject { ["members"] = new JsonArray(), ["memberCount"] = 0, ["complete"] = false, ["issues"] = new JsonArray("export-produced-no-file: the type export returned no XML, no fields could be read.") };
+            }
+            try
+            {
+                return TypeMemberReader.Read(File.ReadAllText(exported.Value.Paths[0]));
+            }
+            catch (IOException ex)
+            {
+                return new JsonObject { ["members"] = new JsonArray(), ["memberCount"] = 0, ["complete"] = false, ["issues"] = new JsonArray("export-read-failed: " + ex.Message) };
+            }
+            finally
+            {
+                try { Directory.Delete(exported.Value.TempDir, true); } catch { /* temp cleanup only */ }
+            }
+        }
+
+        [McpServerTool(Name = "GetTypes"), Description("[L2][PLC-Software]Get a list of the user types of the plc software, including the types inside software units. Each item carries TypePath (pass it to GetTypeInfo / ExportType) and Owner ('PLC_1' or 'Software units/<unit>'). meta.complete=false when the software units could not be read (the list then covers the PLC root only).")]
         public static ResponseTypes GetTypes(
             [Description("softwarePath: defines the path in the project structure to the plc software")] string softwarePath,
             [Description("regexName: defines the name or regular expression to find the block. Use empty string (default) to find all")] string regexName = "")
         {
             try
             {
-                var list = Portal.GetTypes(softwarePath, regexName);
+                var list = Portal.GetTypesWithPaths(softwarePath, regexName, out var unitFailure);
 
                 // null = 根本没查成（没连接/没打开项目）；空列表 = 这个 PLC 里确实没有。
                 // 以前 Portal 层无项目时返回空列表，两件事被同一个值表示，于是下面那句
@@ -88,7 +130,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 }
 
                 var responseList = new List<ResponseTypeInfo>();
-                foreach (var type in list)
+                foreach (var (typePath, owner, type) in list)
                 {
                     if (type != null)
                     {
@@ -96,6 +138,8 @@ namespace TiaMcpServer.ModelContextProtocol
 
                         responseList.Add(new ResponseTypeInfo
                         {
+                            TypePath = typePath,
+                            Owner = owner,
                             Name = type.Name,
                             TypeName = type.GetType().Name,
                             Namespace = type.Namespace,
@@ -112,12 +156,17 @@ namespace TiaMcpServer.ModelContextProtocol
                 {
                     return new ResponseTypes
                     {
-                        Message = $"Types with regex '{regexName}' retrieved from '{softwarePath}'",
+                        Message = unitFailure == null
+                            ? $"Types with regex '{regexName}' retrieved from '{softwarePath}' (PLC root and software units)"
+                            : $"Types with regex '{regexName}' retrieved from the PLC root of '{softwarePath}' only - the software units could not be read ({unitFailure}); the list is INCOMPLETE",
                         Items = responseList,
                         Meta = new JsonObject
                         {
                             ["timestamp"] = DateTime.Now,
-                            ["success"] = true
+                            ["success"] = unitFailure == null,
+                            ["complete"] = unitFailure == null,
+                            ["scope"] = unitFailure == null ? "plcRootAndSoftwareUnits" : "plcRootOnly",
+                            ["softwareUnitsFailure"] = unitFailure
                         }
                     };
                 }

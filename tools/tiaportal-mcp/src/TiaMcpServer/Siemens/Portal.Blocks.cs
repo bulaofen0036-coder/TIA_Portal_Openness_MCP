@@ -926,7 +926,16 @@ namespace TiaMcpServer.Siemens
             var tempDir = Path.Combine(Path.GetTempPath(), "TiaMcpServer_Export_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(tempDir);
 
-            var t = ExportType(softwarePath, typePath, tempDir, preservePath);
+            PlcType? t;
+            try
+            {
+                t = ExportType(softwarePath, typePath, tempDir, preservePath);
+            }
+            catch
+            {
+                try { Directory.Delete(tempDir, true); } catch { /* temp cleanup only */ }
+                throw;
+            }
             if (t == null) return null;
 
             var paths = Directory.GetFiles(tempDir, "*.xml", SearchOption.AllDirectories).ToList();

@@ -1173,13 +1173,15 @@ namespace TiaMcpServer.Siemens
                 }
                 // "Software units/<unit>/..." starts in that unit's own block group (#55). Only when the
                 // unit exists: a plain group that happens to be called "Software units" still resolves below.
-                else if (groupNames.Length > 1 && IsSoftwareUnitsSegment(groupNames[0]))
+                // Checked after the root label too: GetBlocksWithHierarchy lists the units under the root node
+                // (#61), so a path built from that tree reads "Program blocks/Software units/<unit>/...".
+                if (groupNames.Length > startIndex + 1 && IsSoftwareUnitsSegment(groupNames[startIndex]))
                 {
-                    var unit = GetPlcUnits(plcSoftware, out _).FirstOrDefault(u => u.Name.Equals(groupNames[1], StringComparison.OrdinalIgnoreCase));
+                    var unit = GetPlcUnits(plcSoftware, out _).FirstOrDefault(u => u.Name.Equals(groupNames[startIndex + 1], StringComparison.OrdinalIgnoreCase));
                     if (unit?.BlockGroup != null)
                     {
                         currentGroup = unit.BlockGroup;
-                        startIndex = 2;
+                        startIndex += 2;
                     }
                 }
 
@@ -1420,7 +1422,20 @@ namespace TiaMcpServer.Siemens
 
                 PlcTypeGroup? currentGroup = plcSoftware.TypeGroup;
 
-                foreach (var groupName in groupNames)
+                // "Software units/<unit>/..." starts in that unit's own type group (#62), same rule as blocks (#55):
+                // only when the unit exists, so a plain group called "Software units" still resolves below.
+                var startIndex = 0;
+                if (groupNames.Length > 1 && IsSoftwareUnitsSegment(groupNames[0]))
+                {
+                    var unit = GetPlcUnits(plcSoftware, out _).FirstOrDefault(u => u.Name.Equals(groupNames[1], StringComparison.OrdinalIgnoreCase));
+                    if (unit?.TypeGroup != null)
+                    {
+                        currentGroup = unit.TypeGroup;
+                        startIndex = 2;
+                    }
+                }
+
+                foreach (var groupName in groupNames.Skip(startIndex))
                 {
                     currentGroup = currentGroup.Groups.FirstOrDefault(g => g.Name.Equals(groupName, StringComparison.OrdinalIgnoreCase));
 
