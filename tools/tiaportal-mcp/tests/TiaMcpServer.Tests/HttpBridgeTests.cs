@@ -128,6 +128,10 @@ namespace TiaMcpServer.Tests
             check(HttpBodyEncoding.Resolve("application/json; charset=utf-8").CodePage == 65001, "an explicit utf-8 charset is honoured");
             check(HttpBodyEncoding.Resolve("application/json; charset=\"UTF-8\"").CodePage == 65001, "a quoted charset is honoured");
             check(HttpBodyEncoding.Resolve("application/json; charset=no-such-encoding").CodePage == 65001, "an unknown charset falls back to UTF-8");
+            // The two utf-8 cases above would pass even if charset parsing were broken (fallback is UTF-8 too):
+            // a non-UTF-8 charset is the only way to see the parser actually honour it.
+            check(HttpBodyEncoding.Resolve("application/json; charset=utf-16").CodePage == 1200, "an explicit non-UTF-8 charset is honoured");
+            check(HttpBodyEncoding.Resolve("application/json; charset=\"utf-16\"; foo=bar").CodePage == 1200, "a quoted charset followed by another parameter is honoured");
 
             // 现场故障：组名里的 U+00A0 被按 GBK 解成「聽」，该组下所有块都变成 Block not found。
             string blockPath = "Program blocks/6_\u00A0FunctionBlocks/FB1020_modbustcp_Client";

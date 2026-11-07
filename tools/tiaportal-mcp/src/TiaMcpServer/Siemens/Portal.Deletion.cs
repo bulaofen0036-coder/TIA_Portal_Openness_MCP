@@ -117,6 +117,7 @@ namespace TiaMcpServer.Siemens
             {
                 result["crossReferenceCount"] = refs.Count;
                 result["crossReferences"] = ToCrossReferenceArray(refs);
+                AddCrossReferenceCompleteness(result, warnings, LastCrossReferenceTruncation);
             }
             else
             {
@@ -240,13 +241,14 @@ namespace TiaMcpServer.Siemens
             };
 
             // 交叉引用：能查就查，查不到必须说清楚是「查不了」，不是「没人用」。
-            var refs = TryGetTagTableCrossReferences(table, resolvedPath, out var crossRefReason);
+            var refs = TryGetTagTableCrossReferences(table, resolvedPath, out var crossRefReason, out var crossRefTruncation);
             result["crossReferenceAvailable"] = refs != null;
             result["crossReferenceUnavailableReason"] = crossRefReason;
             if (refs != null)
             {
                 result["crossReferences"] = ToCrossReferenceArray(refs);
                 result["crossReferenceCount"] = refs.Count;
+                AddCrossReferenceCompleteness(result, warnings, crossRefTruncation);
             }
             else
             {
@@ -340,6 +342,7 @@ namespace TiaMcpServer.Siemens
             {
                 result["crossReferenceCount"] = refs.Count;
                 result["crossReferences"] = ToCrossReferenceArray(refs);
+                AddCrossReferenceCompleteness(result, warnings, LastCrossReferenceTruncation);
             }
             else
             {
@@ -466,8 +469,9 @@ namespace TiaMcpServer.Siemens
         /// 所以这里**试一次**，拿不到就如实回 null + 原因，绝不假装查过。
         /// </summary>
         private static List<ModelContextProtocol.CrossReferenceEntry>? TryGetTagTableCrossReferences(
-            object table, string resolvedPath, out string? reason)
+            object table, string resolvedPath, out string? reason, out string? truncation)
         {
+            truncation = null;
             var svc = TryGetServiceByTypeSuffix(table, "CrossReferenceService");
             if (svc == null)
             {
@@ -484,7 +488,20 @@ namespace TiaMcpServer.Siemens
             }
 
             reason = null;
-            return TryFlattenCrossReferenceResult(raw, resolvedPath);
+            return CrossReferenceFlattener.Flatten(raw, resolvedPath, out truncation);
+        }
+
+        /// <summary>
+        /// A partial cross-reference list must not read as "only N users" (issue #60):
+        /// flag it in the preview and warn before anyone deletes on the strength of it.
+        /// </summary>
+        private static void AddCrossReferenceCompleteness(JsonObject result, JsonArray warnings, string? truncation)
+        {
+            result["crossReferenceComplete"] = truncation == null;
+            result["crossReferenceTruncation"] = truncation;
+            if (truncation != null)
+                warnings.Add("⚠️ 交叉引用只查到一部分（枚举中途中断），crossReferenceCount 只是已查到的数量，"
+                    + "**不代表**全部引用者。删前请先备份，删后必须 CompileSoftware 看错误。原因：" + truncation);
         }
 
         private static bool TryInvokeVoidMethod(object target, string methodName)

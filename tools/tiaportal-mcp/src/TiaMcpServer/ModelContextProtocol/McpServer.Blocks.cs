@@ -220,13 +220,19 @@ namespace TiaMcpServer.ModelContextProtocol
                             Logger?.LogError(pex, "MCP ExportBlock failed for {SoftwarePath} {BlockPath} -> {ExportPath}",
                                 pex.Data?["softwarePath"], pex.Data?["blockPath"], pex.Data?["exportPath"]);
 
+                            msg += "\n" + ExportErrorContext.Line("export", "Block", softwarePath, blockPath, pex);
                             throw new McpException(msg, McpErrorCode.InternalError);
                         }
 
                     case TiaMcpServer.Siemens.PortalErrorCode.InvalidParams:
-                    case TiaMcpServer.Siemens.PortalErrorCode.InvalidState:
                         {
                             throw new McpException(pex.Message, McpErrorCode.InvalidParams);
+                        }
+
+                    case TiaMcpServer.Siemens.PortalErrorCode.InvalidState:
+                        {
+                            // e.g. inconsistent block: refused before Openness Export is called (issue #63 context).
+                            throw new McpException(pex.Message + "\n" + ExportErrorContext.Line("precheck", "Block", softwarePath, blockPath, pex), McpErrorCode.InvalidParams);
                         }
                 }
 

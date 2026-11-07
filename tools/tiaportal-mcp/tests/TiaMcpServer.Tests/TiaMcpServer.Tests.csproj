@@ -72,5 +72,10 @@
     <Compile Include="..\..\src\TiaMcpServer\Siemens\EverydayEditSpec.cs" Link="EverydayEditSpec.cs" />
     <!-- #54：Unified 离散报警写入前的预检（触发变量类型 / 位宽 / 同位冲突 / 报警类别）。 -->
     <Compile Include="..\..\src\TiaMcpServer\Siemens\HmiDiscreteAlarmSpec.cs" Link="HmiDiscreteAlarmSpec.cs" />
+    <!-- 2.7.9：#60 交叉引用整理（中途异常要标残缺）、#63 导出被拒的结构化上下文、#57 经典 HMI 变量表绝对地址。 -->
+    <Compile Include="..\..\src\TiaMcpServer\Siemens\CrossReferenceFlattener.cs" Link="CrossReferenceFlattener.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\CrossReferenceEntry.cs" Link="CrossReferenceEntry.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ExportErrorContext.cs" Link="ExportErrorContext.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ClassicHmiTagTableXmlBuilder.cs" Link="ClassicHmiTagTableXmlBuilder.cs" />
   </ItemGroup>
 </Project>

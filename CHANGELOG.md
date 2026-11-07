@@ -1,5 +1,34 @@
 ﻿# Change Log
 
+## [2.7.9] - 2026-11-07 - 中文入参不再被 HTTP 解坏、交叉引用残缺不报成功、经典 HMI 变量表支持绝对地址
+
+工具数不变（238）。
+
+### 修复
+
+- **HTTP 传输把中文 / 特殊字符入参解坏（感谢 @FalseLeonLai，来自 PR #59）**：请求头 `Content-Type` 不带 charset 时，
+  .NET Framework 的 `HttpListenerRequest.ContentEncoding` 返回系统默认编码（中文 Windows 上是 GBK），而不是 null，
+  原来的「取不到就用 UTF-8」从不生效。组名里的不换行空格 U+00A0 被解成「聽」，该组下的块全部 `Block not found`，
+  中文路径和注释同样损坏。现在默认按 UTF-8 解码，只有客户端明确写了 charset 才按它解。stdio 方式不受影响。
+- **`GetCrossReferences` 查到一半出错仍报成功（#60，感谢 @BoykaHe）**：Openness 枚举中途抛异常时，原来吞掉异常、
+  把已收集的半截（甚至空表）当完整结果返回，`success=true`。现在返回已收集的部分，同时 `Complete=false`、
+  `Truncation` 写明原因，`success=false`；结果对象没有 `Sources`、某个源的 `References` 取不到、或某个源带有尚未展开的
+  子分支（`Children`），也一样标不完整。枚举中博途进程退出则直接报错，不当作部分结果。
+  `DeletePlcBlock` / `DeletePlcTagTable` / `DeletePlcType` 的预览同步加 `crossReferenceComplete` / `crossReferenceTruncation`，
+  不完整时给出警告，避免「只查到 4 处引用」被当成全部。（子分支 `Children` 里的引用的递归读取另行跟进。）
+- **`BuildClassicHmiTagTableXml` 不支持绝对地址、静默忽略未知参数（#57，来自 #13 @King618219 的实测）**：
+  变量带 `LogicalAddress`（或 `Address`，如 `%M10.0`）时生成 `AddressAccessMode=Absolute` + `LogicalAddress` + `Connection`，
+  结构与 #13 中 V21 导入验证过的一致；连接名可在表级 `ConnectionName` 给出、变量级 `Connection` 覆盖；
+  表级 `Absolute=true` 时每个变量都必须有地址。不认识的键直接报错并列出支持的键（错误码 `InvalidParams`），原来会悄悄生成内部变量。
+  `analysis` 新增 `absoluteBindingCount`。V21 上经典 / 精简面板的变量导入只认绝对地址。
+
+### 新增
+
+- **导出被拒时的结构化错误上下文（#63，感谢 @BoykaHe）**：`ExportBlock` / `ExportType` 在导出前检查不过或导出本身失败时，错误文字末尾附一行
+  `ERROR_CONTEXT: {json}`，含 `code`、`phase`（`precheck` / `export`）、对象身份、`scope`（单对象为 `object`，
+  博途进程已退出或没打开工程为 `session`）、`reason`、`rootCauseKnown`、`retryable`（恒为 false）和博途原话 `nativeMessage`。
+  只凭 "not permitted" 判断不出是权限还是能力限制，所以 `reason=notPermitted` 时 `rootCauseKnown=false`。
+
 ## [2.7.8] - 2026-10-26 - 读软件单元、Unified 离散报警、反射调用的拒绝文字说清楚
 
 工具数 235 → 238；精简档不变（新工具用 FindTools 找、CallTool 调）。

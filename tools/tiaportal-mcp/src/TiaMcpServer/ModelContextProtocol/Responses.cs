@@ -294,6 +294,10 @@ namespace TiaMcpServer.ModelContextProtocol
     public class ResponseCrossReferences : ResponseMessage
     {
         public IEnumerable<CrossReferenceEntry>? Items { get; set; }
+        /// <summary>false = enumeration stopped part-way; Items holds only what was collected (issue #60).</summary>
+        public bool Complete { get; set; } = true;
+        /// <summary>Why the list is partial; null when Complete.</summary>
+        public string? Truncation { get; set; }
     }
 
     public class ResponseNetworkInfo : ResponseMessage

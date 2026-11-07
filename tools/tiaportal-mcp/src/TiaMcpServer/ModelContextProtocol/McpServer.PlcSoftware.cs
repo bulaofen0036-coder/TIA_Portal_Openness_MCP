@@ -996,13 +996,18 @@ namespace TiaMcpServer.ModelContextProtocol
             return int.TryParse(raw?.ToString(), out var parsed) ? parsed : 0;
         }
 
-        [McpServerTool(Name = "BuildClassicHmiTagTableXml"), Description("[L2][HMI-Classic]Offline-only helper: build a Classic/Basic WinCC HMI tag table XML document from structured JSON. Supports plain HMI tags and symbolic PLC bindings through Connection + ControllerTag/PlcTag. It does not connect to TIA Portal, import tags, or modify projects.")]
+        [McpServerTool(Name = "BuildClassicHmiTagTableXml"), Description("[L2][HMI-Classic]Offline-only helper: build a Classic/Basic WinCC HMI tag table XML document from structured JSON. Supports plain HMI tags, symbolic PLC bindings (Connection + ControllerTag/PlcTag) and absolute PLC addresses (Connection + LogicalAddress, e.g. %M10.0; Classic/Basic panel imports on V21 only accept absolute). Unknown fields are rejected. It does not connect to TIA Portal, import tags, or modify projects.")]
         public static ResponseXmlBuild BuildClassicHmiTagTableXml(
-            [Description("tableJson: JSON object with Name/TableName and Tags[]. Tag fields: Name, DataType, Length, optional Connection and ControllerTag/PlcTag.")] string tableJson)
+            [Description("tableJson: JSON object with Name/TableName, Tags[], optional ConnectionName (default connection for bound tags) and Absolute (true = every tag must have LogicalAddress). Tag fields: Name, DataType, Length, optional Connection, ControllerTag/PlcTag (symbolic) or LogicalAddress/Address (absolute, e.g. %M10.0).")] string tableJson)
         {
             try
             {
                 return BuildOfflineXmlBuilderReport(ClassicHmiTagTableXmlBuilder.BuildFromJson(tableJson), "Classic HMI tag table XML built offline");
+            }
+            catch (ArgumentException ex)
+            {
+                // Input validation (unknown field, missing connection, ...) is the caller's mistake, not an engine fault (issue #57).
+                throw new McpException(ex.Message, ex, McpErrorCode.InvalidParams);
             }
             catch (Exception ex) when (ex is not McpException)
             {
@@ -1030,6 +1035,10 @@ namespace TiaMcpServer.ModelContextProtocol
                         ["offlineOnly"] = true
                     }
                 };
+            }
+            catch (ArgumentException ex)
+            {
+                throw new McpException(ex.Message, ex, McpErrorCode.InvalidParams);
             }
             catch (Exception ex) when (ex is not McpException)
             {
@@ -2340,11 +2349,25 @@ namespace TiaMcpServer.ModelContextProtocol
                 var items = Portal.GetCrossReferences(softwarePath, objectPath, objectKind, filter);
                 if (items != null)
                 {
+                    var truncation = Portal.LastCrossReferenceTruncation;
+                    if (truncation != null)
+                    {
+                        // Partial result (issue #60): hand back what was collected, but never as a complete success.
+                        return new ResponseCrossReferences
+                        {
+                            Message = $"INCOMPLETE cross references for {objectKind} '{objectPath}': {items.Count} entries collected before enumeration stopped. {truncation}",
+                            Items = items,
+                            Complete = false,
+                            Truncation = truncation,
+                            Meta = new JsonObject { ["timestamp"] = DateTime.Now, ["success"] = false, ["complete"] = false }
+                        };
+                    }
+
                     return new ResponseCrossReferences
                     {
                         Message = $"Cross references retrieved for {objectKind} '{objectPath}'",
                         Items = items,
-                        Meta = new JsonObject { ["timestamp"] = DateTime.Now, ["success"] = true }
+                        Meta = new JsonObject { ["timestamp"] = DateTime.Now, ["success"] = true, ["complete"] = true }
                     };
                 }
 

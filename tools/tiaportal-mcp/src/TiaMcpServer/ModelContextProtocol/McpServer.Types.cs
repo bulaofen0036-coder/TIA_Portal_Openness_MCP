@@ -166,6 +166,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     case TiaMcpServer.Siemens.PortalErrorCode.NotFound:
                         throw new McpException(("Type not found." + BuildTypeDidYouMean(softwarePath, typePath)).Trim(), McpErrorCode.InvalidParams);
                     case TiaMcpServer.Siemens.PortalErrorCode.InvalidState:
+                        throw new McpException(pex.Message + "\n" + ExportErrorContext.Line("precheck", "Type", softwarePath, typePath, pex), McpErrorCode.InvalidParams);
                     case TiaMcpServer.Siemens.PortalErrorCode.InvalidParams:
                         throw new McpException(pex.Message, McpErrorCode.InvalidParams);
                     case TiaMcpServer.Siemens.PortalErrorCode.ExportFailed:
@@ -175,6 +176,7 @@ namespace TiaMcpServer.ModelContextProtocol
                             if (!string.IsNullOrEmpty(reason)) msg += $" Reason: {reason}";
                             Logger?.LogError(pex, "MCP ExportType failed for {SoftwarePath} {TypePath} -> {ExportPath}",
                                 pex.Data?["softwarePath"], pex.Data?["typePath"], pex.Data?["exportPath"]);
+                            msg += "\n" + ExportErrorContext.Line("export", "Type", softwarePath, typePath, pex);
                             throw new McpException(msg, McpErrorCode.InternalError);
                         }
                 }

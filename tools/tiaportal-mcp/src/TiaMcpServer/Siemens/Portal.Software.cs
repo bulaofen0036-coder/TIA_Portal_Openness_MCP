@@ -6582,8 +6582,15 @@ namespace TiaMcpServer.Siemens
             return current;
         }
 
+        /// <summary>
+        /// Why the last <see cref="GetCrossReferences"/> result is partial (issue #60); null = the walk completed.
+        /// Reset at the start of every call, so read it right after the call returns.
+        /// </summary>
+        public string? LastCrossReferenceTruncation { get; private set; }
+
         public List<ModelContextProtocol.CrossReferenceEntry>? GetCrossReferences(string softwarePath, string objectPath, string objectKind = "Block", string filter = "AllObjects")
         {
+            LastCrossReferenceTruncation = null;
             if (IsProjectNull()) return null;
 
             object? target = null;
@@ -6604,7 +6611,9 @@ namespace TiaMcpServer.Siemens
             var result = TryInvokeGetCrossReferences(crossReferenceService, filter);
             if (result == null) return null;
 
-            return TryFlattenCrossReferenceResult(result, objectPath);
+            var items = CrossReferenceFlattener.Flatten(result, objectPath, out var truncation);
+            LastCrossReferenceTruncation = truncation;
+            return items;
         }
 
         private static object? TryGetServiceByTypeSuffix(object target, string serviceTypeNameSuffix)
@@ -6648,69 +6657,6 @@ namespace TiaMcpServer.Siemens
             {
                 return null;
             }
-        }
-
-        private static List<ModelContextProtocol.CrossReferenceEntry> TryFlattenCrossReferenceResult(object crossReferenceResult, string sourcePathFallback)
-        {
-            var items = new List<ModelContextProtocol.CrossReferenceEntry>();
-
-            try
-            {
-                var sources = crossReferenceResult.GetType().GetProperty("Sources")?.GetValue(crossReferenceResult) as IEnumerable;
-                if (sources == null) return items;
-
-                foreach (var src in sources)
-                {
-                    if (src == null) continue;
-                    var srcName = src.GetType().GetProperty("Name")?.GetValue(src)?.ToString();
-                    var srcPath = src.GetType().GetProperty("Path")?.GetValue(src)?.ToString() ?? sourcePathFallback;
-
-                    var refs = src.GetType().GetProperty("References")?.GetValue(src) as IEnumerable;
-                    if (refs == null) continue;
-
-                    foreach (var rf in refs)
-                    {
-                        if (rf == null) continue;
-                        var refName = rf.GetType().GetProperty("Name")?.GetValue(rf)?.ToString();
-                        var refPath = rf.GetType().GetProperty("Path")?.GetValue(rf)?.ToString();
-
-                        var locations = rf.GetType().GetProperty("Locations")?.GetValue(rf) as IEnumerable;
-                        if (locations == null)
-                        {
-                            items.Add(new ModelContextProtocol.CrossReferenceEntry
-                            {
-                                SourceName = srcName,
-                                SourcePath = srcPath,
-                                ReferenceName = refName,
-                                ReferencePath = refPath
-                            });
-                            continue;
-                        }
-
-                        foreach (var loc in locations)
-                        {
-                            if (loc == null) continue;
-                            items.Add(new ModelContextProtocol.CrossReferenceEntry
-                            {
-                                SourceName = srcName,
-                                SourcePath = srcPath,
-                                ReferenceName = refName,
-                                ReferencePath = refPath,
-                                LocationName = loc.GetType().GetProperty("Name")?.GetValue(loc)?.ToString(),
-                                ReferenceLocation = loc.GetType().GetProperty("ReferenceLocation")?.GetValue(loc)?.ToString(),
-                                ReferenceType = loc.GetType().GetProperty("ReferenceType")?.GetValue(loc)?.ToString(),
-                                Access = loc.GetType().GetProperty("Access")?.GetValue(loc)?.ToString()
-                            });
-                        }
-                    }
-                }
-            }
-            catch
-            {
-                // best-effort
-            }
-
-            return items;
         }
 
         public List<string>? GetPlcExternalSources(string softwarePath)
