@@ -52,6 +52,7 @@
     <!-- 工具安全表：annotations、Openness 串行闸、CallTool 拒绝名单都从这一张表来。
          判错了什么都不会崩 —— 宿主只是不再在下载前问一句，或者两个调用在博途句柄上交错。 -->
     <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ToolSafety.cs" Link="ToolSafety.cs" />
+    <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ReadOnlyPolicy.cs" Link="ReadOnlyPolicy.cs" />
     <!-- CallTool 的绑定与调用：异步工具曾被序列化成 Task 对象，带注入参数的工具曾永远报缺参。 -->
     <Compile Include="..\..\src\TiaMcpServer\ModelContextProtocol\ReflectiveToolInvoker.cs" Link="ReflectiveToolInvoker.cs" />
     <!-- HTTP 传输：按 id 路由响应（超时后孤儿读线程吞掉下一条响应的那个 bug）+ 安全判定。 -->

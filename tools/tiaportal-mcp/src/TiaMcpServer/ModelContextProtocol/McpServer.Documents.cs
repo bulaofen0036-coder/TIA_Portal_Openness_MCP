@@ -83,11 +83,12 @@ namespace TiaMcpServer.ModelContextProtocol
             [Description("softwarePath: defines the path in the project structure to the plc software")] string softwarePath,
             [Description("exportPath: defines the path where to export the documents")] string exportPath,
             [Description("regexName: defines the name or regular expression to find the block. Use empty string (default) to find all")] string regexName = "",
-            [Description("preservePath: preserves the path/structure of the plc software")] bool preservePath = false)
+            [Description("preservePath: preserves the path/structure of the plc software")] bool preservePath = false,
+            [Description("softwareUnit: export only this software unit's blocks; empty = PLC root")] string softwareUnit = "")
         {
             var startTime = DateTime.Now;
             var progressToken = context.Params?.ProgressToken;
-            
+
             try
             {
                 if (Engineering.TiaMajorVersion < 20)
@@ -97,7 +98,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 // First, get the list of blocks to determine total count
                 Logger?.LogInformation($"Starting export of blocks as documents from '{softwarePath}' to '{exportPath}'");
                 
-                var allBlocks = await Task.Run(() => Portal.GetBlocks(softwarePath, regexName));
+                var allBlocks = await Task.Run(() => Portal.GetBlocksForExport(softwarePath, regexName, softwareUnit, "ExportBlocksAsDocuments"));
                 var totalBlocks = allBlocks?.Count ?? 0;
 
                 if (totalBlocks == 0)
@@ -141,7 +142,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 }
 
                 // Export blocks as documents asynchronously
-                var exportedBlocks = await Task.Run(() => Portal.ExportBlocksAsDocuments(softwarePath, exportPath, regexName, preservePath));
+                var exportedBlocks = await Task.Run(() => Portal.ExportBlocksAsDocuments(softwarePath, exportPath, regexName, preservePath, softwareUnit));
                 
                 // Send progress update after export completion
                 if (exportedBlocks != null && progressToken != null)
@@ -203,7 +204,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     // Surface per-block skip/failure reasons so a "matched N but exported 0" is never silent.
                     var failures = Portal.LastExportAsDocumentsFailures;
                     var skipped = totalBlocks - processedCount;
-                    var msg = $"Document export completed: {processedCount}/{totalBlocks} blocks (regex '{regexName}') from '{softwarePath}' to '{exportPath}'";
+                    var msg = $"Document export completed: {processedCount}/{totalBlocks} blocks (regex '{regexName}') from '{softwarePath}' to '{exportPath}'" + ExportScopeText(softwarePath, softwareUnit);
                     if (skipped > 0)
                     {
                         var reason = (failures != null && failures.Count > 0)
@@ -221,6 +222,7 @@ namespace TiaMcpServer.ModelContextProtocol
                         ["skippedBlocks"] = skipped,
                         ["duration"] = duration
                     };
+                    WithExportScope(meta, softwarePath, softwareUnit);
                     if (failures != null && failures.Count > 0)
                     {
                         var arr = new JsonArray();

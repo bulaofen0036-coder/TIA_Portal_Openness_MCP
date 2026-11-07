@@ -52,15 +52,17 @@ namespace TiaMcpServer.Siemens
         private static List<(PlcTagTable Table, string Path)> AllTagTables(PlcSoftware plc)
         {
             var list = new List<(PlcTagTable, string)>();
-            void Walk(PlcTagTableGroup g, string prefix)
-            {
-                foreach (var t in g.TagTables)
-                    list.Add((t, prefix.Length == 0 ? t.Name : prefix + "/" + t.Name));
-                foreach (PlcTagTableGroup sub in g.Groups)
-                    Walk(sub, prefix.Length == 0 ? sub.Name : prefix + "/" + sub.Name);
-            }
-            Walk(plc.TagTableGroup, "");
+            CollectTagTables(plc.TagTableGroup, "", list);
             return list;
+        }
+
+        private static void CollectTagTables(PlcTagTableGroup? g, string prefix, List<(PlcTagTable, string)> list)
+        {
+            if (g == null) return;
+            foreach (var t in g.TagTables)
+                list.Add((t, prefix.Length == 0 ? t.Name : prefix + "/" + t.Name));
+            foreach (PlcTagTableGroup sub in g.Groups)
+                CollectTagTables(sub, prefix.Length == 0 ? sub.Name : prefix + "/" + sub.Name, list);
         }
 
         private static (PlcTagTable Table, string Path)? FindTagTableByName(List<(PlcTagTable Table, string Path)> tables, string wanted)
@@ -130,10 +132,16 @@ namespace TiaMcpServer.Siemens
         }
 
         // ─────────────────────────────────────────────────────────────── GetPlcTags
-        public JsonObject GetPlcTags(string softwarePath, string tagTableName, string nameFilter, string addressFilter, bool includeConstants, int maxTags)
+        public JsonObject GetPlcTags(string softwarePath, string tagTableName, string nameFilter, string addressFilter, bool includeConstants, int maxTags, string softwareUnit = "")
         {
             var plc = RequirePlc("GetPlcTags", softwarePath);
-            var tables = AllTagTables(plc);
+            // #68: read the software units' tag tables too, under "Software units/<unit>/...". softwareUnit set =
+            // that unit only (nothing from the PLC root or other units, so same-named tables cannot mix).
+            var unitScope = (softwareUnit ?? "").Trim();
+            var tables = unitScope.Length == 0 ? AllTagTables(plc) : new List<(PlcTagTable Table, string Path)>();
+            var units = SelectSoftwareUnits(plc, unitScope, "GetPlcTags", out var unitFailure);
+            foreach (var u in units)
+                CollectTagTables(u.TagTableGroup, $"{SoftwareUnitsRoot}/{u.Name}", tables);
             if (!string.IsNullOrWhiteSpace(tagTableName))
             {
                 var hit = FindTagTableByName(tables, tagTableName);
@@ -186,6 +194,12 @@ namespace TiaMcpServer.Siemens
                 ["tags"] = arr,
             };
             if (includeConstants) result["userConstants"] = consts;
+            result["scope"] = unitScope.Length == 0 ? "plcRootAndSoftwareUnits" : "softwareUnit";
+            result["softwareUnits"] = new JsonArray(units.Select(u => (JsonNode)JsonValue.Create(u.Name)!).ToArray());
+            result["complete"] = unitFailure == null;
+            if (unitFailure != null)
+                result["warnings"] = new JsonArray((JsonNode)JsonValue.Create(
+                    $"The software units could not be read ({unitFailure}); only the PLC root tag tables are listed. The list is INCOMPLETE.")!);
             return result;
         }
 

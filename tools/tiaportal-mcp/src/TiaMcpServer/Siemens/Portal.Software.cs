@@ -172,6 +172,14 @@ namespace TiaMcpServer.Siemens
             var result = new List<string>();
             var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
             CollectTagTableNames(group, "", result, visited, diagnostics);
+            // #68: the software units' tag tables, as "Software units/<unit>/<table>" (ExportPlcTagTable takes that path).
+            var units = GetPlcUnitsOrFailure(plc, out var unitFailure);
+            foreach (var unit in units)
+            {
+                var unitGroup = ResolvePlcTagTableGroup(unit);
+                if (unitGroup != null) CollectTagTableNames(unitGroup, $"{SoftwareUnitsRoot}/{unit.Name}", result, visited);
+            }
+            diagnostics.SoftwareUnitsFailure = unitFailure;
             diagnostics.TablesFound = result.Count;
             return result;
         }
@@ -189,10 +197,21 @@ namespace TiaMcpServer.Siemens
             var plc = GetPlcSoftware(softwarePath);
             if (plc == null) { error = $"PLC software not found at '{softwarePath}'"; return false; }
 
-            var group = ResolvePlcTagTableGroup(plc);
+            object? group;
+            var wanted = (tagTableName ?? string.Empty).Replace('\\', '/').Trim('/');
+            // #68: "Software units/<unit>/<table>" is looked up inside that unit only.
+            var unitScoped = ResolveUnitScopedPath(plc, wanted, "ExportPlcTagTable");
+            if (unitScoped != null)
+            {
+                group = ResolvePlcTagTableGroup(unitScoped.Value.Unit);
+                wanted = unitScoped.Value.Remainder;
+            }
+            else
+            {
+                group = ResolvePlcTagTableGroup(plc);
+            }
             if (group == null) { error = $"tag table group not found on '{softwarePath}'"; return false; }
 
-            var wanted = (tagTableName ?? string.Empty).Replace('\\', '/').Trim('/');
             var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
             var table = FindTagTable(group, "", wanted, visited);
             if (table == null)
@@ -230,6 +249,8 @@ namespace TiaMcpServer.Siemens
             public string? TagTablesPropertyError { get; set; }
             public int GroupsVisited { get; set; }
             public int TablesFound { get; set; }
+            /// <summary>Set when the software units could not be read: the list then covers the PLC root only.</summary>
+            public string? SoftwareUnitsFailure { get; set; }
             public List<string> Notes { get; } = new List<string>();
         }
 

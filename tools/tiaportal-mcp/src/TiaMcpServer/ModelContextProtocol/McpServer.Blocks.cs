@@ -818,24 +818,48 @@ namespace TiaMcpServer.ModelContextProtocol
             };
         }
 
-        [McpServerTool(Name = "ExportBlocks"), Description("[L2][PLC-Software] Export all (or regexName-filtered) blocks to a directory as SimaticML XML. Pick the right tool: readable SCL/.s7dcl text → ExportBlocksAsDocuments; a single block → ExportBlock.")]
+        /// <summary>Scope of a bulk block export (#66): which unit, or the root and which units it left out.</summary>
+        internal static JsonObject WithExportScope(JsonObject meta, string softwarePath, string? softwareUnit)
+        {
+            if (!string.IsNullOrWhiteSpace(softwareUnit))
+            {
+                meta["scope"] = "softwareUnit";
+                meta["softwareUnit"] = softwareUnit!.Trim();
+                return meta;
+            }
+            meta["scope"] = "plcRoot";
+            var units = Portal.GetSoftwareUnitBlockGroups(softwarePath, out var failure);
+            if (units.Count > 0) meta["excludedSoftwareUnits"] = new JsonArray(units.Select(u => (JsonNode)JsonValue.Create(u.Name)!).ToArray());
+            if (failure != null) meta["softwareUnitsFailure"] = failure;
+            return meta;
+        }
+
+        internal static string ExportScopeText(string softwarePath, string? softwareUnit)
+        {
+            if (!string.IsNullOrWhiteSpace(softwareUnit)) return $" (software unit '{softwareUnit!.Trim()}' only)";
+            var units = Portal.GetSoftwareUnitBlockGroups(softwarePath, out _);
+            return units.Count == 0 ? "" : $" (PLC root only; {units.Count} software unit(s) not included: {string.Join(", ", units.Select(u => u.Name))} - pass softwareUnit to export one)";
+        }
+
+        [McpServerTool(Name = "ExportBlocks"), Description("[L2][PLC-Software] Export all (or regexName-filtered) blocks of the PLC root to a directory as SimaticML XML; softwareUnit exports exactly one software unit's blocks instead (nothing from the root or other units). Per-block failures are listed in Meta.failures. Pick the right tool: readable SCL/.s7dcl text → ExportBlocksAsDocuments; a single block → ExportBlock.")]
         public static async Task<ResponseExportBlocks> ExportBlocks(
             IMcpServer server,
             RequestContext<CallToolRequestParams> context,
             [Description("softwarePath: defines the path in the project structure to the plc software")] string softwarePath,
             [Description("exportPath: defines the path where to export the blocks")] string exportPath,
             [Description("regexName: defines the name or regular expression to find the block. Use empty string (default) to find all")] string regexName = "",
-            [Description("preservePath: preserves the path/structure of the plc software")] bool preservePath = false)
+            [Description("preservePath: preserves the path/structure of the plc software")] bool preservePath = false,
+            [Description("softwareUnit: export only this software unit's blocks (see GetBlocksWithHierarchy 'Software units'); empty = PLC root")] string softwareUnit = "")
         {
             var startTime = DateTime.Now;
             var progressToken = context.Params?.ProgressToken;
-            
+
             try
             {
                 // First, get the list of blocks to determine total count
-                Logger?.LogInformation($"Starting export of blocks from '{softwarePath}' to '{exportPath}'");
-                
-                var allBlocks = await Task.Run(() => Portal.GetBlocks(softwarePath, regexName));
+                Logger?.LogInformation($"Starting export of blocks from '{softwareUnit}' '{softwarePath}' to '{exportPath}'");
+
+                var allBlocks = await Task.Run(() => Portal.GetBlocksForExport(softwarePath, regexName, softwareUnit, "ExportBlocks"));
                 var totalBlocks = allBlocks?.Count ?? 0;
 
                 if (totalBlocks == 0)
@@ -853,16 +877,16 @@ namespace TiaMcpServer.ModelContextProtocol
                     
                     return new ResponseExportBlocks
                     {
-                        Message = $"No blocks found with regex '{regexName}' in '{softwarePath}'",
+                        Message = $"No blocks found with regex '{regexName}' in '{softwarePath}'" + ExportScopeText(softwarePath, softwareUnit),
                         Items = new List<ResponseBlockInfo>(),
-                        Meta = new JsonObject
+                        Meta = WithExportScope(new JsonObject
                         {
                             ["timestamp"] = DateTime.Now,
                             ["success"] = true,
                             ["totalBlocks"] = 0,
                             ["exportedBlocks"] = 0,
                             ["duration"] = (DateTime.Now - startTime).TotalSeconds
-                        }
+                        }, softwarePath, softwareUnit)
                     };
                 }
 
@@ -879,7 +903,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 }
 
                 // Export blocks asynchronously
-                var exportedBlocks = await Task.Run(() => Portal.ExportBlocks(softwarePath, exportPath, regexName, preservePath));
+                var exportedBlocks = await Task.Run(() => Portal.ExportBlocks(softwarePath, exportPath, regexName, preservePath, softwareUnit));
 
                 // Build list of inconsistent (skipped) blocks for reporting
                 var inconsistentInfos = new List<ResponseBlockInfo>();
@@ -965,20 +989,27 @@ namespace TiaMcpServer.ModelContextProtocol
                     var duration = (DateTime.Now - startTime).TotalSeconds;
                     Logger?.LogInformation($"Export completed: {processedCount} blocks exported in {duration:F2} seconds");
 
+                    var failures = Portal.LastExportBlocksFailures;
+                    var meta = WithExportScope(new JsonObject
+                    {
+                        ["timestamp"] = DateTime.Now,
+                        ["success"] = failures.Count == 0,
+                        ["totalBlocks"] = totalBlocks,
+                        ["exportedBlocks"] = processedCount,
+                        ["inconsistentBlocks"] = inconsistentInfos.Count,
+                        ["failedBlocks"] = failures.Count,
+                        ["duration"] = duration
+                    }, softwarePath, softwareUnit);
+                    if (failures.Count > 0) meta["failures"] = new JsonArray(failures.Select(f => (JsonNode)JsonValue.Create(f)!).ToArray());
+
                     return new ResponseExportBlocks
                     {
-                        Message = $"Export completed: {processedCount} blocks with regex '{regexName}' exported from '{softwarePath}' to '{exportPath}'",
+                        Message = $"Export completed: {processedCount} blocks with regex '{regexName}' exported from '{softwarePath}' to '{exportPath}'"
+                                  + ExportScopeText(softwarePath, softwareUnit)
+                                  + (failures.Count > 0 ? $". {failures.Count} block(s) FAILED: " + string.Join("; ", failures.Take(5)) + (failures.Count > 5 ? " ..." : "") : ""),
                         Items = responseList,
                         Inconsistent = inconsistentInfos,
-                        Meta = new JsonObject
-                        {
-                            ["timestamp"] = DateTime.Now,
-                            ["success"] = true,
-                            ["totalBlocks"] = totalBlocks,
-                            ["exportedBlocks"] = processedCount,
-                            ["inconsistentBlocks"] = inconsistentInfos.Count,
-                            ["duration"] = duration
-                        }
+                        Meta = meta
                     };
                 }
                 else

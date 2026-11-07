@@ -32,7 +32,21 @@ namespace TiaMcpServer.ModelContextProtocol
         /// 诊断放最外层是因为它必须在参数绑定之前拦住调用（副作用一点都不许发生），
         /// 也不该为了报一句「参数写错了」去排队等闸。</summary>
         public static IList<McpServerTool> WrapTools(IList<McpServerTool> tools) =>
-            WrapWithArgDiagnostics(WrapWithPortalGate(WrapWithResponseGuard(Annotate(tools))));
+            WrapWithReadOnlyPolicy(WrapWithArgDiagnostics(WrapWithPortalGate(WrapWithResponseGuard(Annotate(tools)))));
+
+        /// <summary>只读模式（#67）在最外层：被拒的调用连参数绑定都不进，更不排队等闸。
+        /// 每个工具都包，开没开在调用时判（ReadOnlyPolicy.Enabled），不靠注册时的快照。</summary>
+        public static IList<McpServerTool> WrapWithReadOnlyPolicy(IList<McpServerTool> tools)
+        {
+            if (tools == null) return new List<McpServerTool>();
+            var outList = new List<McpServerTool>(tools.Count);
+            foreach (var t in tools)
+            {
+                if (t == null) continue;
+                outList.Add(new ReadOnlyPolicyTool(t));
+            }
+            return outList;
+        }
 
         /// <summary>把 ToolSafety 的判定写进协议层的 annotations。不写的话，按 MCP 规范的默认值
         /// 每个工具都是「可能破坏、会碰外部世界」，宿主没法区分 GetBlocks 和 DownloadToPlc。
@@ -78,6 +92,51 @@ namespace TiaMcpServer.ModelContextProtocol
                 outList.Add(new ArgDiagnosticTool(t));
             }
             return outList;
+        }
+    }
+
+    internal sealed class ReadOnlyPolicyTool : McpServerTool
+    {
+        private readonly McpServerTool _inner;
+
+        public ReadOnlyPolicyTool(McpServerTool inner)
+        {
+            _inner = inner ?? throw new ArgumentNullException(nameof(inner));
+        }
+
+        public override Tool ProtocolTool => _inner.ProtocolTool;
+
+        public override async ValueTask<CallToolResult> InvokeAsync(
+            RequestContext<CallToolRequestParams> request,
+            CancellationToken cancellationToken = default)
+        {
+            if (ReadOnlyPolicy.Enabled)
+            {
+                var args = request?.Params?.Arguments;
+                var refusal = ReadOnlyPolicy.Refusal(ProtocolTool?.Name, key => ArgBool(args, key));
+                if (refusal != null)
+                    return new CallToolResult
+                    {
+                        IsError = true,
+                        Content = new List<ContentBlock> { new TextContentBlock { Text = refusal } }
+                    };
+            }
+            return await _inner.InvokeAsync(request!, cancellationToken).ConfigureAwait(false);
+        }
+
+        internal static bool? ArgBool(IReadOnlyDictionary<string, JsonElement>? args, string key)
+        {
+            if (args == null) return null;
+            foreach (var kv in args)
+            {
+                if (!string.Equals(kv.Key, key, StringComparison.OrdinalIgnoreCase)) continue;
+                var v = kv.Value;
+                if (v.ValueKind == JsonValueKind.True) return true;
+                if (v.ValueKind == JsonValueKind.False) return false;
+                if (v.ValueKind == JsonValueKind.String && bool.TryParse(v.GetString(), out var b)) return b;
+                return null;
+            }
+            return null;
         }
     }
 

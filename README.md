@@ -228,6 +228,13 @@ technology. `reference/` is style/instruction reference only. See `notBundled` i
 `manifest/package-manifest.json`. For what Openness **cannot** do, see
 `手册/openness-limitations.md`.
 
+**Read-only mode:** start the server with `--read-only` (or `TIA_MCP_READ_ONLY=1`) and every call that could
+change the project, the CPU or the open project is refused before it runs — listed tools, `CallTool` and the
+HTTP bridge alike. Reads, exports (written to — and overwriting — the path you give, never the project) and
+connect / open / close stay available; an older project is not upgraded on open, and an export blocked by an
+online PLC is not taken offline for you. The flag covers the MCP server only (CLI verbs refuse to run with it).
+The `lite` / `full` profile only decides which tools are listed; it is not a write protection.
+
 ## Version branches & contributing
 
 `master` is always the stable line for **TIA Portal V20 / V21**; its default

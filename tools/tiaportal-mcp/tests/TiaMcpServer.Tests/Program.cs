@@ -90,6 +90,8 @@ namespace TiaMcpServer.Tests
 
             Console.WriteLine("== 2.7.10：交叉引用读子分支（#60）/ 列块含软件单元（#61）/ 软件单元类型与字段（#62）/ 绝对地址的 PLC 同步自检 ==");
             Release2710Tests.Run(Check, Skip);
+            Console.WriteLine("== 2.7.11：交叉引用诊断节点（#60 补充）/ 服务端只读模式（#67）/ 按软件单元导出（#66）/ 软件单元变量表（#68）==");
+            Release2711Tests.Run(Check, Skip);
 
             Console.WriteLine("== 日常编辑工具：参数校验 / 地址 / 组路径 / 归档文件名 / 整台设备守卫 ==");
             EverydayEditSpecTests.Run(Check);

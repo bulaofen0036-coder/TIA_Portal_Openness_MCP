@@ -1,5 +1,34 @@
 ﻿# Change Log
 
+## [2.7.11] - 2026-11-07 - 服务端只读模式、软件单元的变量表与按单元导出、认出交叉引用诊断节点
+
+工具数不变（238）。`GetPlcTags`、`ExportBlocks`、`ExportBlocksAsDocuments` 各多一个可选参数 `softwareUnit`；
+新增启动参数 `--read-only`。
+
+### 新增
+
+- **服务端只读模式（#67 第一阶段，感谢 @BoykaHe）**：启动时加 `--read-only`（或 `TIA_MCP_READ_ONLY=1`），
+  读取、导出、连接 / 打开 / 关闭工程照常；改工程、编译、保存、下载、写在线值、反射调用和不认识的工具一律拒绝，
+  被拒的调用什么都不执行。直接调用、`CallTool`、HTTP 走同一张表；`closeForeignProject=true` 和默认会改
+  Windows 用户组的 `Doctor` 也被拒（`Doctor(fix=false)` 放行）；打开旧版本工程不做升级；导出碰到 PLC 在线时不自动断开在线，
+  改为报错。导出会写入（并覆盖）调用方指定的路径。这个开关只管 MCP 服务端，和 `tia` 命令行动词一起用会报错退出。
+  `lite` / `full` 档位只管列出哪些工具，不是写保护。
+- **软件单元里的变量表和用户常量（#68，感谢 @BoykaHe）**：`GetPlcTagTables` 列出单元变量表
+  （`Software units/<单元>/<表>`），`ExportPlcTagTable` 按这个路径导出；`GetPlcTags` 默认读 PLC 根目录加全部单元，
+  `softwareUnit` 只读一个单元。常量的 `value` 是原始定义文本，不求值；注释带全部项目语言。单元读不出来时
+  `complete=false` 并给出警告；指定了不存在的单元直接报错并列出现有单元。
+- **按软件单元批量导出（#66，感谢 @BoykaHe）**：`ExportBlocks` / `ExportBlocksAsDocuments` 加 `softwareUnit`，
+  只导这个单元的块，不混入根目录和其他单元；`preservePath` 时放在 `Software units/<单元>/` 下。
+  不指定单元时 `meta.scope=plcRoot`，`excludedSoftwareUnits` 和消息里写明哪些单元没包含。
+
+### 修复
+
+- **交叉引用碰到博途的诊断节点时报成「完整、0 条」（#60 补充，感谢 @BoykaHe 提供复现）**：博途有时在源对象的位置
+  放一句「请重新创建交叉引用信息」的提示，节点不抛错、Path 为空、References / Children 都是空的。现在名字是这类提示
+  （中 / 英 / 德）且 Path 为空时，不再读它的分支，结果标为不完整并点名所在分支。两个条件缺一不判。
+- **`ExportBlocks` 的逐块失败只进日志**：某个块导出失败（文件被占用、许可证、Openness 拒绝）时，结果仍报成功、
+  调用方看不到。现在 `meta.failures` 逐条列出、`meta.failedBlocks` 计数，有失败时 `success=false`。
+
 ## [2.7.10] - 2026-11-07 - 交叉引用读进数据块成员、列块和类型覆盖软件单元、读 UDT 字段
 
 工具数不变（238）。`GetTypeInfo` 多一个可选参数 `includeMembers`。

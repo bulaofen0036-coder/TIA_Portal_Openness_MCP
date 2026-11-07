@@ -213,6 +213,14 @@ namespace TiaMcpServer.ModelContextProtocol
                         McpErrorCode.InvalidParams);
             }
 
+            // Read-only mode (#67): the same table as the outer wrapper, applied to the real target.
+            if (ReadOnlyPolicy.Enabled)
+            {
+                var refusal = ReadOnlyPolicy.Refusal(target, key => ArgBool(args, key));
+                if (refusal != null)
+                    throw new McpException("CallTool: " + refusal, McpErrorCode.InvalidRequest);
+            }
+
             // The generic reflection bridges run any public method once allowWrite is set. Through
             // CallTool the host would only ever see "CallTool"; make the write visible instead.
             if ((target == "InvokeObject" || target == "InvokeService") && IsTrue(args, "allowWrite"))
@@ -243,6 +251,23 @@ namespace TiaMcpServer.ModelContextProtocol
                 else value = cancellationToken;
                 return true;
             };
+        }
+
+        /// <summary>A boolean argument as the binder will see it: true / false, or null when it is missing, JSON null
+        /// or not a boolean (the binder then uses the parameter's default, so the policy must not assume false).</summary>
+        private static bool? ArgBool(JsonObject args, string key)
+        {
+            foreach (var kv in args)
+            {
+                if (!string.Equals(kv.Key, key, StringComparison.OrdinalIgnoreCase)) continue;
+                if (kv.Value is JsonValue v)
+                {
+                    if (v.TryGetValue<bool>(out var b)) return b;
+                    if (v.TryGetValue<string>(out var s) && bool.TryParse(s, out var sb)) return sb;
+                }
+                return null;
+            }
+            return null;
         }
 
         private static bool IsTrue(JsonObject args, string key)

@@ -775,7 +775,11 @@ namespace TiaMcpServer.Siemens
 
                     try
                     {
-                        _project = _portal?.Projects.OpenWithUpgrade(fi);
+                        // Read-only mode (#67): upgrading an older project writes an upgraded copy, so open as-is;
+                        // TIA then refuses an older-version project instead of converting it.
+                        _project = TiaMcpServer.ModelContextProtocol.ReadOnlyPolicy.Enabled
+                            ? _portal?.Projects.Open(fi)
+                            : _portal?.Projects.OpenWithUpgrade(fi);
                         _projectOpenedByUs = true;
                     }
                     catch (Exception ex)

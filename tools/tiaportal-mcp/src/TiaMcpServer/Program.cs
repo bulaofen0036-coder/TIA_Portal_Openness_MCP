@@ -114,6 +114,8 @@ namespace TiaMcpServer
                 // Tool roster size. --profile wins over TIA_MCP_PROFILE; default is lite.
                 // Must be applied before the MCP host is built, since it decides tools/list.
                 ModelContextProtocol.McpServer.SetProfileOverride(options.Profile);
+                // --read-only (#67): enforced per call in WrapTools and inside CallTool.
+                ModelContextProtocol.ReadOnlyPolicy.EnableFromCli(options.ReadOnly);
 
                 Engineering.LaunchWithUserInterface = options.PortalWithUserInterface;
                 LogDiag(options.PortalWithUserInterface
@@ -127,6 +129,12 @@ namespace TiaMcpServer
                 var verbArgs = Cli.CliVerbArgs.ExtractVerbArgs(args, Cli.CliCommands.IsVerb);
                 if (verbArgs != null)
                 {
+                    if (options.ReadOnly)
+                    {
+                        Console.Error.WriteLine("--read-only applies to the MCP server only; the CLI verbs (gen/patch/compile/import/...) do not check it. Nothing was run.");
+                        Environment.Exit(2);
+                        return;
+                    }
                     Environment.Exit(Cli.CliCommands.Run(verbArgs));
                     return;
                 }

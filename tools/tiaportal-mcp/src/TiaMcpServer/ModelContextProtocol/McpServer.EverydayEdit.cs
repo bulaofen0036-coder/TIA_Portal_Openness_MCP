@@ -27,27 +27,31 @@ namespace TiaMcpServer.ModelContextProtocol
         private static string[]? WarningsOf(JsonObject data) =>
             data["warnings"] is JsonArray w && w.Count > 0 ? w.Select(x => x?.ToString() ?? "").ToArray() : null;
 
-        [McpServerTool(Name = "GetPlcTags"), Description("[L1][PLC-Software][READ-ONLY] List PLC tags (name, type, address, comment, HMI flags) without an XML export. Filter by table, name substring and/or address prefix ('%Q' = every output). includeConstants adds user constants. Use to find what sits on an address or which addresses are free. Capped by maxTags (default 300, Meta.truncated). Requires: Connect + OpenProject (or AttachToOpenProject).")]
+        [McpServerTool(Name = "GetPlcTags"), Description("[L1][PLC-Software][READ-ONLY] List PLC tags (name, type, address, comment in every project language, HMI flags) without an XML export, from the PLC root AND every software unit (unit tables are listed as 'Software units/<unit>/<table>'; softwareUnit limits the read to one unit). Filter by table, name substring and/or address prefix ('%Q' = every output). includeConstants adds user constants (value = the definition text as written, not evaluated). Use to find what sits on an address or which addresses are free. Capped by maxTags (default 300, Meta.truncated). Requires: Connect + OpenProject (or AttachToOpenProject).")]
         public static ResponseJsonReport GetPlcTags(
             [Description("PLC software path, e.g. 'PLC_1'")] string softwarePath,
             [Description("one table (bare or group-qualified); empty = all")] string tagTableName = "",
             [Description("case-insensitive name substring; empty = all")] string nameFilter = "",
             [Description("address prefix, e.g. '%Q', '%I0.', '%MW'; empty = all")] string addressFilter = "",
             [Description("also list user constants")] bool includeConstants = false,
-            [Description("cap (default 300, max 5000)")] int maxTags = 300)
+            [Description("cap (default 300, max 5000)")] int maxTags = 300,
+            [Description("software unit name: only that unit's tag tables (nothing from the PLC root or other units); empty = PLC root + all units")] string softwareUnit = "")
         {
             try
             {
-                var data = Portal.GetPlcTags(softwarePath, tagTableName, nameFilter, addressFilter, includeConstants, maxTags);
+                var data = Portal.GetPlcTags(softwarePath, tagTableName, nameFilter, addressFilter, includeConstants, maxTags, softwareUnit);
+                bool complete = data["complete"]?.GetValue<bool>() ?? true;
                 int matched = data["matchedTags"]!.GetValue<int>();
                 int returned = data["returnedTags"]!.GetValue<int>();
                 return new ResponseJsonReport
                 {
                     Ok = true,
                     Message = $"{matched} 个变量符合条件（共 {data["totalTags"]} 个），返回 {returned} 个"
-                              + (matched > returned ? "；已截断，加筛选或调大 maxTags。" : "。"),
+                              + (matched > returned ? "；已截断，加筛选或调大 maxTags。" : "。")
+                              + (complete ? "" : " ⚠️ 软件单元没读成，只列了 PLC 根目录的变量表，清单不完整。"),
                     Data = data,
-                    Meta = new JsonObject { ["timestamp"] = DateTime.Now, ["readOnly"] = true, ["truncated"] = matched > returned },
+                    Warnings = WarningsOf(data),
+                    Meta = new JsonObject { ["timestamp"] = DateTime.Now, ["readOnly"] = true, ["truncated"] = matched > returned, ["complete"] = complete, ["scope"] = data["scope"]?.ToString() },
                 };
             }
             catch (Exception ex) when (ex is not McpException) { throw EditError("GetPlcTags", softwarePath, ex); }

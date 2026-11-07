@@ -2405,7 +2405,7 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
-        [McpServerTool(Name = "GetPlcTagTables"), Description("[L2][PLC-Software] List all PLC tag table names. Requires: Connect + OpenProject. softwarePath from GetProjectTree (e.g. 'PLC_1'). Use before ExportPlcTagTable to get exact table names, or before ImportPlcTagTable to check for conflicts.")]
+        [McpServerTool(Name = "GetPlcTagTables"), Description("[L2][PLC-Software] List all PLC tag table names, including the software units' tables as 'Software units/<unit>/<table>' (pass that path to ExportPlcTagTable; GetPlcTags softwareUnit reads one unit's tags). Requires: Connect + OpenProject. softwarePath from GetProjectTree (e.g. 'PLC_1'). Use before ExportPlcTagTable to get exact table names, or before ImportPlcTagTable to check for conflicts.")]
         public static ResponseStringList GetPlcTagTables(
             [Description("softwarePath: path in the project structure to the PLC software")] string softwarePath)
         {
@@ -2418,7 +2418,9 @@ namespace TiaMcpServer.ModelContextProtocol
                     // 在这个版本上叫别的名字 / 读属性时抛了异常被吞掉。三者返回的东西
                     // 一模一样，用户报「枚举返回空但删除工具能找到同一张表」时我们手上
                     // 没有任何证据。所以空清单必须把「走过了什么」一并带回来。
-                    var meta = new JsonObject { ["timestamp"] = DateTime.Now, ["success"] = true };
+                    var meta = new JsonObject { ["timestamp"] = DateTime.Now, ["success"] = true, ["complete"] = walk.SoftwareUnitsFailure == null };
+                    if (walk.SoftwareUnitsFailure != null)
+                        meta["softwareUnitsFailure"] = "The software units could not be read (" + walk.SoftwareUnitsFailure + "); only the PLC root tables are listed.";
                     if (items.Count == 0)
                     {
                         meta["walkedGroupType"] = walk.RootGroupType;
@@ -2450,7 +2452,7 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
-        [McpServerTool(Name = "ExportPlcTagTable"), Description("[L2][PLC-Software]Export one PLC tag table (PlcTagTable) to XML file")]
+        [McpServerTool(Name = "ExportPlcTagTable"), Description("[L2][PLC-Software]Export one PLC tag table (PlcTagTable) to XML file. A software unit's table: 'Software units/<unit>/<table>' as listed by GetPlcTagTables.")]
         public static ResponseExportFile ExportPlcTagTable(
             [Description("softwarePath: path in the project structure to the PLC software")] string softwarePath,
             [Description("tagTableName: PLC tag table name")] string tagTableName,
@@ -3938,6 +3940,10 @@ namespace TiaMcpServer.ModelContextProtocol
             try { return op(); }
             catch (Exception ex) when (IsOnlineModeError(ex))
             {
+                // Read-only mode (#67): going offline drops the user's online sessions, so it is not done here.
+                if (ReadOnlyPolicy.Enabled)
+                    throw new McpException("READ-ONLY MODE: TIA refused because a PLC is online, and in read-only mode the server does not take PLCs offline (that would drop the user's online session). "
+                        + "Go offline in TIA Portal and call again. TIA said: " + ex.Message, ex, McpErrorCode.InvalidRequest);
                 try { Portal.GoOfflineAll(); } catch { }
                 return op(); // retry once, now fully offline
             }

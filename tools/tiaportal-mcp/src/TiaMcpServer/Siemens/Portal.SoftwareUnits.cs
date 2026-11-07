@@ -164,6 +164,36 @@ namespace TiaMcpServer.Siemens
                 CollectTypesWithPaths(sub, groupPath.Length == 0 ? sub.Name : $"{groupPath}/{sub.Name}", owner, filter, list);
         }
 
+        /// <summary>
+        /// The units a read covers (#66, #68). softwareUnit empty = every unit; a failure to read them is then
+        /// returned in <paramref name="failure"/> so the caller can mark its result incomplete. softwareUnit set =
+        /// exactly that unit; not being able to read the units, or a unit that does not exist, is an error
+        /// (an explicit scope must never quietly become "nothing").
+        /// </summary>
+        internal static List<PlcUnit> SelectSoftwareUnits(PlcSoftware software, string? softwareUnit, string tool, out string? failure)
+        {
+            var units = GetPlcUnitsOrFailure(software, out failure);
+            var wanted = (softwareUnit ?? "").Trim();
+            if (wanted.Length == 0) return units;
+            if (failure != null)
+                throw new PortalException(PortalErrorCode.OpennessError, $"{tool}: the software units could not be read ({failure}), so software unit '{wanted}' cannot be reached.");
+            var hit = units.FirstOrDefault(u => string.Equals(u.Name, wanted, StringComparison.OrdinalIgnoreCase));
+            if (hit == null)
+                throw new PortalException(PortalErrorCode.NotFound,
+                    $"{tool}: no software unit named '{wanted}'. Units of this PLC: " + (units.Count == 0 ? "(none)" : string.Join(", ", units.Select(u => u.Name))) + ".");
+            return new List<PlcUnit> { hit };
+        }
+
+        /// <summary>"Software units/&lt;unit&gt;/&lt;rest&gt;" → that unit and the rest of the path; null when the
+        /// path does not start with the software-units prefix (then it is a PLC root path).</summary>
+        internal static (PlcUnit Unit, string Remainder)? ResolveUnitScopedPath(PlcSoftware software, string? path, string tool)
+        {
+            var parts = (path ?? "").Replace('\\', '/').Trim('/').Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 3 || !IsSoftwareUnitsSegment(parts[0])) return null;
+            var unit = SelectSoftwareUnits(software, parts[1], tool, out _)[0];
+            return (unit, string.Join("/", parts.Skip(2)));
+        }
+
         /// <summary>Like GetPlcUnits, but a CPU without a unit provider is "no units", not a failure.</summary>
         private static List<PlcUnit> GetPlcUnitsOrFailure(PlcSoftware software, out string? failure)
         {

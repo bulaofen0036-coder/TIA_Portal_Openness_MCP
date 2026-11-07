@@ -682,8 +682,34 @@ namespace TiaMcpServer.Siemens
             }
         }
 
-        public IEnumerable<PlcBlock>? ExportBlocks(string softwarePath, string exportPath, string regexName = "", bool preservePath = false)
+        /// <summary>
+        /// The blocks a bulk export covers (#66). softwareUnit empty = the PLC root, as before; set = exactly that
+        /// software unit's blocks, nothing from the PLC root or another unit, so same-named blocks cannot mix.
+        /// An unknown unit or unreadable units are errors, never an empty export.
+        /// </summary>
+        public List<PlcBlock>? GetBlocksForExport(string softwarePath, string regexName, string? softwareUnit, string tool)
         {
+            var unitName = (softwareUnit ?? "").Trim();
+            if (unitName.Length == 0) return GetBlocks(softwarePath, regexName);
+            if (IsProjectNull()) return null;
+            if (GetSoftwareContainer(softwarePath)?.Software is not PlcSoftware plc)
+                throw new PortalException(PortalErrorCode.NotFound, $"{tool}: PLC software not found at '{softwarePath}'." + AvailablePlcPathsSuffix());
+            var unit = SelectSoftwareUnits(plc, unitName, tool, out _)[0];
+            var list = new List<PlcBlock>();
+            if (unit.BlockGroup != null) GetBlocksRecursive((PlcBlockGroup)unit.BlockGroup, list, regexName);
+            return list;
+        }
+
+        /// <summary>Folder prefix for a unit export with preservePath ("Software units\&lt;unit&gt;"); empty for the PLC root.</summary>
+        private static string UnitExportDir(string? softwareUnit)
+            => string.IsNullOrWhiteSpace(softwareUnit) ? "" : Path.Combine(SoftwareUnitsRoot, softwareUnit!.Trim());
+
+        /// <summary>Per-block failures of the last ExportBlocks call ("name: reason"); the tool reports them.</summary>
+        public IReadOnlyList<string> LastExportBlocksFailures { get; private set; } = new List<string>();
+
+        public IEnumerable<PlcBlock>? ExportBlocks(string softwarePath, string exportPath, string regexName = "", bool preservePath = false, string softwareUnit = "")
+        {
+            LastExportBlocksFailures = new List<string>();
             _logger?.LogInformation("Exporting blocks...");
 
             if (IsProjectNull())
@@ -698,11 +724,12 @@ namespace TiaMcpServer.Siemens
 
             try
             {
-                list = (GetBlocks(softwarePath, regexName) is { } got ? got.ToArray() : []);
+                list = (GetBlocksForExport(softwarePath, regexName, softwareUnit, "ExportBlocks") is { } got ? got.ToArray() : []);
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to retrieve block list for {SoftwarePath}", softwarePath);
+                LastExportBlocksFailures = new List<string> { "(block list): " + ex.Message };
                 return exportList;
             }
 
@@ -720,7 +747,7 @@ namespace TiaMcpServer.Siemens
                     {
                         groupPath = GetPlcBlockGroupPath(parentGroup);
                     }
-                    path = Path.Combine(exportPath, groupPath.Replace('/', '\\'), $"{block.Name}.xml");
+                    path = Path.Combine(exportPath, UnitExportDir(softwareUnit), groupPath.Replace('/', '\\'), $"{block.Name}.xml");
                 }
                 else
                 {
@@ -801,6 +828,7 @@ namespace TiaMcpServer.Siemens
                 _logger?.LogInformation($"ExportBlocks completed successfully. Exported {exportList.Count} blocks.");
             }
 
+            LastExportBlocksFailures = failures;
             return exportList;
         }
 
@@ -1070,8 +1098,9 @@ namespace TiaMcpServer.Siemens
         /// </summary>
         public IReadOnlyList<string> LastExportAsDocumentsFailures { get; private set; } = new List<string>();
 
-        public IEnumerable<PlcBlock>? ExportBlocksAsDocuments(string softwarePath, string exportPath, string regexName = "", bool preservePath = false)
+        public IEnumerable<PlcBlock>? ExportBlocksAsDocuments(string softwarePath, string exportPath, string regexName = "", bool preservePath = false, string softwareUnit = "")
         {
+            LastExportAsDocumentsFailures = new List<string>();
             _logger?.LogInformation("Exporting blocks as documents...");
 
             if (IsProjectNull())
@@ -1091,11 +1120,12 @@ namespace TiaMcpServer.Siemens
             PlcBlock[] list;
             try
             {
-                list = (GetBlocks(softwarePath, regexName) is { } got ? got.ToArray() : []);
+                list = (GetBlocksForExport(softwarePath, regexName, softwareUnit, "ExportBlocksAsDocuments") is { } got ? got.ToArray() : []);
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, $"Failed to retrieve block list for {softwarePath}");
+                LastExportAsDocumentsFailures = new List<string> { "(block list): " + ex.Message };
                 return exportList;
             }
 
@@ -1119,7 +1149,7 @@ namespace TiaMcpServer.Siemens
                     var groupPath = GetPlcBlockGroupPath(parentGroup);
                     if (!string.IsNullOrWhiteSpace(groupPath))
                     {
-                        targetDir = Path.Combine(exportPath, groupPath.Replace('/', '\\'));
+                        targetDir = Path.Combine(exportPath, UnitExportDir(softwareUnit), groupPath.Replace('/', '\\'));
                     }
                 }
 

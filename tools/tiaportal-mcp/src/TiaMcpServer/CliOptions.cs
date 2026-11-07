@@ -8,6 +8,8 @@
         // Tool roster size: "lite" (default, the core tools) or "full" (everything).
         // null = not given on the command line; TIA_MCP_PROFILE then decides.
         public string? Profile { get; set; }
+        // --read-only: refuse every tool that could change the project, the CPU or the open project (#67).
+        public bool ReadOnly { get; set; }
         public string? Transport { get; set; } // "stdio" (default) or "http"
         public string? HttpPrefix { get; set; } // e.g. "http://127.0.0.1:8765/"
         public string? HttpApiKey { get; set; } // optional X-API-Key header value (or TIA_MCP_HTTP_API_KEY)
@@ -139,6 +141,11 @@
                             options.TiaPortalLocation = args[i + 1];
                             i++;
                         }
+                        break;
+
+                    case "-read-only":
+                    case "--read-only":
+                        options.ReadOnly = true;
                         break;
 
                     case "-profile":

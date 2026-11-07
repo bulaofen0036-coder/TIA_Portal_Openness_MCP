@@ -22,7 +22,8 @@ namespace TiaMcpServer.Siemens
     /// hierarchy path and not expanded further; its siblings are still read, so the caller learns what
     /// was read and what was not. Only Name / Path / References / Children / Locations are touched — never
     /// UnderlyingObject — and nothing is retried. A lost TIA Portal process is rethrown, never reported as
-    /// a partial result.
+    /// a partial result. A node that is really TIA's own diagnostic message (IsDiagnosticNode) is not read
+    /// at all and makes the result incomplete.
     ///
     /// Pure reflection, no Siemens types, so the offline test suite can drive it with fakes.
     /// </summary>
@@ -108,9 +109,19 @@ namespace TiaMcpServer.Siemens
                 try
                 {
                     var srcName = Prop(src, "Name");
+                    var rawPath = Prop(src, "Path");
+                    if (IsDiagnosticNode(srcName, rawPath))
+                    {
+                        // TIA puts its own error text where a source object should be and does not throw.
+                        // Its References / Children are empty, which would read as "nothing uses this".
+                        // Stop here without touching them and report the branch as unread.
+                        var at = parentHierarchy.Count == 0 ? "(source)" : string.Join(".", parentHierarchy);
+                        Unread.Add(at + " [TIA returned a cross-reference diagnostic instead of a source object: \"" + Shorten(srcName!) + "\"]");
+                        return;
+                    }
                     hierarchy.Add(string.IsNullOrEmpty(srcName) ? "?" : srcName!);
                     label = string.Join(".", hierarchy);
-                    var srcPath = Prop(src, "Path") ?? _fallbackPath;
+                    var srcPath = rawPath ?? _fallbackPath;
 
                     var refs = src.GetType().GetProperty("References")?.GetValue(src) as IEnumerable;
                     if (refs == null)
@@ -182,6 +193,34 @@ namespace TiaMcpServer.Siemens
         }
 
         private static string? Prop(object o, string name) => o.GetType().GetProperty(name)?.GetValue(o)?.ToString();
+
+        /// <summary>
+        /// A node that carries TIA's "cross-reference information is out of date / re-create it" message as its
+        /// Name (issue #60, observed on V21: Chinese UI text, empty Path, empty References and Children, no
+        /// exception). Both conditions are required: an empty Path alone happens on ordinary nodes, and the
+        /// message keywords alone could in theory be part of a (very odd) object name. The keyword lists cover
+        /// the Chinese, English and German UI texts; anything else falls through to the normal walk.
+        /// </summary>
+        internal static bool IsDiagnosticNode(string? name, string? path)
+        {
+            if (string.IsNullOrWhiteSpace(name) || !string.IsNullOrWhiteSpace(path)) return false;
+            var n = name!;
+            if (n.IndexOf("交叉引用", StringComparison.Ordinal) >= 0
+                && (n.IndexOf("重新创建", StringComparison.Ordinal) >= 0 || n.IndexOf("意外", StringComparison.Ordinal) >= 0))
+                return true;
+            if ((n.IndexOf("cross-reference", StringComparison.OrdinalIgnoreCase) >= 0 || n.IndexOf("cross reference", StringComparison.OrdinalIgnoreCase) >= 0)
+                && (n.IndexOf("recreate", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("re-create", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("unexpected", StringComparison.OrdinalIgnoreCase) >= 0))
+                return true;
+            if (n.IndexOf("Querverweis", StringComparison.OrdinalIgnoreCase) >= 0
+                && (n.IndexOf("neu erstellen", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("unerwartet", StringComparison.OrdinalIgnoreCase) >= 0))
+                return true;
+            return false;
+        }
+
+        private static string Shorten(string s) => s.Length <= 80 ? s : s.Substring(0, 80) + "...";
 
         private static bool HasAny(IEnumerable e)
         {
