@@ -1,7 +1,7 @@
 ﻿{
   "schemaVersion": "2026-05-25",
   "bundleVersion": "2.7.8",
-  "packageName": "TIA_MCP_V19_2.7.8_20261026",
+  "packageName": "TIA_MCP_V19_v2.7.8_20261030",
   "packageType": "tia-portal-mcp-complete-offline-delivery-bundle",
   "generatedAt": "2026-05-31T20:30:00+08:00",
   "refreshedAt": "2026-10-26T00:50:00+08:00",
@@ -83,13 +83,16 @@
     }
   },
   "capabilities": {
-    "mcpToolCount": 233,
+    "mcpToolCount": 235,
     "mcpToolLayers": {
       "L0": 9,
       "L1": 38,
-      "L2": 164
+      "L2": 166
     },
-    "newToolsThisRelease": [],
+    "newToolsThisRelease": [
+      "GetBlockInterface",
+      "GetTypeStructure"
+    ],
     "removedToolsThisRelease": [],
     "hmiTemplateJsonCount": 8,
     "plcTemplateJsonCount": 9,
