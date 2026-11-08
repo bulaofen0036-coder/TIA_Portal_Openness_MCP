@@ -59,7 +59,7 @@
 | `GetBlockInterface` | 读 FB/FC/OB/DB 的接口声明：Input / Output / InOut / Static / Temp / Constant；每个成员带类型、初值、注释、数组边界、嵌套结构。DB 的结构就是它的 Static 段。 |
 | `GetTypeStructure` | 读 UDT / `PlcType` 的结构（成员、类型、初值、注释、数组、嵌套）。 |
 
-- **为什么 V19 要走 XML**：V19 的 Openness 只给 `DataBlock.Interface`；FB/FC/OB 和 `PlcType` 没有 `Interface` CLR 属性。这两个工具在引擎侧把对象导出成临时 XML、解析完删除，宿主机只收 JSON——不依赖共享目录，也不会把文件写到错误的一侧。
+- **为什么 V19 必须走 XML（官方 API 核对）**：V19 的官方 `Siemens.Engineering.xml` 里只有 `DataBlock.Interface`（返回 `PlcBlockInterface`，且只有扁平的 `Members`）；`PlcBlock` 只有 `InterfaceModifiedDate`，`FunctionBlock` / `Function` / `OrganizationBlock` 继承 `PlcBlock`，`PlcType` 也没有 `Interface` 属性。FB/FC/OB/UDT 没有 typed interface API，而 `PlcBlock.Export(FileInfo, ExportOptions)` / `PlcType.Export(...)` 本身就是西门子官方的 SimaticML 导出；`<Interface><Sections>` 是官方文档定义的结构。因此 XML 不是反射或私有 API，而是 V19 上唯一的官方通用路径。详见 `docs/V19-INTERFACE-API.md`。
 - **前置条件**：块/类型必须一致（先编译）、PLC 必须离线（先 `GoOffline`）。在线调用会明确拒绝并给出恢复提示。
 - **反射桥修复**：`GetObjectProperty` / `ListObjectChildren` 以前对「属性不存在」「路径中段为 null」「不是集合」都回 `OK` + 空数据；现在返回结构化 `InvalidParams`，并提示改用 `GetBlockInterface`。这是报告里 `Interface` 静默成功那一类的根因。
 - **离线回归**：517 passed / 0 failed（新增 45 条接口解析用例）。
