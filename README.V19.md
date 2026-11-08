@@ -63,6 +63,7 @@
 - **前置条件**：块/类型必须一致（先编译）、PLC 必须离线（先 `GoOffline`）。在线调用会明确拒绝并给出恢复提示。
 - **反射桥修复**：`GetObjectProperty` / `ListObjectChildren` 以前对「属性不存在」「路径中段为 null」「不是集合」都回 `OK` + 空数据；现在返回结构化 `InvalidParams`，并提示改用 `GetBlockInterface`。这是报告里 `Interface` 静默成功那一类的根因。
 - **离线回归**：517 passed / 0 failed（新增 45 条接口解析用例）。
+- **真机状态**：本轮新增的 `GetBlockInterface` / `GetTypeStructure` 尚未在 TIA V19 真机上验证；上面的 48 PASS 是 2.7.8.1 旧矩阵，不覆盖这两个工具。
 
 ## 默认工具档位
 
