@@ -232,6 +232,13 @@ namespace TiaMcpServer.Tests
             check(empty.Sections.Count == 0 && empty.MemberCount == 0 && !empty.HasInterface,
                 "empty: no interface returns zero sections and HasInterface=false");
 
+            var interfaceNoSections = InterfaceXmlReader.Parse(
+                @"<Document><SW.Blocks.OB><AttributeList><Interface><Name>Main</Name></Interface><Name>OB1</Name></AttributeList></SW.Blocks.OB></Document>",
+                "Block");
+            check(interfaceNoSections.HasInterface && !interfaceNoSections.HasSections
+                  && interfaceNoSections.MemberCount == 0,
+                "empty: <Interface> without <Sections> is flagged as malformed by HasSections=false");
+
             // 6) Wrong/empty input must fail loudly.
             var threw = false;
             try { InterfaceXmlReader.Parse("not xml", "Block"); }

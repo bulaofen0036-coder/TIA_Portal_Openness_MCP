@@ -630,8 +630,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     {
                         return Portal.ListObjectChildren(objectKind, objectPath, collectionProperty, softwarePath, limit);
                     }
-                    catch (PortalException pex) when (pex.Code == PortalErrorCode.InvalidParams
-                                                   || pex.Code == PortalErrorCode.NotFound)
+                    catch (PortalException pex) when (pex.Code == PortalErrorCode.InvalidParams)
                     {
                         return GetInterfaceChildren(objectKind, objectPath, collectionProperty, softwarePath, limit);
                     }

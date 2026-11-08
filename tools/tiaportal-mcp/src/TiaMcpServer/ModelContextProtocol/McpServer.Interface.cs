@@ -34,6 +34,7 @@ namespace TiaMcpServer.ModelContextProtocol
         public int? MemberCount { get; set; }
         public bool? Truncated { get; set; }
         public bool? HasInterface { get; set; }
+        public bool? HasSections { get; set; }
         public IEnumerable<InterfaceSection>? Sections { get; set; }
         public string? Source { get; set; }
     }
@@ -74,6 +75,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     ? expectedXml
                     : new DirectoryInfo(tempDir).GetFiles("*.xml")
                         .OrderByDescending(f => f.LastWriteTimeUtc)
+                        .ThenBy(f => f.Name, StringComparer.Ordinal)
                         .FirstOrDefault();
                 if (xmlFile == null)
                 {
@@ -89,6 +91,9 @@ namespace TiaMcpServer.ModelContextProtocol
                 var noInterfaceNote = info.HasInterface
                     ? ""
                     : " No <Interface> element was found in the export; this object has no declared interface (for example an empty OB).";
+                var noSectionsNote = info.HasInterface && !info.HasSections
+                    ? " The export contains an <Interface> element but no <Sections>; the structure may be malformed."
+                    : "";
 
                 return new ResponseInterfaceStructure
                 {
@@ -105,15 +110,18 @@ namespace TiaMcpServer.ModelContextProtocol
                     MemberCount = info.MemberCount,
                     Truncated = info.Truncated,
                     HasInterface = info.HasInterface,
+                    HasSections = info.HasSections,
                     Sections = info.Sections,
                     Source = "block-xml-export",
-                    Message = $"Interface of block '{block.Name}': {info.MemberCount} member(s) in {info.Sections.Count} section(s).{truncatedNote}{noInterfaceNote}",
+                    Message = $"Interface of block '{block.Name}': {info.MemberCount} member(s) in {info.Sections.Count} section(s).{truncatedNote}{noInterfaceNote}{noSectionsNote}",
                     Meta = new JsonObject
                     {
                         ["timestamp"] = DateTime.Now,
                         ["success"] = true,
                         ["memberCount"] = info.MemberCount,
                         ["sectionCount"] = info.Sections.Count,
+                        ["hasInterface"] = info.HasInterface,
+                        ["hasSections"] = info.HasSections,
                         ["xmlBytes"] = xmlFile.Length
                     }
                 };
@@ -162,6 +170,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     ? expectedXml
                     : new DirectoryInfo(tempDir).GetFiles("*.xml")
                         .OrderByDescending(f => f.LastWriteTimeUtc)
+                        .ThenBy(f => f.Name, StringComparer.Ordinal)
                         .FirstOrDefault();
                 if (xmlFile == null)
                 {
@@ -177,6 +186,9 @@ namespace TiaMcpServer.ModelContextProtocol
                 var noInterfaceNote = info.HasInterface
                     ? ""
                     : " No <Interface> element was found in the export; this type has no declared structure.";
+                var noSectionsNote = info.HasInterface && !info.HasSections
+                    ? " The export contains an <Interface> element but no <Sections>; the structure may be malformed."
+                    : "";
 
                 return new ResponseInterfaceStructure
                 {
@@ -193,15 +205,18 @@ namespace TiaMcpServer.ModelContextProtocol
                     MemberCount = info.MemberCount,
                     Truncated = info.Truncated,
                     HasInterface = info.HasInterface,
+                    HasSections = info.HasSections,
                     Sections = info.Sections,
                     Source = "type-xml-export",
-                    Message = $"Structure of type '{type.Name}': {info.MemberCount} member(s) in {info.Sections.Count} section(s).{truncatedNote}{noInterfaceNote}",
+                    Message = $"Structure of type '{type.Name}': {info.MemberCount} member(s) in {info.Sections.Count} section(s).{truncatedNote}{noInterfaceNote}{noSectionsNote}",
                     Meta = new JsonObject
                     {
                         ["timestamp"] = DateTime.Now,
                         ["success"] = true,
                         ["memberCount"] = info.MemberCount,
                         ["sectionCount"] = info.Sections.Count,
+                        ["hasInterface"] = info.HasInterface,
+                        ["hasSections"] = info.HasSections,
                         ["xmlBytes"] = xmlFile.Length
                     }
                 };
@@ -256,12 +271,11 @@ namespace TiaMcpServer.ModelContextProtocol
 
             var listing = InterfaceXmlReader.BuildChildren(
                 iface.Sections, iface.Truncated == true, collectionProperty, limit);
-            var take = Math.Max(1, Math.Min(2000, limit));
 
             return new ResponseObjectChildren
             {
                 Message = listing.Truncated
-                    ? $"OK (truncated at limit={take}; {listing.Total} top-level item(s) available)."
+                    ? $"OK (truncated at limit={listing.EffectiveLimit}; {listing.Total} top-level item(s) available)."
                     : "OK",
                 ObjectKind = objectKind,
                 ObjectPath = objectPath,
@@ -274,6 +288,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     ["total"] = listing.Total,
                     ["truncated"] = listing.Truncated,
                     ["sourceTruncated"] = listing.SourceTruncated,
+                    ["sectionsMode"] = listing.IsSections,
                     ["empty"] = listing.Items.Count == 0,
                     ["source"] = isType ? "type-xml-export" : "block-xml-export"
                 }

@@ -28,7 +28,7 @@
 
 ### 离线回归
 
-- `TiaMcpServer.Tests` 525 passed / 0 failed（新增 53 条接口解析/列表用例）。
+- `TiaMcpServer.Tests` 526 passed / 0 failed（新增 54 条接口解析/列表用例）。
 
 ## [2.7.8.1] - 2026-10-30 - HTTP 请求体一律按 UTF-8 解码
 

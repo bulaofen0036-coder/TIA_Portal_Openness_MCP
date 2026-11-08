@@ -33,6 +33,7 @@ namespace TiaMcpServer.ModelContextProtocol
         public int MemberCount { get; set; }
         public bool Truncated { get; set; }
         public bool HasInterface { get; set; }
+        public bool HasSections { get; set; }
         public List<InterfaceSection> Sections { get; set; } = new List<InterfaceSection>();
     }
 
@@ -63,6 +64,7 @@ namespace TiaMcpServer.ModelContextProtocol
     {
         public List<string> Items { get; } = new List<string>();
         public int Total { get; set; }
+        public int EffectiveLimit { get; set; }
         public bool Truncated { get; set; }
         public bool SourceTruncated { get; set; }
         public bool IsSections { get; set; }
@@ -110,6 +112,7 @@ namespace TiaMcpServer.ModelContextProtocol
             {
                 IsSections = isSections,
                 SourceTruncated = sourceTruncated,
+                EffectiveLimit = take,
                 Total = isSections
                     ? list.Count
                     : list.Sum(s => s.Members?.Count ?? 0)
@@ -194,6 +197,7 @@ namespace TiaMcpServer.ModelContextProtocol
             var sectionsEl = Child(iface, "Sections");
             if (sectionsEl == null)
                 return structure;
+            structure.HasSections = true;
 
             var ctx = new ParseContext
             {
