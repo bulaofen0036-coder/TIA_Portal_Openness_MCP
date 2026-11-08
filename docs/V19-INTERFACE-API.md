@@ -21,9 +21,18 @@
 核对命令（PowerShell，路径按实际安装位置调整）：
 
 ```powershell
-$xml = "C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19\Siemens.Engineering.xml"
-Select-String -Path $xml -Pattern 'DataBlock\.Interface|PlcBlock\.InterfaceModifiedDate|PlcType\.InterfaceModifiedDate'
-# 不应出现 P:...PlcBlock.Interface 或 P:...PlcType.Interface
+$root = "C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19"
+$xml  = Join-Path $root "Siemens.Engineering.xml"
+$dll  = Join-Path $root "Siemens.Engineering.dll"
+(Get-Item $dll).VersionInfo.FileVersion
+Get-FileHash $dll -Algorithm SHA256
+
+# 精确负向断言：下面两条应无输出
+Select-String -Path $xml -Pattern 'P:Siemens\.Engineering\.SW\.Blocks\.PlcBlock\.Interface"'
+Select-String -Path $xml -Pattern 'P:Siemens\.Engineering\.SW\.Types\.PlcType\.Interface"'
+
+# 正向断言：下面这条应命中
+Select-String -Path $xml -Pattern 'P:Siemens\.Engineering\.SW\.Blocks\.DataBlock\.Interface"'
 ```
 
 `DataBlock.Interface` 返回的 `PlcBlockInterface` 也只有 `Members`，没有
@@ -75,8 +84,9 @@ Input/Output/InOut/Static/Temp/Constant 的段信息；DB 的“结构”就是�
 
 DB 的 `DataBlock.Interface.Members` 原生可用，`ListObjectChildren(Interface.Members)` 会先走原生，
 不需要块编译或 `GoOffline`；`Interface` / `Interface.Sections` 在 DB 上仍回退 XML（原生只有
-`Members`）。FB/FC/OB/UDT 全部走 XML。两种来源的 `Items` 形状不同：原生返回对象项，XML 返回
-`Section/Member` 字符串；调用方不要假设两者完全同形。
+`Members`）。FB/FC/OB/UDT 全部走 XML。两种来源的 `Items` 形状不同：原生返回裸成员名，XML 返回
+`Section/Member` 字符串；调用方不要假设两者完全同形。原生 `Interface.Members` 在 `limit` 处直接
+停止且不报告截断；需要完整列表时用 `GetBlockInterface`。
 
 ## 5. 参考
 

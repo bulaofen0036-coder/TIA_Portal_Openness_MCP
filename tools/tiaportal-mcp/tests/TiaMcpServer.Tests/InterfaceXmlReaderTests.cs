@@ -250,6 +250,17 @@ namespace TiaMcpServer.Tests
             catch (InvalidDataException) { threw = true; }
             check(threw, "invalid: non-block XML throws InvalidDataException");
 
+            threw = false;
+            try
+            {
+                InterfaceXmlReader.Parse(
+                    "<!DOCTYPE foo [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]>" +
+                    "<Document><SW.Blocks.OB><AttributeList><Name>OB1</Name></AttributeList></SW.Blocks.OB></Document>",
+                    "Block");
+            }
+            catch (InvalidDataException) { threw = true; }
+            check(threw, "security: DOCTYPE/DTD is rejected");
+
             // 7) Real V19-shaped export from the repo (skipped only when the test runs outside the repo).
             var realPath = Path.GetFullPath(Path.Combine(
                 AppContext.BaseDirectory,

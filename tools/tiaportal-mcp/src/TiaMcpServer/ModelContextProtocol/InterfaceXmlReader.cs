@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace TiaMcpServer.ModelContextProtocol
@@ -155,7 +156,17 @@ namespace TiaMcpServer.ModelContextProtocol
             XDocument doc;
             try
             {
-                doc = XDocument.Parse(xml, LoadOptions.PreserveWhitespace);
+                // SimaticML never needs a DTD. Pin the safe settings instead of relying on
+                // framework defaults, and cap the document size so a corrupted export cannot
+                // exhaust the engine process.
+                var settings = new XmlReaderSettings
+                {
+                    DtdProcessing = DtdProcessing.Prohibit,
+                    XmlResolver = null,
+                    MaxCharactersInDocument = 50_000_000
+                };
+                using (var reader = XmlReader.Create(new StringReader(xml), settings))
+                    doc = XDocument.Load(reader, LoadOptions.PreserveWhitespace);
             }
             catch (Exception ex)
             {

@@ -1,10 +1,10 @@
 ﻿{
   "schemaVersion": "2026-05-25",
   "bundleVersion": "2.7.8",
-  "packageName": "TIA_MCP_V19_v2.7.8_20261030",
+  "packageName": "TIA_MCP_V19_v2.7.8_20261108",
   "packageType": "tia-portal-mcp-complete-offline-delivery-bundle",
   "generatedAt": "2026-05-31T20:30:00+08:00",
-  "refreshedAt": "2026-10-26T00:50:00+08:00",
+  "refreshedAt": "2026-11-08T23:55:00+08:00",
   "target": {
     "tiaPortalMajorVersion": [
       19
@@ -85,9 +85,9 @@
   "capabilities": {
     "mcpToolCount": 235,
     "mcpToolLayers": {
-      "L0": 9,
-      "L1": 38,
-      "L2": 166
+      "L0": 10,
+      "L1": 45,
+      "L2": 180
     },
     "newToolsThisRelease": [
       "GetBlockInterface",

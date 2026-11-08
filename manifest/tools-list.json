@@ -1,6 +1,6 @@
 ﻿{
   "package": "TIA_MCP_V19_v2.7.8",
-  "generatedAt": "2026-10-26T15:15:37",
+  "generatedAt": "2026-11-08T23:55:00+08:00",
   "source": "tools/tiaportal-mcp/src/TiaMcpServer/ModelContextProtocol/*.cs (V19 build excludes VCI)",
   "toolCount": 235,
   "note": "Full roster (--profile full). The default lite profile lists only the core tools; the rest stay reachable via FindTools + CallTool. Runtime tools/list remains authoritative.",

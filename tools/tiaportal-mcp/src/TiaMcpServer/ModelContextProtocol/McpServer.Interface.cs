@@ -343,8 +343,10 @@ namespace TiaMcpServer.ModelContextProtocol
                             McpErrorCode.InvalidParams);
 
                     case PortalErrorCode.InvalidParams:
-                    case PortalErrorCode.InvalidState:
                         return new McpException(pex.Message, ex, McpErrorCode.InvalidParams);
+
+                    case PortalErrorCode.InvalidState:
+                        return new McpException(pex.Message, ex, McpErrorCode.InternalError);
 
                     case PortalErrorCode.ExportFailed:
                     {

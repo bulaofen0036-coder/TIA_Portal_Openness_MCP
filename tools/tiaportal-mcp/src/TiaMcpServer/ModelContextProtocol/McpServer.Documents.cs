@@ -619,6 +619,9 @@ namespace TiaMcpServer.ModelContextProtocol
         {
             try
             {
+                objectKind = (objectKind ?? string.Empty).Trim();
+                collectionProperty = (collectionProperty ?? string.Empty).Trim();
+
                 // V19 FB/FC/PlcType have no Interface CLR property; serve Interface* from the
                 // XML interface reader instead of returning an empty list. Keep the native path
                 // for DataBlock, which does expose DataBlock.Interface and does not require the
