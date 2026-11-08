@@ -599,7 +599,6 @@ namespace TiaMcpServer.ModelContextProtocol
                 // 属性不存在 / 路径中段为 null 同样是参数问题；它们以前被当成 OK 返回。
                 var code = pex.Code == PortalErrorCode.NotFound
                         || pex.Code == PortalErrorCode.InvalidParams
-                        || pex.Code == PortalErrorCode.InvalidState
                     ? McpErrorCode.InvalidParams
                     : McpErrorCode.InternalError;
                 throw new McpException(pex.Message, pex, code);
@@ -644,7 +643,6 @@ namespace TiaMcpServer.ModelContextProtocol
                 // 属性不存在 / 路径中段为 null / 不是集合同样是参数问题，不再回空列表。
                 var code = pex.Code == PortalErrorCode.NotFound
                         || pex.Code == PortalErrorCode.InvalidParams
-                        || pex.Code == PortalErrorCode.InvalidState
                     ? McpErrorCode.InvalidParams
                     : McpErrorCode.InternalError;
                 throw new McpException(pex.Message, pex, code);

@@ -71,11 +71,12 @@ Input/Output/InOut/Static/Temp/Constant 的段信息；DB 的“结构”就是�
 - 块/类型 `IsConsistent=true`（否则先编译）；
 - PLC 离线（先 `GoOffline`；在线模式 XML 导出不工作）。
 
-## 4. 为什么不做 DB 的 typed 快路径
+## 4. DB 的原生快路径
 
-可以做，但只覆盖 DB，而且 `PlcBlockInterface.Members` 是扁平的，没有段分类。
-为了 FB/FC/OB/DB/UDT 返回同一种结构，当前统一走 XML。若以后需要降低 DB 读取的
-前置要求，可以单独加一条 typed 快路径，但不能替代 FB/FC/OB/UDT 的 XML 路径。
+DB 的 `DataBlock.Interface.Members` 原生可用，`ListObjectChildren(Interface.Members)` 会先走原生，
+不需要块编译或 `GoOffline`；`Interface` / `Interface.Sections` 在 DB 上仍回退 XML（原生只有
+`Members`）。FB/FC/OB/UDT 全部走 XML。两种来源的 `Items` 形状不同：原生返回对象项，XML 返回
+`Section/Member` 字符串；调用方不要假设两者完全同形。
 
 ## 5. 参考
 

@@ -71,6 +71,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 }
 
                 var expectedXml = new FileInfo(Path.Combine(tempDir, block.Name + ".xml"));
+                var usedFallback = !expectedXml.Exists;
                 var xmlFile = expectedXml.Exists
                     ? expectedXml
                     : new DirectoryInfo(tempDir).GetFiles("*.xml")
@@ -85,6 +86,12 @@ namespace TiaMcpServer.ModelContextProtocol
                 }
 
                 var info = InterfaceXmlReader.ReadFile(xmlFile.FullName, "Block", maxMembers, includeComments);
+                if (usedFallback && !string.Equals(info.ObjectName, block.Name, StringComparison.Ordinal))
+                {
+                    throw new McpException(
+                        $"Export of '{blockPath}' produced '{xmlFile.Name}' for object '{info.ObjectName}', not '{block.Name}'; refusing to read a different object.",
+                        McpErrorCode.InternalError);
+                }
                 var truncatedNote = info.Truncated
                     ? $" Output truncated at maxMembers={Math.Max(1, Math.Min(5000, maxMembers))}; raise it to see the rest."
                     : "";
@@ -166,6 +173,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 }
 
                 var expectedXml = new FileInfo(Path.Combine(tempDir, type.Name + ".xml"));
+                var usedFallback = !expectedXml.Exists;
                 var xmlFile = expectedXml.Exists
                     ? expectedXml
                     : new DirectoryInfo(tempDir).GetFiles("*.xml")
@@ -180,6 +188,12 @@ namespace TiaMcpServer.ModelContextProtocol
                 }
 
                 var info = InterfaceXmlReader.ReadFile(xmlFile.FullName, "Type", maxMembers, includeComments);
+                if (usedFallback && !string.Equals(info.ObjectName, type.Name, StringComparison.Ordinal))
+                {
+                    throw new McpException(
+                        $"Export of type '{typePath}' produced '{xmlFile.Name}' for object '{info.ObjectName}', not '{type.Name}'; refusing to read a different object.",
+                        McpErrorCode.InternalError);
+                }
                 var truncatedNote = info.Truncated
                     ? $" Output truncated at maxMembers={Math.Max(1, Math.Min(5000, maxMembers))}; raise it to see the rest."
                     : "";
@@ -272,11 +286,29 @@ namespace TiaMcpServer.ModelContextProtocol
             var listing = InterfaceXmlReader.BuildChildren(
                 iface.Sections, iface.Truncated == true, collectionProperty, limit);
 
+            var interfaceNote = iface.HasInterface == false
+                ? " Export XML has no <Interface> element; this object has no declared interface."
+                : iface.HasSections == false
+                    ? " Export XML has an <Interface> element but no <Sections>; the structure may be malformed."
+                    : "";
+            string message;
+            if (!listing.Truncated)
+            {
+                message = "OK" + interfaceNote;
+            }
+            else if (listing.SourceTruncated && listing.Total <= listing.Items.Count)
+            {
+                message = "OK (parser reached maxMembers; the list is based on the parsed part)." + interfaceNote;
+            }
+            else
+            {
+                var sourceNote = listing.SourceTruncated ? " Parser also reached maxMembers." : "";
+                message = $"OK (truncated at limit={listing.EffectiveLimit}; {listing.Total} top-level item(s) observed).{sourceNote}{interfaceNote}";
+            }
+
             return new ResponseObjectChildren
             {
-                Message = listing.Truncated
-                    ? $"OK (truncated at limit={listing.EffectiveLimit}; {listing.Total} top-level item(s) available)."
-                    : "OK",
+                Message = message,
                 ObjectKind = objectKind,
                 ObjectPath = objectPath,
                 Collection = collectionProperty,
@@ -289,6 +321,8 @@ namespace TiaMcpServer.ModelContextProtocol
                     ["truncated"] = listing.Truncated,
                     ["sourceTruncated"] = listing.SourceTruncated,
                     ["sectionsMode"] = listing.IsSections,
+                    ["hasInterface"] = iface.HasInterface,
+                    ["hasSections"] = iface.HasSections,
                     ["empty"] = listing.Items.Count == 0,
                     ["source"] = isType ? "type-xml-export" : "block-xml-export"
                 }
