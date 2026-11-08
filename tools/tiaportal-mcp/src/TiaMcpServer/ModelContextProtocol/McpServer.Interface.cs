@@ -231,16 +231,22 @@ namespace TiaMcpServer.ModelContextProtocol
             int limit)
         {
             var isType = string.Equals(objectKind, "Type", StringComparison.OrdinalIgnoreCase);
+            // Parse the whole interface (up to the tool's hard cap), then apply the LISTING limit to the
+            // children this route actually emits. Passing `limit` to the parser lets nested struct members
+            // consume the budget, so a short but apparently complete list comes back.
+            const int parseCap = 5000;
             var iface = isType
-                ? GetTypeStructure(softwarePath, objectPath, includeComments: false, maxMembers: limit)
-                : GetBlockInterface(softwarePath, objectPath, includeComments: false, maxMembers: limit);
+                ? GetTypeStructure(softwarePath, objectPath, includeComments: false, maxMembers: parseCap)
+                : GetBlockInterface(softwarePath, objectPath, includeComments: false, maxMembers: parseCap);
 
-            var sections = iface.Sections ?? Enumerable.Empty<InterfaceSection>();
+            var sections = (iface.Sections ?? Enumerable.Empty<InterfaceSection>()).ToList();
             var items = new List<string>();
             var take = Math.Max(1, Math.Min(2000, limit));
+            var isSections = collectionProperty.Equals("Interface", StringComparison.OrdinalIgnoreCase)
+                || collectionProperty.Equals("Interface.Sections", StringComparison.OrdinalIgnoreCase);
+            var total = isSections ? sections.Count : sections.Sum(s => s.Members.Count());
 
-            if (collectionProperty.Equals("Interface", StringComparison.OrdinalIgnoreCase)
-                || collectionProperty.Equals("Interface.Sections", StringComparison.OrdinalIgnoreCase))
+            if (isSections)
             {
                 foreach (var section in sections)
                 {
@@ -261,9 +267,13 @@ namespace TiaMcpServer.ModelContextProtocol
                 }
             }
 
+            var truncated = iface.Truncated == true || total > items.Count;
+
             return new ResponseObjectChildren
             {
-                Message = "OK",
+                Message = truncated
+                    ? $"OK (truncated at limit={take}; {total} top-level item(s) available)."
+                    : "OK",
                 ObjectKind = objectKind,
                 ObjectPath = objectPath,
                 Collection = collectionProperty,
@@ -272,6 +282,9 @@ namespace TiaMcpServer.ModelContextProtocol
                 {
                     ["timestamp"] = DateTime.Now,
                     ["count"] = items.Count,
+                    ["total"] = total,
+                    ["truncated"] = truncated,
+                    ["sourceTruncated"] = iface.Truncated == true,
                     ["empty"] = items.Count == 0,
                     ["source"] = isType ? "type-xml-export" : "block-xml-export"
                 }
