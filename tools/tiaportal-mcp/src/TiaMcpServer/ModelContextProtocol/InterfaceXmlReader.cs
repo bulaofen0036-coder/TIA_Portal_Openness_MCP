@@ -32,6 +32,7 @@ namespace TiaMcpServer.ModelContextProtocol
         public string? MemoryLayout { get; set; }
         public int MemberCount { get; set; }
         public bool Truncated { get; set; }
+        public bool HasInterface { get; set; }
         public List<InterfaceSection> Sections { get; set; } = new List<InterfaceSection>();
     }
 
@@ -58,6 +59,15 @@ namespace TiaMcpServer.ModelContextProtocol
         public List<InterfaceMember>? Members { get; set; }
     }
 
+    public sealed class InterfaceChildListing
+    {
+        public List<string> Items { get; } = new List<string>();
+        public int Total { get; set; }
+        public bool Truncated { get; set; }
+        public bool SourceTruncated { get; set; }
+        public bool IsSections { get; set; }
+    }
+
     public static class InterfaceXmlReader
     {
         private static readonly Regex ArrayType = new Regex(
@@ -76,6 +86,58 @@ namespace TiaMcpServer.ModelContextProtocol
                 throw new FileNotFoundException("SimaticML export not found", xmlPath);
 
             return Parse(File.ReadAllText(xmlPath), objectKind, maxMembers, includeComments);
+        }
+
+        /// <summary>
+        /// Build the top-level child list used by the legacy ListObjectChildren(Interface*) route.
+        /// Kept pure so the limit/truncation semantics can be pinned by the offline suite without
+        /// a TIA instance. The parser's maxMembers cap is separate: this limit applies only to the
+        /// items actually emitted, so nested struct members cannot consume the listing budget.
+        /// </summary>
+        public static InterfaceChildListing BuildChildren(
+            IEnumerable<InterfaceSection>? sections,
+            bool sourceTruncated,
+            string? collectionProperty,
+            int limit)
+        {
+            var list = sections?.ToList() ?? new List<InterfaceSection>();
+            var property = collectionProperty ?? string.Empty;
+            var isSections = property.Equals("Interface", StringComparison.OrdinalIgnoreCase)
+                || property.Equals("Interface.Sections", StringComparison.OrdinalIgnoreCase);
+            var take = Math.Max(1, Math.Min(2000, limit));
+
+            var listing = new InterfaceChildListing
+            {
+                IsSections = isSections,
+                SourceTruncated = sourceTruncated,
+                Total = isSections
+                    ? list.Count
+                    : list.Sum(s => s.Members?.Count ?? 0)
+            };
+
+            if (isSections)
+            {
+                foreach (var section in list)
+                {
+                    listing.Items.Add(section.Name);
+                    if (listing.Items.Count >= take) break;
+                }
+            }
+            else
+            {
+                foreach (var section in list)
+                {
+                    foreach (var member in section.Members ?? new List<InterfaceMember>())
+                    {
+                        listing.Items.Add(section.Name + "/" + member.Name);
+                        if (listing.Items.Count >= take) break;
+                    }
+                    if (listing.Items.Count >= take) break;
+                }
+            }
+
+            listing.Truncated = listing.SourceTruncated || listing.Total > listing.Items.Count;
+            return listing;
         }
 
         public static InterfaceStructure Parse(
@@ -127,6 +189,7 @@ namespace TiaMcpServer.ModelContextProtocol
             var iface = Child(attrList, "Interface");
             if (iface == null)
                 return structure;
+            structure.HasInterface = true;
 
             var sectionsEl = Child(iface, "Sections");
             if (sectionsEl == null)

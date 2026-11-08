@@ -1,5 +1,5 @@
 ﻿{
-  "package": "TIA_MCP_V19_2.7.8",
+  "package": "TIA_MCP_V19_v2.7.8",
   "generatedAt": "2026-10-26T15:15:37",
   "source": "tools/tiaportal-mcp/src/TiaMcpServer/ModelContextProtocol/*.cs (V19 build excludes VCI)",
   "toolCount": 235,

@@ -20,10 +20,15 @@
   对不存在/为 null/不是集合的属性，以前都返回 `Message=OK` + 空数据，调用方会把它当成
   「这个对象确实没有成员」。现在返回结构化 `InvalidParams`，并在消息里指向 `GetBlockInterface`。
   属性查找同时补上了实现接口上的显式成员。
+- **DB 的 `Interface` 仍走原生 `DataBlock.Interface`**：只有 FB/FC/OB/UDT 回退 XML；未编译的 DB 不再因为 XML 导出的“一致/离线”前置条件而失效。
+- **`ListObjectChildren` 的 limit 修复补齐离线回归**：limit 只限制实际列出的顶层项，解析上限独立；覆盖嵌套 struct 不吃预算、Sections、sourceTruncated、空接口。
+- **无 `<Interface>` 的导出**：响应带 `hasInterface=false` 和明确提示，不再静默当成 0 成员。
+- **导出文件定位**：优先按块/类型名取 `<Name>.xml`，不再只靠“最新文件”。
+- manifest：lite 工具数 52 → 68，`tools-list.json` 的 package 对齐 `TIA_MCP_V19_v2.7.8`。
 
 ### 离线回归
 
-- `TiaMcpServer.Tests` 517 passed / 0 failed（新增 45 条接口解析用例）。
+- `TiaMcpServer.Tests` 525 passed / 0 failed（新增 53 条接口解析/列表用例）。
 
 ## [2.7.8.1] - 2026-10-30 - HTTP 请求体一律按 UTF-8 解码
 

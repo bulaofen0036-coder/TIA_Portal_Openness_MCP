@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using TiaMcpServer.ModelContextProtocol;
@@ -129,6 +130,7 @@ namespace TiaMcpServer.Tests
             var fb = InterfaceXmlReader.Parse(FbXml, "Block");
             check(fb.ObjectType == "SW.Blocks.FB", "FB: object type read");
             check(fb.ObjectName == "MCPVerify_FB", "FB: name read");
+            check(fb.HasInterface, "FB: HasInterface=true when <Interface> is present");
             check(fb.Number == 59989, "FB: block number read");
             check(fb.ProgrammingLanguage == "LAD", "FB: programming language read");
             check(fb.MemoryLayout == "Optimized", "FB: memory layout read");
@@ -177,11 +179,58 @@ namespace TiaMcpServer.Tests
             check(capped.Truncated, "cap: Truncated=true when maxMembers is hit");
             check(capped.MemberCount == 2, "cap: MemberCount reports what was returned");
 
+            // 4b) The ListObjectChildren listing limit must count only emitted top-level items.
+            // A nested struct member must not consume the budget (Codex P2 regression).
+            var listingSections = new List<InterfaceSection>
+            {
+                new InterfaceSection
+                {
+                    Name = "Static",
+                    Members = new List<InterfaceMember>
+                    {
+                        new InterfaceMember
+                        {
+                            Name = "st",
+                            Datatype = "Struct",
+                            Members = new List<InterfaceMember>
+                            {
+                                new InterfaceMember { Name = "x", Datatype = "Int" }
+                            }
+                        },
+                        new InterfaceMember { Name = "arr", Datatype = "Array[0..3] of Int" },
+                        new InterfaceMember { Name = "third", Datatype = "Bool" }
+                    }
+                }
+            };
+            var limited = InterfaceXmlReader.BuildChildren(listingSections, false, "Interface.Members", 2);
+            check(limited.Items.Count == 2, "limit: returns exactly two top-level items");
+            check(limited.Items[0] == "Static/st" && limited.Items[1] == "Static/arr",
+                "limit: nested struct member does not consume the listing budget");
+            check(limited.Total == 3 && limited.Truncated && !limited.SourceTruncated,
+                "limit: total=3, truncated=true, sourceTruncated=false");
+
+            var all = InterfaceXmlReader.BuildChildren(listingSections, false, "Interface.Members", 10);
+            check(all.Items.Count == 3 && all.Total == 3 && !all.Truncated,
+                "limit: a larger limit returns all top-level items and is not truncated");
+
+            var sectionOnly = InterfaceXmlReader.BuildChildren(listingSections, false, "Interface.Sections", 1);
+            check(sectionOnly.Items.Count == 1 && sectionOnly.Total == 1 && !sectionOnly.Truncated,
+                "limit: Interface.Sections lists sections, not members");
+
+            var sourceCapped = InterfaceXmlReader.BuildChildren(listingSections, true, "Interface.Members", 10);
+            check(sourceCapped.SourceTruncated && sourceCapped.Truncated,
+                "limit: parser-level truncation is surfaced as sourceTruncated");
+
+            var emptyListing = InterfaceXmlReader.BuildChildren(new List<InterfaceSection>(), false, "Interface.Members", 10);
+            check(emptyListing.Items.Count == 0 && emptyListing.Total == 0 && !emptyListing.Truncated,
+                "limit: empty interface is empty, not an error");
+
             // 5) A block without an <Interface> is an explicit empty structure, not a crash.
             var empty = InterfaceXmlReader.Parse(
                 @"<Document><SW.Blocks.OB><AttributeList><Name>OB1</Name><Number>1</Number></AttributeList></SW.Blocks.OB></Document>",
                 "Block");
-            check(empty.Sections.Count == 0 && empty.MemberCount == 0, "empty: no interface returns zero sections");
+            check(empty.Sections.Count == 0 && empty.MemberCount == 0 && !empty.HasInterface,
+                "empty: no interface returns zero sections and HasInterface=false");
 
             // 6) Wrong/empty input must fail loudly.
             var threw = false;

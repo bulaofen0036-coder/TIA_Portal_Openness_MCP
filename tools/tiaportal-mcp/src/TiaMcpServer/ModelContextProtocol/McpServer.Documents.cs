@@ -621,9 +621,21 @@ namespace TiaMcpServer.ModelContextProtocol
             try
             {
                 // V19 FB/FC/PlcType have no Interface CLR property; serve Interface* from the
-                // XML interface reader instead of returning an empty list.
+                // XML interface reader instead of returning an empty list. Keep the native path
+                // for DataBlock, which does expose DataBlock.Interface and does not require the
+                // block to be compiled/offline.
                 if (IsInterfaceCollection(objectKind, collectionProperty))
-                    return GetInterfaceChildren(objectKind, objectPath, collectionProperty, softwarePath, limit);
+                {
+                    try
+                    {
+                        return Portal.ListObjectChildren(objectKind, objectPath, collectionProperty, softwarePath, limit);
+                    }
+                    catch (PortalException pex) when (pex.Code == PortalErrorCode.InvalidParams
+                                                   || pex.Code == PortalErrorCode.NotFound)
+                    {
+                        return GetInterfaceChildren(objectKind, objectPath, collectionProperty, softwarePath, limit);
+                    }
+                }
 
                 return Portal.ListObjectChildren(objectKind, objectPath, collectionProperty, softwarePath, limit);
             }

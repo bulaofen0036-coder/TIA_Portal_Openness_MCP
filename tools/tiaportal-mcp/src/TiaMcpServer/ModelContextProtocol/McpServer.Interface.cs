@@ -33,6 +33,7 @@ namespace TiaMcpServer.ModelContextProtocol
         public DateTime? InterfaceModifiedDate { get; set; }
         public int? MemberCount { get; set; }
         public bool? Truncated { get; set; }
+        public bool? HasInterface { get; set; }
         public IEnumerable<InterfaceSection>? Sections { get; set; }
         public string? Source { get; set; }
     }
@@ -68,9 +69,12 @@ namespace TiaMcpServer.ModelContextProtocol
                         McpErrorCode.InternalError);
                 }
 
-                var xmlFile = new DirectoryInfo(tempDir).GetFiles("*.xml")
-                    .OrderByDescending(f => f.LastWriteTimeUtc)
-                    .FirstOrDefault();
+                var expectedXml = new FileInfo(Path.Combine(tempDir, block.Name + ".xml"));
+                var xmlFile = expectedXml.Exists
+                    ? expectedXml
+                    : new DirectoryInfo(tempDir).GetFiles("*.xml")
+                        .OrderByDescending(f => f.LastWriteTimeUtc)
+                        .FirstOrDefault();
                 if (xmlFile == null)
                 {
                     throw new McpException(
@@ -82,6 +86,9 @@ namespace TiaMcpServer.ModelContextProtocol
                 var truncatedNote = info.Truncated
                     ? $" Output truncated at maxMembers={Math.Max(1, Math.Min(5000, maxMembers))}; raise it to see the rest."
                     : "";
+                var noInterfaceNote = info.HasInterface
+                    ? ""
+                    : " No <Interface> element was found in the export; this object has no declared interface (for example an empty OB).";
 
                 return new ResponseInterfaceStructure
                 {
@@ -97,9 +104,10 @@ namespace TiaMcpServer.ModelContextProtocol
                     InterfaceModifiedDate = block.InterfaceModifiedDate,
                     MemberCount = info.MemberCount,
                     Truncated = info.Truncated,
+                    HasInterface = info.HasInterface,
                     Sections = info.Sections,
                     Source = "block-xml-export",
-                    Message = $"Interface of block '{block.Name}': {info.MemberCount} member(s) in {info.Sections.Count} section(s).{truncatedNote}",
+                    Message = $"Interface of block '{block.Name}': {info.MemberCount} member(s) in {info.Sections.Count} section(s).{truncatedNote}{noInterfaceNote}",
                     Meta = new JsonObject
                     {
                         ["timestamp"] = DateTime.Now,
@@ -149,9 +157,12 @@ namespace TiaMcpServer.ModelContextProtocol
                         McpErrorCode.InternalError);
                 }
 
-                var xmlFile = new DirectoryInfo(tempDir).GetFiles("*.xml")
-                    .OrderByDescending(f => f.LastWriteTimeUtc)
-                    .FirstOrDefault();
+                var expectedXml = new FileInfo(Path.Combine(tempDir, type.Name + ".xml"));
+                var xmlFile = expectedXml.Exists
+                    ? expectedXml
+                    : new DirectoryInfo(tempDir).GetFiles("*.xml")
+                        .OrderByDescending(f => f.LastWriteTimeUtc)
+                        .FirstOrDefault();
                 if (xmlFile == null)
                 {
                     throw new McpException(
@@ -163,6 +174,9 @@ namespace TiaMcpServer.ModelContextProtocol
                 var truncatedNote = info.Truncated
                     ? $" Output truncated at maxMembers={Math.Max(1, Math.Min(5000, maxMembers))}; raise it to see the rest."
                     : "";
+                var noInterfaceNote = info.HasInterface
+                    ? ""
+                    : " No <Interface> element was found in the export; this type has no declared structure.";
 
                 return new ResponseInterfaceStructure
                 {
@@ -178,9 +192,10 @@ namespace TiaMcpServer.ModelContextProtocol
                     InterfaceModifiedDate = type.InterfaceModifiedDate,
                     MemberCount = info.MemberCount,
                     Truncated = info.Truncated,
+                    HasInterface = info.HasInterface,
                     Sections = info.Sections,
                     Source = "type-xml-export",
-                    Message = $"Structure of type '{type.Name}': {info.MemberCount} member(s) in {info.Sections.Count} section(s).{truncatedNote}",
+                    Message = $"Structure of type '{type.Name}': {info.MemberCount} member(s) in {info.Sections.Count} section(s).{truncatedNote}{noInterfaceNote}",
                     Meta = new JsonObject
                     {
                         ["timestamp"] = DateTime.Now,
@@ -239,53 +254,27 @@ namespace TiaMcpServer.ModelContextProtocol
                 ? GetTypeStructure(softwarePath, objectPath, includeComments: false, maxMembers: parseCap)
                 : GetBlockInterface(softwarePath, objectPath, includeComments: false, maxMembers: parseCap);
 
-            var sections = (iface.Sections ?? Enumerable.Empty<InterfaceSection>()).ToList();
-            var items = new List<string>();
+            var listing = InterfaceXmlReader.BuildChildren(
+                iface.Sections, iface.Truncated == true, collectionProperty, limit);
             var take = Math.Max(1, Math.Min(2000, limit));
-            var isSections = collectionProperty.Equals("Interface", StringComparison.OrdinalIgnoreCase)
-                || collectionProperty.Equals("Interface.Sections", StringComparison.OrdinalIgnoreCase);
-            var total = isSections ? sections.Count : sections.Sum(s => s.Members.Count());
-
-            if (isSections)
-            {
-                foreach (var section in sections)
-                {
-                    items.Add(section.Name);
-                    if (items.Count >= take) break;
-                }
-            }
-            else
-            {
-                foreach (var section in sections)
-                {
-                    foreach (var member in section.Members)
-                    {
-                        items.Add(section.Name + "/" + member.Name);
-                        if (items.Count >= take) break;
-                    }
-                    if (items.Count >= take) break;
-                }
-            }
-
-            var truncated = iface.Truncated == true || total > items.Count;
 
             return new ResponseObjectChildren
             {
-                Message = truncated
-                    ? $"OK (truncated at limit={take}; {total} top-level item(s) available)."
+                Message = listing.Truncated
+                    ? $"OK (truncated at limit={take}; {listing.Total} top-level item(s) available)."
                     : "OK",
                 ObjectKind = objectKind,
                 ObjectPath = objectPath,
                 Collection = collectionProperty,
-                Items = items,
+                Items = listing.Items,
                 Meta = new JsonObject
                 {
                     ["timestamp"] = DateTime.Now,
-                    ["count"] = items.Count,
-                    ["total"] = total,
-                    ["truncated"] = truncated,
-                    ["sourceTruncated"] = iface.Truncated == true,
-                    ["empty"] = items.Count == 0,
+                    ["count"] = listing.Items.Count,
+                    ["total"] = listing.Total,
+                    ["truncated"] = listing.Truncated,
+                    ["sourceTruncated"] = listing.SourceTruncated,
+                    ["empty"] = listing.Items.Count == 0,
                     ["source"] = isType ? "type-xml-export" : "block-xml-export"
                 }
             };
