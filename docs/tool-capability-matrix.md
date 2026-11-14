@@ -2,8 +2,8 @@
 
 本文件由源码中的 `[McpServerTool]` 静态抽取生成，运行时仍以 `tools/list` 为准。
 
-- 生成时间：2026-10-26 15:15:32
-- 工具数量：233
+- 生成时间：2026-10-31
+- 工具数量：235
 
 ## L0
 
@@ -314,6 +314,8 @@
 | Tool | Description |
 |---|---|
 | GetBlockInfo | [L2][PLC-Software] Get detailed info for one block (attributes, language, number, modification time). Requires: Connect + OpenProject. blockPath must be fully qualified: 'Group/Subgroup/BlockName' — get it from GetSoftwareTree or GetBlocksWithHierarchy. Returns: IsConsistent (false = must compile before export). |
+| GetBlockInterface | [L2][PLC-Software] Read a block's INTERFACE (declarations) — FB/FC/OB/DB. Returns Input/Output/InOut/Static/Temp/Constant sections; each member has name, datatype, start value, comment, array bounds and nested struct members. Works for DBs too: the DB structure is its Static section. Requires: Connect + OpenProject + block consistent and offline (GoOffline first). For a UDT use GetTypeStructure. |
+| GetTypeStructure | [L2][PLC-Software] Read a PLC data type (UDT / PlcType) structure — members, datatypes, start values, comments, array bounds and nested struct members. Requires: Connect + OpenProject + offline (GoOffline first); type must be consistent. For FB/FC/OB/DB use GetBlockInterface. |
 | GetBlocks | [L2][PLC-Software] Get a flat list of all blocks in PLC software. Requires: Connect + OpenProject. Use GetBlocksWithHierarchy instead when you need group/folder paths for ExportBlock. Returns: block name, number, type (OB/FC/FB/GlobalDB/InstanceDB), programming language. |
 | GetBlocksWithHierarchy | [L2][PLC-Software]Get a list of all blocks with their group hierarchy from the plc software. |
 | ExportBlock | [L2][PLC-Software] Export one block to an XML file. Requires: Connect + OpenProject + block must be consistent (compile first if IsConsistent=false). blockPath must be fully qualified 'Group/Subgroup/Name' from GetSoftwareTree — bare names return InvalidParams with suggestions. Pick the right tool: batch → ExportBlocks; readable SCL/.s7dcl text → ExportAsDocuments. |

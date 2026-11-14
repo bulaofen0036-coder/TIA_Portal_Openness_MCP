@@ -596,8 +596,12 @@ namespace TiaMcpServer.ModelContextProtocol
             catch (PortalException pex)
             {
                 // 路径解析不到是调用方的参数问题，不是服务器内部意外错误。
-                throw new McpException(pex.Message, pex,
-                    pex.Code == PortalErrorCode.NotFound ? McpErrorCode.InvalidParams : McpErrorCode.InternalError);
+                // 属性不存在 / 路径中段为 null 同样是参数问题；它们以前被当成 OK 返回。
+                var code = pex.Code == PortalErrorCode.NotFound
+                        || pex.Code == PortalErrorCode.InvalidParams
+                    ? McpErrorCode.InvalidParams
+                    : McpErrorCode.InternalError;
+                throw new McpException(pex.Message, pex, code);
             }
             catch (Exception ex) when (ex is not McpException)
             {
@@ -615,13 +619,36 @@ namespace TiaMcpServer.ModelContextProtocol
         {
             try
             {
+                objectKind = (objectKind ?? string.Empty).Trim();
+                collectionProperty = (collectionProperty ?? string.Empty).Trim();
+
+                // V19 FB/FC/PlcType have no Interface CLR property; serve Interface* from the
+                // XML interface reader instead of returning an empty list. Keep the native path
+                // for DataBlock, which does expose DataBlock.Interface and does not require the
+                // block to be compiled/offline.
+                if (IsInterfaceCollection(objectKind, collectionProperty))
+                {
+                    try
+                    {
+                        return Portal.ListObjectChildren(objectKind, objectPath, collectionProperty, softwarePath, limit);
+                    }
+                    catch (PortalException pex) when (pex.Code == PortalErrorCode.InvalidParams)
+                    {
+                        return GetInterfaceChildren(objectKind, objectPath, collectionProperty, softwarePath, limit);
+                    }
+                }
+
                 return Portal.ListObjectChildren(objectKind, objectPath, collectionProperty, softwarePath, limit);
             }
             catch (PortalException pex)
             {
                 // 路径解析不到是调用方的参数问题，不是服务器内部意外错误。
-                throw new McpException(pex.Message, pex,
-                    pex.Code == PortalErrorCode.NotFound ? McpErrorCode.InvalidParams : McpErrorCode.InternalError);
+                // 属性不存在 / 路径中段为 null / 不是集合同样是参数问题，不再回空列表。
+                var code = pex.Code == PortalErrorCode.NotFound
+                        || pex.Code == PortalErrorCode.InvalidParams
+                    ? McpErrorCode.InvalidParams
+                    : McpErrorCode.InternalError;
+                throw new McpException(pex.Message, pex, code);
             }
             catch (Exception ex) when (ex is not McpException)
             {

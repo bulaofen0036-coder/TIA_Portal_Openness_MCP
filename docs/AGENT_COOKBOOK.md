@@ -1,8 +1,8 @@
 # Agent 编程与工具使用手册（TIA Portal V19）
 
 > 给 AI agent 看的操作手册。目标：**用最少的 token 把事做对**。
-> 只读这一份 + 需要时查 `docs/tools-index.csv`（233 个工具的一行索引），**不要**一次拉全部 233 个工具的描述。
-> 默认 **lite** 档；要看/调用全部 233 个工具，用 `--profile full` 或 `TIA_MCP_PROFILE=full`。
+> 只读这一份 + 需要时查 `docs/tools-index.csv`（235 个工具的一行索引），**不要**一次拉全部 235 个工具的描述。
+> 默认 **lite** 档；要看/调用全部 235 个工具，用 `--profile full` 或 `TIA_MCP_PROFILE=full`。
 
 ---
 
@@ -35,6 +35,7 @@
 | 读工程结构 | `GetProjectTree`（设备级） |
 | 读块列表 | `GetBlocks`（扁平） / `GetBlocksWithHierarchy`（要分组路径时） |
 | 读块逻辑（LAD/SCL） | `DescribeBlockLogic`（大响应用 `GetExport` 分页或 `SaveExport` 落盘） |
+| 读 FB 参数 / DB 布局 / UDT 结构 | `GetBlockInterface`（Block，含 DB）；`GetTypeStructure`（UDT）；需离线、块已编译 |
 | 看大响应 / 分页 | `GetExport`（`exportId` + `nextOffset`） / `SaveExport` |
 | 找不到工具 | `FindTools` → `CallTool` |
 | 下载到 PLC | `CheckDownloadReadiness` → `DownloadToPlc`（**在线写，先确认安全**） |

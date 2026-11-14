@@ -1,6 +1,6 @@
-# TIA Portal MCP 工具总览（全部 233 个）
+# TIA Portal MCP 工具总览（全部 235 个）
 
-> 由 `scripts/generate-tools-reference.py` 从源码 `[McpServerTool]` 属性生成，与运行时 `tools/list` 一致。生成日期：2026-10-26。
+> 由 `scripts/generate-tools-reference.py` 从源码 `[McpServerTool]` 属性生成，与运行时 `tools/list` 一致。生成日期：2026-10-31。
 > 分层：**L0** 只读引导/诊断 · **L1** 高频主力 · **L2** 专用/离线构建器。
 >
 > **V19 注意**：`ExportAsDocuments`、`ExportBlocksAsDocuments`、`ImportFromDocuments`、`ImportBlocksFromDocuments` 在 V19 上返回 `NotSupportedOnVersion`（V19 没有 SIMATIC SD 文档 API）；5 个 VCI 工具不编译；默认 lite 档，全量工具用 `--profile full` 或 `TIA_MCP_PROFILE=full`。
@@ -24,14 +24,14 @@
 | [PLC-Builders](#plc-builders) | 9 | 离线 XML / DSL 构建器 |
 | [PLC-Online](#plc-online) | 9 | 上线、下载、在线状态、在线/离线比较 |
 | [PLC-OpcUA](#plc-opcua) | 4 | OPC UA 接口导入导出与启用开关 |
-| [PLC-Software](#plc-software) | 54 | 块/类型/变量表/编译/外部源 |
+| [PLC-Software](#plc-software) | 56 | 块/类型/变量表/编译/外部源 |
 | [PLC-TechnologyObjects](#plc-technologyobjects) | 3 | 工艺对象（TO）导入导出 |
 | [Portal](#portal) | 6 | 连接、用户组、进程 |
 | [Project](#project) | 10 | 工程创建/打开/保存/关闭/树 |
 | [Reflection](#reflection) | 7 | 对象反射查询 |
 | [Reports](#reports) | 6 | 验收/诊断/交付报告 |
 | [Validation](#validation) | 3 | 离线校验套件 |
-| **合计** | **233** | |
+| **合计** | **235** | |
 
 <a id="bootstrap"></a>
 ## Bootstrap（1 个）
@@ -1785,7 +1785,7 @@
 ---
 
 <a id="plc-software"></a>
-## PLC-Software（54 个）
+## PLC-Software（56 个）
 
 ### `CompileAndDiagnosePlc` <sub>L1</sub>
 
@@ -2083,6 +2083,19 @@
 
 返回：`ResponseBlockInfo`
 
+### `GetBlockInterface` <sub>L2</sub>
+
+[L2][PLC-Software] Read a block's INTERFACE (declarations) — FB/FC/OB/DB.
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | PLC software path, e.g. 'PLC_1' or 'T6_PLC_1' (from GetProjectTree) |
+| `blockPath` | `string` |  | fully qualified 'Group/Subgroup/Name' from GetSoftwareTree |
+| `includeComments` | `bool` | `true` | include member comments (default true) |
+| `maxMembers` | `int` | `1000` | maximum members to return, 1-5000 (default 1000); Truncated=true when hit |
+
+返回：`ResponseInterfaceStructure`
+
 ### `GetBlocks` <sub>L2</sub>
 
 [L2][PLC-Software] Get a flat list of all blocks in PLC software. Requires: Connect + OpenProject. Use GetBlocksWithHierarchy instead when you need group/folder paths for ExportBlock. Returns: block name, number, type (OB/FC/FB/GlobalDB/InstanceDB), programming language.
@@ -2203,6 +2216,19 @@
 | `typePath` | `string` |  | defines the path in the project structure to the type |
 
 返回：`ResponseTypeInfo`
+
+### `GetTypeStructure` <sub>L2</sub>
+
+[L2][PLC-Software] Read a PLC data type (UDT / PlcType) structure — members, datatypes,
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `softwarePath` | `string` |  | PLC software path, e.g. 'PLC_1' or 'T6_PLC_1' (from GetProjectTree) |
+| `typePath` | `string` |  | fully qualified 'Group/Subgroup/TypeName' from GetSoftwareTree or GetTypes |
+| `includeComments` | `bool` | `true` | include member comments (default true) |
+| `maxMembers` | `int` | `1000` | maximum members to return, 1-5000 (default 1000); Truncated=true when hit |
+
+返回：`ResponseInterfaceStructure`
 
 ### `GetTypes` <sub>L2</sub>
 

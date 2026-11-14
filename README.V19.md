@@ -1,12 +1,12 @@
-# TIA Portal V19 引擎（master 2.7.8 全量合并）
+﻿# TIA Portal V19 引擎（master 2.7.8 全量合并）
 
-> 状态：**V19 构建 0 errors / 2 既有 warnings；离线测试 479 passed；真机验收 48 PASS / 2 FAIL / 1 BLOCKED / 7 N/A**（2026-10-30）。
+> 状态：**V19 构建 0 errors / 既有 warnings；离线测试 527 passed；真机验收 48 PASS / 2 FAIL / 1 BLOCKED / 7 N/A**（2026-10-30）。
 > 核心链、块读取与导出、HTTP 编码、V19 边界、编译、生成、日常编辑（除改名）、HTTP 安全已真机验证；HMI 未测（测试工程无 HMI）。
 > 已知问题：`ExportDeviceAml` 在 V19 上可能让 TIA 实例崩溃；`SetPlcTag` 改名在 V19 不受支持（`PlcTag.Name` 只读）。
 >
 > **给 AI agent**：先读 [`docs/AGENT_COOKBOOK.md`](docs/AGENT_COOKBOOK.md)（决策表 / 黄金路径 / 参数规则 / token 纪律），
 > 经验库在 [`docs/AGENT_LEARNINGS.md`](docs/AGENT_LEARNINGS.md)。
-> 全部 **233** 个工具（V19 编译面）的说明与索引：[`docs/TOOLS_REFERENCE.md`](docs/TOOLS_REFERENCE.md)（机器索引用 `docs/tools-index.csv`）。
+> 全部 **235** 个工具（V19 编译面）的说明与索引：[`docs/TOOLS_REFERENCE.md`](docs/TOOLS_REFERENCE.md)（机器索引用 `docs/tools-index.csv`）。
 
 ## 这是什么
 
@@ -16,7 +16,7 @@
 - 新增 `TiaMcpServer.V19.csproj`，定义 `TIA_V19`，输出 `bin-v19/`
 - 默认 TIA 版本 **19**（`Engineering.DefaultTiaMajorVersion`），Openness 初始化门槛 `>= 19`
 - V19 缺失的 API 用 `#if !TIA_V19` 排除，运行期由 stub 返回 `NotSupportedOnVersion`
-- 全量合并后 **233 个工具**：master 238 个减去 5 个 VCI 工具；4 个文档工具仍在但不可用
+- 全量合并后 **233 个工具**：master 238 个减去 5 个 VCI 工具；4 个文档工具仍在但不可用。2.7.8.2 新增 2 个读取工具后为 **235**。
 
 ## 全量合并结果
 
@@ -27,7 +27,7 @@
 | V19 适配 | 约 30 行 guard + V19 csproj/stub/compat |
 | 构建 | 0 errors，2 warnings（MSB3539、OpcUaLiveReader CS8602，均为既有） |
 | 离线测试 | `TiaMcpServer.Tests` 472 passed / 0 failed |
-| 工具数 | 238 → 233（5 个 VCI 不编译） |
+| 工具数 | 238 → 233（5 个 VCI 不编译）；2.7.8.2 +2 → 235 |
 
 关键 V19 适配：
 
@@ -52,9 +52,22 @@
 | 日常编辑 11 工具 | ⚠️ | 除 `SetPlcTag` 改名（V19 只读）外已真机验证 |
 | 运行时只读监控（S7 / OPC UA） | ✅ | 不依赖 Openness，独立通道 |
 
+## 2.7.8.2 新增（2026-10-31）
+
+| 工具 | 用途 |
+|---|---|
+| `GetBlockInterface` | 读 FB/FC/OB/DB 的接口声明：Input / Output / InOut / Static / Temp / Constant；每个成员带类型、初值、注释、数组边界、嵌套结构。DB 的结构就是它的 Static 段。 |
+| `GetTypeStructure` | 读 UDT / `PlcType` 的结构（成员、类型、初值、注释、数组、嵌套）。 |
+
+- **为什么 V19 必须走 XML（官方 API 核对）**：V19 的官方 `Siemens.Engineering.xml` 里只有 `DataBlock.Interface`（返回 `PlcBlockInterface`，且只有扁平的 `Members`）；`PlcBlock` 只有 `InterfaceModifiedDate`，`FunctionBlock` / `Function` / `OrganizationBlock` 继承 `PlcBlock`，`PlcType` 也没有 `Interface` 属性。FB/FC/OB/UDT 没有 typed interface API，而 `PlcBlock.Export(FileInfo, ExportOptions)` / `PlcType.Export(...)` 本身就是西门子官方的 SimaticML 导出；`<Interface><Sections>` 是官方文档定义的结构。因此 XML 不是反射或私有 API，而是 V19 上唯一的官方通用路径。详见 `docs/V19-INTERFACE-API.md`。
+- **前置条件**：块/类型必须一致（先编译）、PLC 必须离线（先 `GoOffline`）。在线调用会明确拒绝并给出恢复提示。
+- **反射桥修复**：`GetObjectProperty` / `ListObjectChildren` 以前对「属性不存在」「路径中段为 null」「不是集合」都回 `OK` + 空数据；现在返回结构化 `InvalidParams`，并提示改用 `GetBlockInterface`。这是报告里 `Interface` 静默成功那一类的根因。
+- **离线回归**：527 passed / 0 failed（本 PR 接口/列表用例 48 条；总数含既有基线）。
+- **真机状态**：本轮新增的 `GetBlockInterface` / `GetTypeStructure` 尚未在 TIA V19 真机上验证；上面的 48 PASS 是 2.7.8.1 旧矩阵，不覆盖这两个工具。
+
 ## 默认工具档位
 
-master 2.4+ 默认 **lite**（核心工具）。要看到全部 233 个工具：
+master 2.4+ 默认 **lite**（核心工具）。要看到全部 235 个工具：
 
 ```bat
 rem MCP 客户端启动参数
@@ -125,7 +138,7 @@ TIA 装在默认位置且只装 V19 时，`--tia-major-version` 可省略（会�
 
 ## 真机验证（2026-10-30，2.7.8.1）
 
-工程 `configuar_t20261028`（S7-1500，无 HMI），TIA V19。58 条验收矩阵：
+工程 `<TEST_PROJECT>`（S7-1500，无 HMI），TIA V19。58 条验收矩阵：
 **48 PASS / 2 FAIL / 1 BLOCKED / 7 N/A**；必过组全绿（编码回归 5/5、V19 边界 4/4、删除 dryRun 2/2）。
 
 | # | 检查项 | 结果 |

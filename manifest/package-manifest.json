@@ -1,10 +1,10 @@
 ﻿{
   "schemaVersion": "2026-05-25",
   "bundleVersion": "2.7.8",
-  "packageName": "TIA_MCP_V19_2.7.8_20261026",
+  "packageName": "TIA_MCP_V19_v2.7.8_20261108",
   "packageType": "tia-portal-mcp-complete-offline-delivery-bundle",
   "generatedAt": "2026-05-31T20:30:00+08:00",
-  "refreshedAt": "2026-10-26T00:50:00+08:00",
+  "refreshedAt": "2026-11-08T23:55:00+08:00",
   "target": {
     "tiaPortalMajorVersion": [
       19
@@ -83,13 +83,16 @@
     }
   },
   "capabilities": {
-    "mcpToolCount": 233,
+    "mcpToolCount": 235,
     "mcpToolLayers": {
-      "L0": 9,
-      "L1": 38,
-      "L2": 164
+      "L0": 10,
+      "L1": 45,
+      "L2": 180
     },
-    "newToolsThisRelease": [],
+    "newToolsThisRelease": [
+      "GetBlockInterface",
+      "GetTypeStructure"
+    ],
     "removedToolsThisRelease": [],
     "hmiTemplateJsonCount": 8,
     "plcTemplateJsonCount": 9,
@@ -109,11 +112,11 @@
       "reflection-based API discovery for uncovered Openness shapes"
     ],
     "liteProfile": {
-      "toolCount": 52,
+      "toolCount": 67,
       "isDefault": true,
       "scope": "L0+L1 essentials + FindTools/CallTool; covers the full golden path",
       "optOut": "--profile full  (or TIA_MCP_PROFILE=full, or `tia config --full`)",
-      "note": "The other 166 tools stay reachable on demand via FindTools + CallTool; nothing is removed."
+      "note": "The other 168 tools stay reachable on demand via FindTools + CallTool; nothing is removed."
     }
   },
   "validationSnapshot": {

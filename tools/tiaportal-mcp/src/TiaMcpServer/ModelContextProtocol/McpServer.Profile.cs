@@ -58,6 +58,9 @@ namespace TiaMcpServer.ModelContextProtocol
             "ImportBlocksFromDocuments", "ExportBlocksAsDocuments",
             "GetPlcTagTables", "GetCrossReferences",
             "GetBlocks", "GetBlocksWithHierarchy", "GetBlockInfo",
+            // 读块/UDT 接口：FB 参数、DB 布局、UDT 结构。V19 的 FB/FC/PlcType 没有 Interface
+            // CLR 属性，专用工具比让模型 ExportBlock + 手工解析 XML 可靠得多。
+            "GetBlockInterface", "GetTypeStructure",
             "ExportAsDocuments", "GoOffline",
             // 大响应寄存与分页。**任何档都必须能翻页** —— 超过阈值的响应会被寄存，
             // 挡掉这几个出口等于内容直接丢：真实工程上 GetBlocks 的首页只装得下十几个块，

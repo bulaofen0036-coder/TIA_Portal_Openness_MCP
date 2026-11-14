@@ -1875,19 +1875,78 @@ namespace TiaMcpServer.Siemens
             return list;
         }
 
-        private static object? GetPropertyPathValue(object root, string propertyPath)
+        private enum PropertyPathStatus
         {
-            object? current = root;
+            Ok,
+            PropertyNotFound,
+            NullInPath
+        }
+
+        /// <summary>
+        /// Resolve a dotted CLR-property path and say *why* it failed. The old helper returned null
+        /// for both "no such property" and "property exists but is null", which made the reflection
+        /// tools answer {"message":"OK"} with no data — a wrong path looked like an empty object.
+        ///
+        /// Property lookup also walks implemented interfaces: Openness proxies can expose members
+        /// explicitly, and GetType().GetProperty() alone misses those.
+        /// </summary>
+        private static PropertyPathStatus ResolvePropertyPath(
+            object root,
+            string propertyPath,
+            out object? value,
+            out string? missing)
+        {
+            value = root;
+            missing = null;
+
             foreach (var part in (propertyPath ?? string.Empty).Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries))
             {
-                if (current == null) return null;
-                var t = current.GetType();
-                var p = t.GetProperty(part, BindingFlags.Public | BindingFlags.Instance);
-                if (p == null) return null;
-                if (p.GetIndexParameters().Length != 0) return null;
-                current = p.GetValue(current);
+                if (value == null)
+                {
+                    missing = part;
+                    return PropertyPathStatus.NullInPath;
+                }
+
+                var property = FindProperty(value.GetType(), part);
+                if (property == null || property.GetIndexParameters().Length != 0)
+                {
+                    missing = part;
+                    return PropertyPathStatus.PropertyNotFound;
+                }
+
+                try
+                {
+                    value = property.GetValue(value);
+                }
+                catch (Exception ex)
+                {
+                    throw new PortalException(
+                        PortalErrorCode.OpennessError,
+                        $"Reading property '{part}' on {value.GetType().Name} failed: {ex.Message}",
+                        null,
+                        ex);
+                }
             }
-            return current;
+
+            return PropertyPathStatus.Ok;
+        }
+
+        private static PropertyInfo? FindProperty(Type type, string name)
+        {
+            var property = type.GetProperty(
+                name,
+                BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
+            if (property != null)
+                return property;
+
+            foreach (var iface in type.GetInterfaces())
+            {
+                property = iface.GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
+                if (property != null)
+                    return property;
+            }
+
+            return null;
         }
 
         public ModelContextProtocol.ResponseObjectDescribe DescribeObject(string objectKind, string objectPath, string softwarePath = "", int maxMembers = 200)
@@ -1930,12 +1989,25 @@ namespace TiaMcpServer.Siemens
                     + "for objectKind=Block/Type also pass softwarePath.");
             }
 
-            var v = GetPropertyPathValue(o, propertyPath);
-            if (v == null)
+            var status = ResolvePropertyPath(o, propertyPath, out var v, out var missing);
+            if (status == PropertyPathStatus.PropertyNotFound)
             {
                 return new ModelContextProtocol.ResponseObjectDescribe
                 {
-                    Message = "Property not found",
+                    Message = $"Property not found: '{missing}'",
+                    ObjectKind = objectKind,
+                    ObjectPath = $"{objectPath}.{propertyPath}",
+                    TypeName = null,
+                    Members = Array.Empty<ModelContextProtocol.ObjectMember>()
+                };
+            }
+            if (status == PropertyPathStatus.NullInPath || v == null)
+            {
+                return new ModelContextProtocol.ResponseObjectDescribe
+                {
+                    Message = status == PropertyPathStatus.NullInPath
+                        ? $"Property path is null at '{missing}'"
+                        : "Property value is null",
                     ObjectKind = objectKind,
                     ObjectPath = $"{objectPath}.{propertyPath}",
                     TypeName = null,
@@ -1968,7 +2040,36 @@ namespace TiaMcpServer.Siemens
                     + "for objectKind=Block/Type also pass softwarePath.");
             }
 
-            var v = GetPropertyPathValue(o, propertyPath);
+            var status = ResolvePropertyPath(o, propertyPath, out var v, out var missing);
+            if (status == PropertyPathStatus.PropertyNotFound)
+            {
+                // A wrong property must fail. Returning Message="OK" with no value made a typo look
+                // like "this object really has no such data" — the exact false fact the reflection
+                // bridge is supposed to prevent while the caller is still guessing paths.
+                throw new PortalException(
+                    PortalErrorCode.InvalidParams,
+                    $"Property '{missing}' does not exist on {o.GetType().Name} (path '{propertyPath}'). "
+                    + "Call DescribeObject to list the available properties. For a block interface "
+                    + "(Input/Output/InOut/Static/Temp/Constant) use GetBlockInterface(softwarePath, blockPath); "
+                    + "FB/FC in V19 do not expose 'Interface' as a CLR property.");
+            }
+            if (status == PropertyPathStatus.NullInPath)
+            {
+                return new ModelContextProtocol.ResponseObjectValue
+                {
+                    Message = $"Property path '{propertyPath}' is null at '{missing}'; no value to return.",
+                    ObjectKind = objectKind,
+                    ObjectPath = objectPath,
+                    ValueType = null,
+                    Value = null,
+                    Meta = new JsonObject
+                    {
+                        ["timestamp"] = DateTime.Now,
+                        ["nullInPath"] = true
+                    }
+                };
+            }
+
             var vt = v?.GetType();
 
             object? outValue = v;
@@ -1990,7 +2091,10 @@ namespace TiaMcpServer.Siemens
                 ObjectKind = objectKind,
                 ObjectPath = objectPath,
                 ValueType = vt?.FullName ?? (v == null ? null : v.GetType().Name),
-                Value = outValue
+                Value = outValue,
+                Meta = v == null
+                    ? new JsonObject { ["timestamp"] = DateTime.Now, ["nullValue"] = true }
+                    : null
             };
         }
 
@@ -2009,17 +2113,31 @@ namespace TiaMcpServer.Siemens
                     + "for objectKind=Block/Type also pass softwarePath.");
             }
 
-            var v = GetPropertyPathValue(o, collectionProperty);
+            var status = ResolvePropertyPath(o, collectionProperty, out var v, out var missing);
+            if (status == PropertyPathStatus.PropertyNotFound)
+            {
+                throw new PortalException(
+                    PortalErrorCode.InvalidParams,
+                    $"Collection property '{missing}' does not exist on {o.GetType().Name} (path '{collectionProperty}'). "
+                    + "Call DescribeObject to list the available properties. For a block interface "
+                    + "(Input/Output/InOut/Static/Temp/Constant) use GetBlockInterface(softwarePath, blockPath); "
+                    + "FB/FC in V19 do not expose 'Interface' as a CLR property.");
+            }
+            if (status == PropertyPathStatus.NullInPath)
+            {
+                throw new PortalException(
+                    PortalErrorCode.InvalidParams,
+                    $"Property path '{collectionProperty}' is null at '{missing}'; it is not an empty collection. "
+                    + "For a block interface use GetBlockInterface(softwarePath, blockPath).");
+            }
             if (v is not IEnumerable enumerable || v is string)
             {
-                return new ModelContextProtocol.ResponseObjectChildren
-                {
-                    Message = "Collection not found or not enumerable",
-                    ObjectKind = objectKind,
-                    ObjectPath = objectPath,
-                    Collection = collectionProperty,
-                    Items = Array.Empty<string>()
-                };
+                // Returning an empty list here made "wrong property" indistinguishable from
+                // "collection is genuinely empty". Say which one it is.
+                throw new PortalException(
+                    PortalErrorCode.InvalidParams,
+                    $"'{collectionProperty}' resolved to {(v == null ? "null" : v.GetType().FullName)}, "
+                    + "which is not an enumerable collection.");
             }
 
             var items = new List<string>();
@@ -2036,7 +2154,13 @@ namespace TiaMcpServer.Siemens
                 ObjectKind = objectKind,
                 ObjectPath = objectPath,
                 Collection = collectionProperty,
-                Items = items
+                Items = items,
+                Meta = new JsonObject
+                {
+                    ["timestamp"] = DateTime.Now,
+                    ["count"] = items.Count,
+                    ["empty"] = items.Count == 0
+                }
             };
         }
 

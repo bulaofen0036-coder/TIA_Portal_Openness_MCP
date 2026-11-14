@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>Latest</LangVersion>
     <OutputType>Exe</OutputType>
-    <AssemblyVersion>2.7.8.1</AssemblyVersion>
+    <AssemblyVersion>2.7.8.2</AssemblyVersion>
     <AssemblyName>TiaMcpServer</AssemblyName>
     <BaseOutputPath>.\bin-v19</BaseOutputPath>
     <BaseIntermediateOutputPath>.\obj-v19\</BaseIntermediateOutputPath>

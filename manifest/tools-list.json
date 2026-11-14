@@ -1,8 +1,8 @@
 ﻿{
-  "package": "TIA_MCP_V19_2.7.8",
-  "generatedAt": "2026-10-26T15:15:37",
+  "package": "TIA_MCP_V19_v2.7.8",
+  "generatedAt": "2026-11-08T23:55:00+08:00",
   "source": "tools/tiaportal-mcp/src/TiaMcpServer/ModelContextProtocol/*.cs (V19 build excludes VCI)",
-  "toolCount": 233,
+  "toolCount": 235,
   "note": "Full roster (--profile full). The default lite profile lists only the core tools; the rest stay reachable via FindTools + CallTool. Runtime tools/list remains authoritative.",
   "tools": [
     {
@@ -1454,6 +1454,20 @@
       "description": "[L2][PLC-Software] Get detailed info for one block (attributes, language, number, modification time). Requires: Connect + OpenProject. blockPath must be fully qualified: 'Group/Subgroup/BlockName' — get it from GetSoftwareTree or GetBlocksWithHierarchy. Returns: IsConsistent (false = must compile before export)."
     },
     {
+      "name": "GetBlockInterface",
+      "layer": "L2",
+      "domain": "PLC-Software",
+      "method": "GetBlockInterface",
+      "returnType": "",
+      "parameters": [
+        "softwarePath",
+        "blockPath",
+        "includeComments",
+        "maxMembers"
+      ],
+      "description": "[L2][PLC-Software] Read a block's INTERFACE (declarations) — FB/FC/OB/DB. Returns Input/Output/InOut/Static/Temp/Constant sections; each member has name, datatype, start value, comment, array bounds and nested struct members. Use this instead of ExportBlock plus hand-parsing XML when you need an FB's parameters, a DB's layout, or any block's variable declarations. Works for DBs too: the DB structure is its Static section. Requires: Connect + OpenProject + block consistent (compile first if IsConsistent=false) and offline (GoOffline first — the XML export does not work in online mode). For a UDT / PLC data type use GetTypeStructure."
+    },
+    {
       "name": "GetBlocks",
       "layer": "L2",
       "domain": "PLC-Software",
@@ -1898,6 +1912,20 @@
         "regexName"
       ],
       "description": "[L2][PLC-Software]Get a list of types from the plc software"
+    },
+    {
+      "name": "GetTypeStructure",
+      "layer": "L2",
+      "domain": "PLC-Software",
+      "method": "GetTypeStructure",
+      "returnType": "",
+      "parameters": [
+        "softwarePath",
+        "typePath",
+        "includeComments",
+        "maxMembers"
+      ],
+      "description": "[L2][PLC-Software] Read a PLC data type (UDT / PlcType) structure — members, datatypes, start values, comments, array bounds and nested struct members. Use this for UDTs; for FB/FC/OB/DB use GetBlockInterface. Requires: Connect + OpenProject + offline (GoOffline first — the XML export does not work in online mode); type must be consistent (compile first if IsConsistent=false)."
     },
     {
       "name": "GetUnifiedHmiDiscreteAlarms",
