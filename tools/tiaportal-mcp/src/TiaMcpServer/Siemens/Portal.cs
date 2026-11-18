@@ -561,11 +561,46 @@ namespace TiaMcpServer.Siemens
                 }
             }
 
+            var visibleProjects = new List<string>();
+            if (_portal != null)
+            {
+                try
+                {
+                    foreach (var s in _portal.LocalSessions)
+                    {
+                        var n = s.Project?.Name;
+                        if (!string.IsNullOrWhiteSpace(n) && !visibleProjects.Any(x => string.Equals(x, n, StringComparison.OrdinalIgnoreCase)))
+                            visibleProjects.Add(n!);
+                    }
+                }
+                catch { }
+                try
+                {
+                    foreach (var p in _portal.Projects)
+                    {
+                        var n = p?.Name;
+                        if (!string.IsNullOrWhiteSpace(n) && !visibleProjects.Any(x => string.Equals(x, n, StringComparison.OrdinalIgnoreCase)))
+                            visibleProjects.Add(n!);
+                    }
+                }
+                catch { }
+            }
+
+            string? nextAction = null;
+            if (_project == null && IsConnected())
+            {
+                nextAction = visibleProjects.Count > 0
+                    ? $"AttachToOpenProject(projectName=\"{visibleProjects[0]}\")"
+                    : "OpenProject(path) or CreateProject — this TIA instance has no open project";
+            }
+
             return new State
             {
                 IsConnected = IsConnected(),
                 Project = _project != null ? _project.Name : "-",
-                Session = _session != null ? _session.Project.Name : "-"
+                Session = _session != null ? _session.Project.Name : "-",
+                AttachableProjects = visibleProjects,
+                NextAction = nextAction
             };
         }
 

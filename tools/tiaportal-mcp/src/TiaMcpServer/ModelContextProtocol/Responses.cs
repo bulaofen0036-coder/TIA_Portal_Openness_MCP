@@ -90,6 +90,8 @@ namespace TiaMcpServer.ModelContextProtocol
         public bool? IsConnected { get; set; }
         public string? Project { get; set; }
         public string? Session { get; set; }
+        public IEnumerable<string>? AttachableProjects { get; set; }
+        public string? NextAction { get; set; }
     }
 
     public class CapabilitySelfTestItem
@@ -146,6 +148,8 @@ namespace TiaMcpServer.ModelContextProtocol
         public string? ProjectName { get; set; }
         public string? SessionName { get; set; }
         public string? LastConnectError { get; set; }
+        public IEnumerable<string>? AttachableProjects { get; set; }
+        public string? NextAction { get; set; }
     }
 
     public class BootstrapToolLayers

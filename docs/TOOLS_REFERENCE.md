@@ -2560,7 +2560,7 @@
 
 ### `GetState` <sub>L0</sub>
 
-[L0][Portal] Get current connection state: IsConnected, open Project name, and open Session name. Use this to check preconditions before other tools — if IsConnected=false, call Connect first; if Project is empty, call OpenProject or CreateProject.
+[L0][Portal] Get current connection state: IsConnected, open Project name, and open Session name. When Project is '-' it also returns AttachableProjects and a concrete NextAction (AttachToOpenProject / OpenProject / CreateProject), so a client does not have to guess after Disconnect→Connect. Use this to check preconditions before other tools — if IsConnected=false, call Connect first; if Project is empty, follow NextAction.
 
 返回：`ResponseState`
 

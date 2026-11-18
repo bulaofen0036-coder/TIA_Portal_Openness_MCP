@@ -201,7 +201,7 @@ namespace TiaMcpServer.ModelContextProtocol
 
         #region state
 
-        [McpServerTool(Name = "GetState"), Description("[L0][Portal] Get current connection state: IsConnected, open Project name, and open Session name. Use this to check preconditions before other tools — if IsConnected=false, call Connect first; if Project is empty, call OpenProject or CreateProject.")]
+        [McpServerTool(Name = "GetState"), Description("[L0][Portal] Get current connection state: IsConnected, open Project name, and open Session name. When Project is '-' it also returns AttachableProjects and a concrete NextAction (AttachToOpenProject / OpenProject / CreateProject), so a client does not have to guess after Disconnect→Connect. Use this to check preconditions before other tools — if IsConnected=false, call Connect first; if Project is empty, follow NextAction.")]
         public static ResponseState GetState()
         {
             try
@@ -216,6 +216,8 @@ namespace TiaMcpServer.ModelContextProtocol
                         IsConnected = state.IsConnected,
                         Project = state.Project,
                         Session = state.Session,
+                        AttachableProjects = state.AttachableProjects,
+                        NextAction = state.NextAction,
                         Meta = new JsonObject
                         {
                             ["timestamp"] = DateTime.Now,
@@ -258,15 +260,21 @@ namespace TiaMcpServer.ModelContextProtocol
                 catch { env.OpennessGroupOk = false; }
 
                 var portalDto = new BootstrapPortal();
+                IEnumerable<string>? attachableProjects = null;
+                string? stateNextAction = null;
                 try
                 {
                     var st = Portal.GetState();
                     portalDto.Connected = st?.IsConnected;
                     portalDto.ProjectName = st?.Project;
                     portalDto.SessionName = st?.Session;
+                    attachableProjects = st?.AttachableProjects;
+                    stateNextAction = st?.NextAction;
                 }
                 catch { portalDto.Connected = false; }
                 portalDto.LastConnectError = Portal.LastConnectError;
+                portalDto.AttachableProjects = attachableProjects;
+                portalDto.NextAction = stateNextAction;
 
                 string nextTool;
                 string reason;
@@ -287,8 +295,12 @@ namespace TiaMcpServer.ModelContextProtocol
                 }
                 else if (string.IsNullOrWhiteSpace(portalDto.ProjectName) || portalDto.ProjectName == "-")
                 {
-                    nextTool = "AttachToOpenProject";
-                    reason = "Connected to portal but no project bound. Use AttachToOpenProject if a project is already open in TIA UI, or OpenProject/CreateProject otherwise.";
+                    bool hasAttachable = attachableProjects != null && attachableProjects.Any();
+                    nextTool = hasAttachable ? "AttachToOpenProject" : "OpenProject";
+                    reason = stateNextAction
+                        ?? (hasAttachable
+                            ? "Connected but no project bound; call AttachToOpenProject with one of AttachableProjects."
+                            : "Connected but this TIA instance has no open project; call OpenProject(path) or CreateProject.");
                 }
                 else
                 {

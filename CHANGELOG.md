@@ -1,5 +1,33 @@
 ﻿# Change Log
 
+## [2.7.8.4] - 2026-11-18 - 调用框 / TON 数组实例 / 空网络提示 + GetState / GetBlockInfo 排障
+
+工具数不变（V19 235）。
+
+### 修复
+
+- **`DescribeBlockLogic`：`<Call>` 调用框整行消失（B1）。** SimaticML 里块调用是独立的 `<Call UId=...><CallInfo Name="FB284" BlockType="FB"><Instance .../></CallInfo></Call>`，
+  不是 `<Part Name="Call">`；旧解析只遍历 `<Part>`，于是调用框没有输出行，目标引脚只剩 `[82].EnableAxis`。
+  现在解析 `<Call>`，输出 `[82] Call #epos (FB284)`，引脚目标带实例/块名；Call 引脚的输入/输出方向从线的另一端推断，
+  下游线圈能正确显示 `Call ... .Done`。
+- **`DescribeBlockLogic`：箱式 TON 的数组实例丢下标（B2）。** 实例原来只取 `<Component Name="Delay">` 的 Name，
+  丢掉 `<Access>` 里的 `[1]`，多个定时器都显示成 `TON[Delay]`。现在按 `<Instance>` 的 Component/Access/Token 还原
+  `TON[Delay[1]]`；SCL 风格 `Token "[" + Access + "]"` 与 LAD 风格直接挂 Access 都覆盖。
+- **`DescribeBlockLogic`：空网络与不支持语言混成一句（B3）。** 空 LAD 网络现在明确输出
+  `(空网络：0 个部件，0 条接线)`；有部件但没有可渲染引脚时输出
+  `(未识别：N 个部件，类型=...，M 条接线)`；未知语言输出 `(不支持的语言：X)`，不再用同一句覆盖三种情况。
+- **`GetState`：Disconnect → Connect 后没有工程时只返回 `"-"`（B4）。** 现在额外返回
+  `attachableProjects`（当前 TIA 实例可见的工程）和 `nextAction`（`AttachToOpenProject(...)`、`OpenProject` 或
+  `CreateProject`），客户端不用再猜下一步。未改自动绑定行为，避免误绑用户工程。
+- **`GetBlockInfo`：`Block not found` 没有恢复建议 / NBSP 提示（B5）。** 现在复用 `McpHints` 的 RECOVERY；
+  找不到时按“普通空格 ↔ U+00A0”归一化做一次候选匹配，命中会返回 `Did you mean '...'`，未命中也会提示从
+  `GetSoftwareTree` 复制原字符串。
+
+### 离线回归
+
+- `TiaMcpServer.Tests` **546 passed / 0 failed**（新增 7 条：Call 行/输入输出、TON 数组实例、空网络、未识别部件）。
+- V19 构建 **0 errors / 2 既有 warnings**；B4/B5 未真机，需 Windows + TIA V19 复测。
+
 ## [2.7.8.3] - 2026-11-18 - DescribeBlockLogic 还原完整 LAD 接线（TON 触发 / 运算分支）
 
 工具数不变（V19 235）。

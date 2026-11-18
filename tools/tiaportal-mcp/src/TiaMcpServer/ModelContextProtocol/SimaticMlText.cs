@@ -68,6 +68,62 @@ namespace TiaMcpServer.ModelContextProtocol
             return (text.Length == 0 ? "?" : text, false);
         }
 
+        /// <summary>
+        /// 读一个 &lt;Instance&gt; 的实例路径：Component 名 + 数组下标 + Token（DOT）。
+        /// 以前 LadTextRenderer 只取 Component 的 Name 属性，<c>Delay[1]</c> 会退化成
+        /// <c>Delay</c>，多个定时器无法区分。下标有兩種导出形态：Component 直接挂 Access，
+        /// 或 SCL 风格的 Token "[" + Access + Token "]"；两种都按原顺序还原。
+        /// </summary>
+        public static string ReadInstance(XElement instance)
+        {
+            var sb = new StringBuilder();
+            foreach (var child in instance.Elements())
+            {
+                switch (child.Name.LocalName)
+                {
+                    case "Component":
+                        AppendComponent(child, sb);
+                        break;
+                    case "Token":
+                        sb.Append(child.Attribute("Text")?.Value ?? "");
+                        break;
+                    case "AbsoluteOffset":
+                        sb.Append('.').Append(child.Value?.Trim());
+                        break;
+                    case "Address":
+                        sb.Append(ReadAccess(child).text);
+                        break;
+                }
+            }
+            return sb.ToString();
+        }
+
+        private static void AppendComponent(XElement component, StringBuilder sb)
+        {
+            var name = component.Attribute("Name")?.Value;
+            if (!string.IsNullOrEmpty(name)) sb.Append(name);
+
+            // SCL 形态：<Component Name="Delay"><Token Text="["/><Access .../><Token Text="]"/></Component>
+            bool bracketTokens = component.Elements("Token")
+                .Any(t => (t.Attribute("Text")?.Value ?? "").IndexOfAny(new[] { '[', ']', '(', ')' }) >= 0);
+            if (bracketTokens)
+            {
+                foreach (var child in component.Elements())
+                {
+                    if (child.Name.LocalName == "Token")
+                        sb.Append(child.Attribute("Text")?.Value ?? "");
+                    else if (child.Name.LocalName == "Access")
+                        sb.Append(ReadAccess(child).text);
+                }
+                return;
+            }
+
+            // LAD 形态：下标直接挂在 Component 下，没有括号 Token。
+            var indices = component.Elements("Access").Select(a => ReadAccess(a).text).ToList();
+            if (indices.Count > 0)
+                sb.Append('[').Append(string.Join(", ", indices)).Append(']');
+        }
+
         /// <summary>一个 CompileUnit 里的 SCL/STL 正文，按导出的 token 流还原（含缩进与换行）。</summary>
         public static string RenderStructuredText(XElement unit)
         {

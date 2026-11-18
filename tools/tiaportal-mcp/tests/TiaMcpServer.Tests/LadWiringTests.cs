@@ -118,5 +118,47 @@ internal static class LadWiringTests
 
         check(orTon.Contains("IN⇐(#TrigA + #TrigB)"), "O 盒的两条触发支路要汇总到 TON.IN");
         check(orTon.Contains("ET⇒#Elapsed"), "TON 的 ET 要写明输出到 #Elapsed");
+
+        // 5) <Call> 是独立元素，不是 Part Name="Call"。旧实现整行消失，目标只剩 [82].Pin。
+        string call = LadTextRenderer.Render(Block(LadUnit(
+            "<Access Scope=\"LocalVariable\" UId=\"a1\"><Symbol><Component Name=\"up\"><Access Scope=\"LiteralConstant\"><Constant><ConstantValue>7</ConstantValue></Constant></Access></Component></Symbol></Access>"
+          + "<Call UId=\"82\"><CallInfo Name=\"FB284\" BlockType=\"FB\">"
+          + "<Instance Scope=\"LocalVariable\" UId=\"83\"><Component Name=\"epos\" /></Instance>"
+          + "</CallInfo></Call>"
+          + "<Part Name=\"Contact\" UId=\"71\" /><Part Name=\"Coil\" UId=\"90\" />",
+            "<Wire><Powerrail /><NameCon UId=\"71\" Name=\"in\" /></Wire>"
+          + "<Wire><IdentCon UId=\"a1\" /><NameCon UId=\"71\" Name=\"operand\" /></Wire>"
+          + "<Wire><NameCon UId=\"71\" Name=\"out\" /><NameCon UId=\"82\" Name=\"EnableAxis\" /></Wire>"
+          + "<Wire><NameCon UId=\"82\" Name=\"Done\" /><NameCon UId=\"90\" Name=\"in\" /></Wire>"
+          + "<Wire><IdentCon UId=\"a1\" /><NameCon UId=\"90\" Name=\"operand\" /></Wire>")));
+
+        check(call.Contains("[82] Call #epos (FB284)"), "Call 元素要有独立输出行，带实例/块名");
+        check(call.Contains("EnableAxis⇐#up[7]"), "Call 输入脚要展开上游条件");
+        check(call.Contains("Done⇒[90] Coil #up[7].in"), "Call 输出脚要指向下游线圈");
+
+        // 6) 箱式 TON 的数组实例必须带下标，否则同名定时器无法区分。
+        string tonArray = LadTextRenderer.Render(Block(LadUnit(
+            "<Access Scope=\"TypedConstant\" UId=\"a1\"><Constant><ConstantValue>T#1S</ConstantValue></Constant></Access>"
+          + "<Part Name=\"TON\" UId=\"52\"><Instance Scope=\"LocalVariable\" UId=\"53\">"
+          + "<Component Name=\"Delay\"><Access Scope=\"LiteralConstant\" UId=\"54\">"
+          + "<Constant><ConstantValue>1</ConstantValue></Constant></Access></Component>"
+          + "</Instance><TemplateValue Name=\"time_type\" Type=\"Type\">Time</TemplateValue></Part>",
+            "<Wire><Powerrail /><NameCon UId=\"52\" Name=\"IN\" /></Wire>"
+          + "<Wire><IdentCon UId=\"a1\" /><NameCon UId=\"52\" Name=\"PT\" /></Wire>"
+          + "<Wire><NameCon UId=\"52\" Name=\"ET\" /><OpenCon UId=\"55\" /></Wire>")));
+
+        check(tonArray.Contains("TON[Delay[1]]"), "箱式 TON 的数组实例要保留 [1]");
+        check(tonArray.Contains("ET=未接"), "TON 的 ET 未接仍要显式写出");
+
+        // 7) 空网络与“有部件但渲染不了”必须分开说。
+        string empty = LadTextRenderer.Render(Block(
+            "<SW.Blocks.CompileUnit ID=\"9\"><AttributeList><NetworkSource />"
+          + "<ProgrammingLanguage>LAD</ProgrammingLanguage></AttributeList></SW.Blocks.CompileUnit>"));
+        check(empty.Contains("(空网络：0 个部件，0 条接线)"), "空 LAD 网络要明确写 0 部件 0 接线");
+
+        string unknown = LadTextRenderer.Render(Block(LadUnit(
+            "<Part Name=\"Mystery\" UId=\"60\" />", "")));
+        check(unknown.Contains("(未识别：1 个部件，类型=Mystery，0 条接线)"),
+            "有部件但无可渲染引脚时要说未识别及类型");
     }
 }

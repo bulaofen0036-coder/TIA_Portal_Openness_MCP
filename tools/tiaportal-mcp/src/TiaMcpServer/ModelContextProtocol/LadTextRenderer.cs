@@ -53,6 +53,10 @@ namespace TiaMcpServer.ModelContextProtocol
                 {
                     sb.Append(RenderLadNetwork(flg));
                 }
+                else if (flg == null && (lang.Equals("LAD", StringComparison.OrdinalIgnoreCase) || lang.Equals("FBD", StringComparison.OrdinalIgnoreCase)))
+                {
+                    sb.Append("   (空网络：0 个部件，0 条接线)\n");
+                }
                 else if (lang.Equals("SCL", StringComparison.OrdinalIgnoreCase) || lang.Equals("STL", StringComparison.OrdinalIgnoreCase))
                 {
                     var text = RenderStructuredText(unit);
@@ -62,7 +66,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 }
                 else
                 {
-                    sb.Append("   (无 FlgNet / 不支持的语言)\n");
+                    sb.Append($"   (不支持的语言：{lang})\n");
                 }
                 sb.Append('\n');
             }
@@ -77,6 +81,8 @@ namespace TiaMcpServer.ModelContextProtocol
             public string Name = "";
             public bool Negated;                 // contact/coil operand negated
             public string? Instance;             // timer/counter/FB instance name
+            public string? BlockName;            // call target block name
+            public string? BlockType;            // FB / FC / ...
             public Dictionary<string, string> Operands = new(StringComparer.OrdinalIgnoreCase); // pin name -> operand text
         }
 
@@ -94,6 +100,12 @@ namespace TiaMcpServer.ModelContextProtocol
             public Dictionary<string, List<string>> Sources = new(StringComparer.OrdinalIgnoreCase);
             public HashSet<string> OpenPins = new(StringComparer.OrdinalIgnoreCase);
             public HashSet<string> RailPins = new(StringComparer.OrdinalIgnoreCase);
+            // NameCon <-> NameCon edges and roles inferred from the other end (Call pins have no
+            // static input/output metadata in SimaticML). Without this a Call output never reaches
+            // a coil and all its pins render as "↔".
+            public List<(string from, string to)> Edges = new();
+            public Dictionary<string, PinRole> InferredRoles = new(StringComparer.OrdinalIgnoreCase);
+            public int WireCount;
         }
 
         private enum PinRole { Input, Output, Operand, Unknown }
@@ -109,7 +121,8 @@ namespace TiaMcpServer.ModelContextProtocol
         private static string RenderLadNetwork(XElement flg)
         {
             var net = BuildModel(flg);
-            if (net.Order.Count == 0) return "   (空网络)\n";
+            if (net.Order.Count == 0)
+                return $"   (空网络：0 个部件，{net.WireCount} 条接线)\n";
 
             var sb = new StringBuilder();
 
@@ -132,8 +145,15 @@ namespace TiaMcpServer.ModelContextProtocol
             }
 
             // Full ladder netlist: every part and every pin, including boxes that never reach a coil.
+            string wiring = RenderWiring(net);
+            if (wiring.Length == 0)
+            {
+                var types = string.Join("/", net.Order.Select(p => p.Name).Distinct(StringComparer.OrdinalIgnoreCase));
+                sb.Append($"   (未识别：{net.Order.Count} 个部件，类型={types}，{net.WireCount} 条接线)\n");
+                return sb.ToString();
+            }
             sb.Append("   接线（逐引脚）:\n");
-            sb.Append(RenderWiring(net));
+            sb.Append(wiring);
             return sb.ToString();
         }
 
@@ -148,23 +168,51 @@ namespace TiaMcpServer.ModelContextProtocol
                 net.AccessText[uid] = ReadAccess(acc);
             }
 
-            foreach (var p in flg.Descendants("Part"))
+            var partsContainer = flg.Element("Parts");
+            if (partsContainer != null)
             {
-                var uid = p.Attribute("UId")?.Value;
-                if (uid == null) continue;
-                var part = new Part
+                foreach (var p in partsContainer.Elements())
                 {
-                    UId = uid,
-                    Name = p.Attribute("Name")?.Value ?? "?",
-                    Negated = p.Elements("Negated").Any(),
-                    Instance = p.Descendants("Instance").Descendants("Component").FirstOrDefault()?.Attribute("Name")?.Value
-                };
-                net.Parts[uid] = part;
-                net.Order.Add(part);
+                    var uid = p.Attribute("UId")?.Value;
+                    if (uid == null) continue;
+
+                    if (p.Name.LocalName == "Call")
+                    {
+                        // A block call is <Call UId=...><CallInfo Name="FB284" BlockType="FB">
+                        // <Instance .../></CallInfo></Call>. Old code only walked <Part>, so the
+                        // call never got its own line and its pin targets rendered as "[82].Pin".
+                        var ci = p.Element("CallInfo");
+                        var call = new Part
+                        {
+                            UId = uid,
+                            Name = "Call",
+                            BlockName = ci?.Attribute("Name")?.Value,
+                            BlockType = ci?.Attribute("BlockType")?.Value,
+                            Instance = ci?.Element("Instance") is XElement callInst
+                                ? SimaticMlText.ReadInstance(callInst)
+                                : null
+                        };
+                        net.Parts[uid] = call;
+                        net.Order.Add(call);
+                        continue;
+                    }
+
+                    if (p.Name.LocalName != "Part") continue;
+                    var part = new Part
+                    {
+                        UId = uid,
+                        Name = p.Attribute("Name")?.Value ?? "?",
+                        Negated = p.Elements("Negated").Any(),
+                        Instance = p.Element("Instance") is XElement inst ? SimaticMlText.ReadInstance(inst) : null
+                    };
+                    net.Parts[uid] = part;
+                    net.Order.Add(part);
+                }
             }
 
             foreach (var wire in flg.Descendants("Wires").Elements("Wire"))
             {
+                net.WireCount++;
                 var ends = wire.Elements().ToList();
                 bool hasRail = ends.Any(e => e.Name.LocalName == "Powerrail");
                 bool hasOpen = ends.Any(e => e.Name.LocalName == "OpenCon");
@@ -214,13 +262,73 @@ namespace TiaMcpServer.ModelContextProtocol
                         var b = pins[j];
                         AddLink(net, Key(a.uid, a.pin), Key(b.uid, b.pin));
                         AddLink(net, Key(b.uid, b.pin), Key(a.uid, a.pin));
-                        AddFlow(net, a, b);
-                        AddFlow(net, b, a);
+                        net.Edges.Add((Key(a.uid, a.pin), Key(b.uid, b.pin)));
                     }
                 }
             }
 
+            InferPinRoles(net);
+            RebuildFlow(net);
             return net;
+        }
+
+        /// <summary>
+        /// Call pins have no static input/output direction in SimaticML. Infer it from the other
+        /// end of each wire: contact/coil/box pins already have a known role, so a Call pin wired
+        /// from an output is an input, and a Call pin wired to an input is an output.
+        /// </summary>
+        private static void InferPinRoles(NetModel net)
+        {
+            for (int pass = 0; pass < 4; pass++)
+            {
+                bool changed = false;
+                foreach (var edge in net.Edges)
+                {
+                    var fromRole = RoleOf(net, edge.from);
+                    var toRole = RoleOf(net, edge.to);
+
+                    if (fromRole == PinRole.Unknown && toRole == PinRole.Output)
+                        changed |= SetRole(net, edge.from, PinRole.Input);
+                    else if (fromRole == PinRole.Unknown && toRole == PinRole.Input)
+                        changed |= SetRole(net, edge.from, PinRole.Output);
+
+                    if (toRole == PinRole.Unknown && fromRole == PinRole.Output)
+                        changed |= SetRole(net, edge.to, PinRole.Input);
+                    else if (toRole == PinRole.Unknown && fromRole == PinRole.Input)
+                        changed |= SetRole(net, edge.to, PinRole.Output);
+                }
+                if (!changed) break;
+            }
+        }
+
+        private static bool SetRole(NetModel net, string key, PinRole role)
+        {
+            if (net.InferredRoles.ContainsKey(key)) return false;
+            net.InferredRoles[key] = role;
+            return true;
+        }
+
+        /// <summary>
+        /// Rebuild Sources after role inference. RAIL entries are kept; every NameCon edge is then
+        /// walked again so a Call output that only became "Output" after inference reaches its
+        /// downstream coil.
+        /// </summary>
+        private static void RebuildFlow(NetModel net)
+        {
+            var rebuilt = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var rail in net.RailPins)
+                rebuilt[rail] = new List<string> { "RAIL" };
+
+            foreach (var edge in net.Edges)
+            {
+                if (RoleOf(net, edge.from) != PinRole.Output || RoleOf(net, edge.to) != PinRole.Input)
+                    continue;
+                if (!rebuilt.TryGetValue(edge.to, out var list))
+                    rebuilt[edge.to] = list = new List<string>();
+                if (!list.Contains(edge.from)) list.Add(edge.from);
+            }
+
+            net.Sources = rebuilt;
         }
 
         private static void AddRail(NetModel net, (string uid, string pin) nc)
@@ -235,18 +343,6 @@ namespace TiaMcpServer.ModelContextProtocol
         {
             if (!net.Links.TryGetValue(from, out var list)) net.Links[from] = list = new List<string>();
             if (!list.Contains(to)) list.Add(to);
-        }
-
-        private static void AddFlow(NetModel net, (string uid, string pin) from, (string uid, string pin) to)
-        {
-            if (!net.Parts.TryGetValue(from.uid, out var fp)) return;
-            if (!net.Parts.TryGetValue(to.uid, out var tp)) return;
-            if (RoleOf(fp, from.pin) != PinRole.Output || RoleOf(tp, to.pin) != PinRole.Input) return;
-
-            var key = Key(to.uid, to.pin);
-            if (!net.Sources.TryGetValue(key, out var list)) net.Sources[key] = list = new List<string>();
-            var src = Key(from.uid, from.pin);
-            if (!list.Contains(src)) list.Add(src);
         }
 
         private static string AnnotateContactConstant(Part pt, string text)
@@ -273,7 +369,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 foreach (var pin in pins)
                 {
                     string key = Key(p.UId, pin);
-                    var role = RoleOf(p, pin);
+                    var role = RoleOf(net, p, pin);
                     p.Operands.TryGetValue(pin, out var opText);
                     bool hasOperand = opText != null;
                     string? seg = null;
@@ -345,8 +441,18 @@ namespace TiaMcpServer.ModelContextProtocol
             foreach (var k in net.OpenPins) AddKey(k);
             foreach (var k in net.RailPins) AddKey(k);
 
-            return set.OrderBy(PinOrder).ThenBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
+            return set.OrderBy(pin => RoleOrder(RoleOf(net, p, pin)))
+                      .ThenBy(PinOrder)
+                      .ThenBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
         }
+
+        private static int RoleOrder(PinRole role) => role switch
+        {
+            PinRole.Input => 0,
+            PinRole.Operand => 1,
+            PinRole.Output => 2,
+            _ => 3
+        };
 
         private static string EndpointLabel(NetModel net, string key)
         {
@@ -358,6 +464,14 @@ namespace TiaMcpServer.ModelContextProtocol
 
         private static string PartLabel(Part p)
         {
+            if (p.Name == "Call")
+            {
+                var call = "Call";
+                if (!string.IsNullOrEmpty(p.Instance)) call += " #" + p.Instance;
+                if (!string.IsNullOrEmpty(p.BlockName)) call += $" ({p.BlockName})";
+                return call;
+            }
+
             var name = p.Name;
             if (!string.IsNullOrEmpty(p.Instance)) name += $"[{p.Instance}]";
             if ((IsContact(p.Name) || IsCoil(p.Name)) && p.Operands.TryGetValue("operand", out var op))
@@ -390,6 +504,15 @@ namespace TiaMcpServer.ModelContextProtocol
             int i = 0;
             while (i < name.Length && !char.IsDigit(name[i])) i++;
             return i < name.Length && int.TryParse(name.Substring(i), out var n) ? n : 0;
+        }
+
+        private static PinRole RoleOf(NetModel net, Part p, string pin) => RoleOf(net, Key(p.UId, pin));
+
+        private static PinRole RoleOf(NetModel net, string key)
+        {
+            if (net.InferredRoles.TryGetValue(key, out var inferred)) return inferred;
+            var (uid, pin) = SplitKey(key);
+            return net.Parts.TryGetValue(uid, out var p) ? RoleOf(p, pin) : PinRole.Unknown;
         }
 
         private static PinRole RoleOf(Part p, string pin)
@@ -473,6 +596,11 @@ namespace TiaMcpServer.ModelContextProtocol
             {
                 return TracePin(net, Key(uid, "in"), guard);
             }
+            if (p.Name == "Call")
+            {
+                string callEn = TracePin(net, Key(uid, EnablePin(net, p) ?? "en"), guard);
+                return Series(callEn, DescribeBoxInline(p) + "." + pin);
+            }
             // timers / edges / arithmetic / other boxes producing power at Q/OUT/ENO
             string en = TracePin(net, Key(uid, EnablePin(net, p) ?? "en"), guard);
             return Series(en, DescribeBoxInline(p));
@@ -529,6 +657,8 @@ namespace TiaMcpServer.ModelContextProtocol
 
         private static string DescribeBoxInline(Part p)
         {
+            if (p.Name == "Call") return PartLabel(p) + FormatOperands(p);
+
             var name = p.Name;
             if (p.Instance != null) name += $"[{p.Instance}]";
             var ops = IsTimer(p.Name)

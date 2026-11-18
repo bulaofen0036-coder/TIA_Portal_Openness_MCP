@@ -60,7 +60,14 @@ namespace TiaMcpServer.ModelContextProtocol
                 }
                 else
                 {
-                    throw new McpException($"Block not found at '{blockPath}' in '{softwarePath}'", McpErrorCode.InternalError);
+                    var suggestion = FindBlockPathIgnoringWhitespace(softwarePath, blockPath);
+                    var message = $"Block not found at '{blockPath}' in '{softwarePath}'";
+                    if (!string.IsNullOrEmpty(suggestion) && !string.Equals(suggestion, blockPath, StringComparison.Ordinal))
+                        message += $". Did you mean '{suggestion}'? (the path differs only by spaces / U+00A0)";
+                    else if (blockPath.Contains(' ') || blockPath.Contains('\u00A0'))
+                        message += ". HINT: group names may contain U+00A0 (NBSP); copy the exact path from GetSoftwareTree instead of typing a normal space.";
+                    message += McpHints.Recovery(new Exception("Block not found"));
+                    throw new McpException(message, McpErrorCode.InternalError);
                 }
             }
             catch (Exception ex) when (ex is not McpException)
@@ -1010,6 +1017,61 @@ namespace TiaMcpServer.ModelContextProtocol
                 throw new McpException($"Unexpected error exporting blocks to temp: {ex.Message}{McpHints.Recovery(ex)}", ex, McpErrorCode.InternalError);
             }
         }
+
+        /// <summary>
+        /// Find a block whose path matches after normalizing ordinary spaces and NBSP (U+00A0)
+        /// to one space. Used only on the not-found path; returns null when the hierarchy is
+        /// unavailable or there is no candidate.
+        /// </summary>
+        private static string? FindBlockPathIgnoringWhitespace(string softwarePath, string requested)
+        {
+            try
+            {
+                var root = Portal.GetBlockRootGroup(softwarePath);
+                if (root == null) return null;
+                var tree = Helper.BuildBlockHierarchy(root);
+                var target = NormalizePathForMatch(requested);
+                string? found = null;
+
+                void Walk(BlockGroupInfo group, string prefix)
+                {
+                    foreach (var block in group.Blocks ?? Enumerable.Empty<ResponseBlockInfo>())
+                    {
+                        if (string.IsNullOrEmpty(block.Name)) continue;
+                        var path = string.IsNullOrEmpty(prefix) ? block.Name! : prefix + "/" + block.Name;
+                        if (string.Equals(NormalizePathForMatch(path), target, StringComparison.OrdinalIgnoreCase))
+                        {
+                            found = path;
+                            return;
+                        }
+                        if (string.Equals(NormalizePathForMatch("Program blocks/" + path), target, StringComparison.OrdinalIgnoreCase))
+                        {
+                            found = "Program blocks/" + path;
+                            return;
+                        }
+                    }
+
+                    foreach (var sub in group.Groups ?? Enumerable.Empty<BlockGroupInfo>())
+                    {
+                        var subPrefix = string.IsNullOrEmpty(prefix)
+                            ? sub.Name ?? ""
+                            : prefix + "/" + sub.Name;
+                        Walk(sub, subPrefix);
+                        if (found != null) return;
+                    }
+                }
+
+                Walk(tree, "");
+                return found;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string NormalizePathForMatch(string value)
+            => Regex.Replace(value.Replace('\u00A0', ' '), @"\s+", " ").Trim();
 
         #endregion
     }
