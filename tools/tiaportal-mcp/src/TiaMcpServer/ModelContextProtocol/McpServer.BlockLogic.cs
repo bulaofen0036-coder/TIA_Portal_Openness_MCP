@@ -18,7 +18,7 @@ namespace TiaMcpServer.ModelContextProtocol
 
     public static partial class McpServer
     {
-        [McpServerTool(Name = "DescribeBlockLogic"), Description("[L1][PLC-Software] Read a block's LOGIC as READABLE TEXT — the fast, accurate way to analyze LADDER (LAD) without hand-parsing FlgNet XML. For each LAD network it reconstructs the power flow as a boolean-ish expression (series = ' · ', parallel = ' + '), shows coils ( )/(S)/(R), MOVE/compare/timer boxes with their operands, and — critically — FLAGS any contact whose operand is a LITERAL CONSTANT with '⟨常量⟩' (a normally-open contact wired to FALSE silently disables its whole rung; this is nearly impossible to spot by eye). SCL/STL networks are rendered inline as code. Use this to understand or review LAD logic before editing. Requires: Connect + OpenProject + the block consistent (compile first if IsConsistent=false; export does not work in online mode — GoOffline first). blockPath must be fully qualified 'Group/Subgroup/Name' from GetSoftwareTree.")]
+        [McpServerTool(Name = "DescribeBlockLogic"), Description("[L1][PLC-Software] Read a block's LOGIC as READABLE TEXT — the fast, accurate way to analyze LADDER (LAD) without hand-parsing FlgNet XML. For each LAD network it reconstructs the power flow as a boolean-ish expression (series = ' · ', parallel = ' + '), shows coils ( )/(S)/(R), MOVE/compare/timer boxes with their operands, and — critically — FLAGS any contact whose operand is a LITERAL CONSTANT with '⟨常量⟩' (a normally-open contact wired to FALSE silently disables its whole rung; this is nearly impossible to spot by eye). It ALSO prints a complete pin-level wiring table for every part: each input pin (EN/IN/IN1/IN2/PT/…) with the branch that energizes it, each output pin (Q/ET/ENO/OUT) with its destinations, and open pins. This is what makes TON triggers and arithmetic branches traceable, including boxes that never drive a coil. SCL/STL networks are rendered inline as code. Use this to understand or review LAD logic before editing. Requires: Connect + OpenProject + the block consistent (compile first if IsConsistent=false; export does not work in online mode — GoOffline first). blockPath must be fully qualified 'Group/Subgroup/Name' from GetSoftwareTree.")]
         public static ResponseBlockLogic DescribeBlockLogic(
             [Description("softwarePath: PLC software path, e.g. '5T车' or 'PLC_1' (from GetProjectTree)")] string softwarePath,
             [Description("blockPath: fully qualified 'Group/Subgroup/Name' from GetSoftwareTree")] string blockPath)
@@ -50,7 +50,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     BlockPath = blockPath,
                     Language = lang,
                     Readable = readable,
-                    Message = $"Logic of '{block.Name}' [{lang}] decoded. Series contacts joined with ' · ', parallel branches with ' + '; '⟨常量⟩' marks a contact wired to a literal constant (disabled/forced rung).",
+                    Message = $"Logic of '{block.Name}' [{lang}] decoded. Series contacts joined with ' · ', parallel branches with ' + '; '⟨常量⟩' marks a contact wired to a literal constant (disabled/forced rung). Each LAD network also has a pin-level wiring table (IN/EN/IN1/IN2/PT → source, Q/ET/ENO/OUT → destination, 未接 = open).",
                     Meta = new JsonObject { ["timestamp"] = DateTime.Now, ["success"] = true, ["language"] = lang }
                 };
             }

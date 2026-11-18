@@ -1,6 +1,6 @@
 # TIA Portal MCP 工具总览（全部 235 个）
 
-> 由 `scripts/generate-tools-reference.py` 从源码 `[McpServerTool]` 属性生成，与运行时 `tools/list` 一致。生成日期：2026-10-31。
+> 由 `scripts/generate-tools-reference.py` 从源码 `[McpServerTool]` 属性生成，与运行时 `tools/list` 一致。生成日期：2026-11-18。
 > 分层：**L0** 只读引导/诊断 · **L1** 高频主力 · **L2** 专用/离线构建器。
 >
 > **V19 注意**：`ExportAsDocuments`、`ExportBlocksAsDocuments`、`ImportFromDocuments`、`ImportBlocksFromDocuments` 在 V19 上返回 `NotSupportedOnVersion`（V19 没有 SIMATIC SD 文档 API）；5 个 VCI 工具不编译；默认 lite 档，全量工具用 `--profile full` 或 `TIA_MCP_PROFILE=full`。
@@ -1932,7 +1932,7 @@
 
 ### `DescribeBlockLogic` <sub>L1</sub>
 
-[L1][PLC-Software] Read a block's LOGIC as READABLE TEXT — the fast, accurate way to analyze LADDER (LAD) without hand-parsing FlgNet XML. For each LAD network it reconstructs the power flow as a boolean-ish expression (series = ' · ', parallel = ' + '), shows coils ( )/(S)/(R), MOVE/compare/timer boxes with their operands, and — critically — FLAGS any contact whose operand is a LITERAL CONSTANT with '⟨常量⟩' (a normally-open contact wired to FALSE silently disables its whole rung; this is nearly impossible to spot by eye). SCL/STL networks are rendered inline as code. Use this to understand or review LAD logic before editing. Requires: Connect + OpenProject + the block consistent (compile first if IsConsistent=false; export does not work in online mode — GoOffline first). blockPath must be fully qualified 'Group/Subgroup/Name' from GetSoftwareTree.
+[L1][PLC-Software] Read a block's LOGIC as READABLE TEXT — the fast, accurate way to analyze LADDER (LAD) without hand-parsing FlgNet XML. For each LAD network it reconstructs the power flow as a boolean-ish expression (series = ' · ', parallel = ' + '), shows coils ( )/(S)/(R), MOVE/compare/timer boxes with their operands, and — critically — FLAGS any contact whose operand is a LITERAL CONSTANT with '⟨常量⟩' (a normally-open contact wired to FALSE silently disables its whole rung; this is nearly impossible to spot by eye). It ALSO prints a complete pin-level wiring table for every part: each input pin (EN/IN/IN1/IN2/PT/…) with the branch that energizes it, each output pin (Q/ET/ENO/OUT) with its destinations, and open pins. This is what makes TON triggers and arithmetic branches traceable, including boxes that never drive a coil. SCL/STL networks are rendered inline as code. Use this to understand or review LAD logic before editing. Requires: Connect + OpenProject + the block consistent (compile first if IsConsistent=false; export does not work in online mode — GoOffline first). blockPath must be fully qualified 'Group/Subgroup/Name' from GetSoftwareTree.
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|

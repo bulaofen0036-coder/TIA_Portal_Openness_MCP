@@ -69,6 +69,9 @@ namespace TiaMcpServer.Tests
             Console.WriteLine("== DescribeBlockLogic 的 SCL 回读逐行还原：下标 / 调用 / 常量 / 引号（issue #42）==");
             SymbolQuotingReadbackTests.Run(Check);
 
+            Console.WriteLine("== DescribeBlockLogic 的 LAD 完整接线：TON 触发 / 运算分支 / 并联 ==");
+            LadWiringTests.Run(Check);
+
             Console.WriteLine("== 工具安全表：annotations / Openness 串行闸 / CallTool 拒绝名单 ==");
             ToolSafetyTests.Run(Check, Skip);
 
